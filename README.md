@@ -15,13 +15,13 @@ npm run wp:start
 npm run wp:setup
 ```
 
-Open `http://localhost:8888`. The local WordPress defaults supplied by `wp-env` are username `admin` and password `password`; replace test credentials in `.env` after fixture users are added.
+Open `http://localhost:8888`. The bootstrap creates a local `guest` / `password` subscriber for the member journey; override `WP_TEST_USER` and `WP_TEST_PASSWORD` in `.env` when needed.
 
-The start wrapper stages the theme in the operating system's temporary directory before launching Docker. This avoids macOS Docker file-sharing restrictions on projects stored in `Documents`; restart the environment after theme changes so the mirror is refreshed.
+The start wrapper stages the theme and must-use plugin in Docker Desktop's shared temporary directory, starts the stock WordPress volume, then copies the theme and cached community plugins into that volume. This avoids macOS Docker file-sharing and image-initialiser issues for projects stored in `Documents`; restart the environment after theme or mu-plugin changes so the mirror is refreshed. Plugin archives remain in wp-env's cache rather than Git.
 
 ## Test layers
 
-- `npm test`: Chromium desktop and mobile-Safari-emulated functional checks, with trace/video/screenshots retained on failure.
+- `npm test`: Chromium desktop and mobile-Safari-emulated privacy checks, plus authenticated member, forum, album, RSVP, food, and memories journeys, with trace/video/screenshots retained on failure.
 - `npm run test:visual`: screenshot regression checks. Establish intentional baselines with `npm run test:update-snapshots`.
 - `npm run test:a11y`: axe automated accessibility checks.
 - `npm run test:performance`: current Lighthouse engine, run three times with median budgets for LCP, layout shift, blocking time, accessibility, and best practices. Raw reports are retained locally.
@@ -29,7 +29,7 @@ The start wrapper stages the theme in the operating system's temporary directory
 
 Synthetic tests catch regressions before deployment. Once production exists, the same read-only suite can target it through `BASE_URL`. Real-user Web Vitals collection and geographic synthetic runs will be added only after the privacy implications and retention policy are agreed; neither should collect visitor identity or private page contents.
 
-The initial local performance run deliberately remains over budget: the unthemed WordPress login route has a roughly 6.1-second median simulated LCP. This is a recorded product issue, not a relaxed threshold; the themed login and plugin asset loading must bring it below 2.5 seconds.
+The local benchmark covers the anonymous redirect/login experience and runs three times with median budgets. The current themed login median is comfortably below the 2.5-second LCP budget after removing album and admin assets that do not belong on a friend sign-in page.
 
 `@wordpress/env` is development-only. Its current upstream dependency tree has moderate advisories in archive extraction and an optional preview server; it must never be installed or exposed on production. We track upstream releases and audit upgrades, but do not downgrade to the older release npm suggests because that version has more severe known issues.
 

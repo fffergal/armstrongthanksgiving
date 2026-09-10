@@ -3,11 +3,32 @@
   "version": 3,
   "settings": {
     "appearanceTools": true,
-    "layout": { "contentSize": "44rem", "wideSize": "72rem" },
-    "spacing": { "units": ["px", "rem", "vw", "%"] }
+    "color": {
+      "palette": [
+        { "slug": "cream", "color": "#f6ede1", "name": "Cream" },
+        { "slug": "orange", "color": "#f36f32", "name": "Pumpkin orange" },
+        { "slug": "coral", "color": "#e86149", "name": "Coral" },
+        { "slug": "mustard", "color": "#f4b62f", "name": "Mustard" },
+        { "slug": "olive", "color": "#9d9a62", "name": "Olive" },
+        { "slug": "brown", "color": "#4c2518", "name": "Roasted brown" },
+        { "slug": "ink", "color": "#2f201a", "name": "Ink" }
+      ]
+    },
+    "layout": { "contentSize": "48rem", "wideSize": "76rem" },
+    "spacing": { "units": ["px", "rem", "vw", "%"] },
+    "typography": {
+      "fontFamilies": [
+        { "fontFamily": "ui-rounded, 'Trebuchet MS', system-ui, sans-serif", "slug": "rounded", "name": "Rounded" },
+        { "fontFamily": "Georgia, 'Times New Roman', serif", "slug": "serif", "name": "Warm serif" }
+      ]
+    }
   },
   "styles": {
-    "typography": { "fontFamily": "system-ui, sans-serif", "lineHeight": "1.5" }
+    "color": { "background": "var:preset|color|cream", "text": "var:preset|color|ink" },
+    "typography": { "fontFamily": "var:preset|font-family|rounded", "lineHeight": "1.5" },
+    "elements": {
+      "heading": { "fontFamily": "var:preset|font-family|rounded", "fontWeight": "700" },
+      "button": { "border": { "radius": "999px" } }
+    }
   }
 }
-

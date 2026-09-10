@@ -8,7 +8,6 @@ playwright-report/
 lighthouse-results/
 artifacts/
 tmp/
-.wp-env.json
 wp-content/uploads/
 wp-content/cache/
 vendor/

@@ -1,0 +1,25 @@
+{
+  "core": null,
+  "phpVersion": "8.3",
+  "port": 8888,
+  "testsEnvironment": false,
+  "themes": [
+    "./wp-content/themes/armstrong-thanksgiving"
+  ],
+  "mappings": {
+    "wp-content/mu-plugins": "./wp-content/mu-plugins"
+  },
+  "plugins": [
+    "https://downloads.wordpress.org/plugin/bbpress.latest-stable.zip",
+    "https://downloads.wordpress.org/plugin/wp-photo-album-plus.latest-stable.zip",
+    "https://downloads.wordpress.org/plugin/magic-login.latest-stable.zip",
+    "https://downloads.wordpress.org/plugin/jonradio-private-site.latest-stable.zip"
+  ],
+  "config": {
+    "WP_DEBUG": true,
+    "WP_DEBUG_LOG": true,
+    "WP_DEBUG_DISPLAY": false,
+    "SCRIPT_DEBUG": true,
+    "WP_ENVIRONMENT_TYPE": "local"
+  }
+}
