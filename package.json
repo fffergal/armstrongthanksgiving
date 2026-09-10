@@ -1,0 +1,32 @@
+{
+  "name": "armstrong-thanksgiving",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Theme, configuration and acceptance-test harness for the Armstrong Thanksgiving site",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "wp:start": "node scripts/wp-env.mjs start",
+    "wp:stop": "node scripts/wp-env.mjs stop",
+    "wp:clean": "node scripts/wp-env.mjs clean all",
+    "wp:logs": "node scripts/wp-env.mjs logs",
+    "wp:setup": "node scripts/setup-local.mjs",
+    "test": "npm run test:e2e",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:visual": "playwright test --project=visual",
+    "test:a11y": "playwright test --project=accessibility",
+    "test:performance": "node scripts/performance.mjs",
+    "test:all": "npm run test:e2e && npm run test:performance",
+    "test:update-snapshots": "playwright test --project=visual --update-snapshots"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
+    "@playwright/test": "^1.55.0",
+    "@wordpress/env": "^11.15.0",
+    "chrome-launcher": "^1.2.0",
+    "dotenv": "^17.2.2",
+    "lighthouse": "^13.4.1"
+  }
+}

@@ -1,0 +1,14 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+node_modules/
+test-results/
+playwright-report/
+lighthouse-results/
+artifacts/
+tmp/
+.wp-env.json
+wp-content/uploads/
+wp-content/cache/
+vendor/
