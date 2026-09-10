@@ -1,7 +1,7 @@
 /*
 Theme Name: Armstrong Thanksgiving
 Description: Private gathering theme; visual direction to be based on the event flyers.
-Version: 0.1.0
+Version: 0.1.4
 Requires at least: 6.8
 Requires PHP: 8.1
 Text Domain: armstrong-thanksgiving
@@ -102,6 +102,7 @@ a:hover { color: var(--at-orange); }
 
 /* bbPress: let the classic forum structure borrow the flyer palette. */
 #bbpress-forums, .bbp-user-page { color: var(--at-ink); }
+#bbpress-forums .bbp-breadcrumb { display: none; }
 #bbpress-forums a { color: var(--at-brown); }
 #bbpress-forums .bbp-forum-title, #bbpress-forums .bbp-topic-permalink { color: var(--at-orange); font-weight: 800; }
 #bbpress-forums li.bbp-header, #bbpress-forums li.bbp-footer { background: var(--at-olive); color: #fff; border: 0; }
@@ -116,6 +117,11 @@ a:hover { color: var(--at-orange); }
 .wppa-thumb, .wppa-cover-box { border-radius: 1rem; overflow: hidden; box-shadow: 0 7px 20px rgba(76,37,24,.12); }
 .wppa-title, .wppa-album-title { color: var(--at-orange); font-weight: 800; }
 .wppa-button, .wppa-upload-button { border: 0; border-radius: 999px; background: var(--at-coral); color: #fff; font-weight: 800; }
+.wppa-container .wppa-nav.wppa-bc { background: transparent !important; border: 0 !important; padding: 0 0 .75rem !important; }
+.wppa-container .wppa-cover-box { background: #fff8ef !important; border: 1px solid rgba(76,37,24,.14) !important; }
+.wppa-container .wppa-box { background: rgba(255,255,255,.48) !important; border-color: rgba(76,37,24,.14) !important; }
+.wppa-container .wppa-title { color: var(--at-orange) !important; }
+.wppa-container .wppa-cover-box * { max-width: 100%; overflow-wrap: anywhere; }
 
 @media (max-width: 700px) {
   .at-header-inner, .at-footer-inner { align-items: flex-start; flex-direction: column; }
