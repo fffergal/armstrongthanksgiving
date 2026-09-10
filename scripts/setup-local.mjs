@@ -44,10 +44,10 @@ if (wp(['user', 'get', 'guest', '--field=ID'], { allowFailure: true }).status !=
 }
 
 const homeId = ensurePage('home', 'Home', '');
-ensurePage('rsvp', 'RSVP', '<div class="at-form-note"><strong>RSVP by Nov 14</strong><br>Let Anna know if you are coming, and bring your best appetite.</div><h2>Count me in</h2><p>Use the <a href="/forums/">gathering forum</a> to say hello, or email Anna with your headcount and any dietary notes.</p><p><a class="at-button" href="/forums/">Open the RSVP conversation</a></p>');
+ensurePage('rsvp', 'RSVP', '<div class="at-form-note"><strong>Nov 21 · 16:00</strong><br>52 Priestfield Crescent, EH16 5JG<br><strong>RSVP by Nov 14</strong></div><h2>Count me in</h2><p>Use the <a href="/forum/">gathering forum</a> to say hello, share your headcount, and add any dietary notes.</p><p><a class="at-button" href="/forum/">Open the RSVP conversation</a></p>');
 ensurePage('food', 'Food & Friends', '<h2>What shall we bring?</h2><p>This is a collaborative menu board, not a test. Add a reply in the forum when you know what you would like to bring.</p><ul><li>Something savoury for the middle of the table</li><li>A vegetable that deserves a little attention</li><li>Something sweet, crisp, fizzy, or unexpectedly excellent</li><li>Maybe it will be a fun midwest salad?</li></ul><p class="at-form-note"><strong>Tip:</strong> If you are unsure, claim a category and we will coordinate the details together.</p>');
 ensurePage('albums', 'Shared Albums', '<p>Photos from this Thanksgiving, previous Thanksgivings, and anything that helps prove we were all there.</p>[wppa type="generic"]');
-ensurePage('memories', 'Memories', '<h2>Reminisce on Thanksgivings past</h2><p>Use this page for the stories that do not fit in a group chat: favourite dishes, accidental traditions, legendary leftovers, and the year someone brought the wrong pie.</p><p><a class="at-button" href="/forums/">Share a memory in the forum</a></p>');
+ensurePage('memories', 'Memories', '<h2>Reminisce on Thanksgivings past</h2><p>Use this page for the stories that do not fit in a group chat: favourite dishes, accidental traditions, legendary leftovers, and the year someone brought the wrong pie.</p><p><a class="at-button" href="/forum/">Share a memory in the forum</a></p>');
 ensurePage('forum', 'The Gathering', '<p>Plans, questions, logistics, and the gentle business of deciding who is bringing what.</p>[bbp-forum-index]');
 if (homeId) {
   wp(['option', 'update', 'show_on_front', 'page']);
