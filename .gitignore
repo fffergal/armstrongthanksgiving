@@ -8,6 +8,7 @@ playwright-report/
 lighthouse-results/
 artifacts/
 tmp/
+armstrong-thanksgiving-theme.zip
 wp-content/uploads/
 wp-content/cache/
 vendor/
