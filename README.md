@@ -38,3 +38,6 @@ The local benchmark covers the anonymous redirect/login experience and runs thre
 The suite will grow with the site and cover account claiming, password/passwordless login, access control, forum posting and subscriptions, album creation/upload, responsive rendering, keyboard navigation, email delivery, direct media access, caching headers, and plugin-update compatibility.
 
 See [plugin evaluation](docs/plugin-evaluation.md) for the theming and acceptance gates.
+
+See [email and friend onboarding](docs/email-onboarding.md) for the production mail settings,
+invite flow, deliverability follow-up, and the evidence needed to confirm a real invitation.
