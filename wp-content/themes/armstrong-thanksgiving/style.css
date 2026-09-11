@@ -1,7 +1,7 @@
 /*
 Theme Name: Armstrong Thanksgiving
 Description: Private gathering theme; visual direction to be based on the event flyers.
-Version: 0.1.11
+Version: 0.2.2
 Requires at least: 6.8
 Requires PHP: 8.1
 Text Domain: armstrong-thanksgiving
@@ -27,6 +27,8 @@ body {
   overflow-wrap: break-word;
   word-break: normal;
 }
+h1, h2, h3, h4, h5, h6 { font-family: Georgia, 'Times New Roman', serif; font-kerning: normal; font-weight: 700; letter-spacing: -.025em; }
+input, select, textarea, button { font-family: inherit; }
 a { color: var(--at-brown); text-decoration-thickness: .12em; text-underline-offset: .16em; }
 a:hover { color: var(--at-orange); }
 
@@ -48,7 +50,9 @@ a:hover { color: var(--at-orange); }
 .at-hero { position: relative; padding: clamp(3.5rem, 9vw, 8rem) 0 5rem; }
 .at-hero-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(16rem, .95fr); align-items: center; gap: clamp(2rem, 6vw, 6rem); }
 .at-kicker { margin: 0 0 1rem; color: var(--at-orange); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: .78rem; }
-.at-hero h1 { margin: 0; color: var(--at-orange); font-size: clamp(3.5rem, 11vw, 9.5rem); line-height: .86; letter-spacing: -.085em; }
+.home .at-wordmark { display: none; }
+.home .at-header-inner { justify-content: flex-end; }
+.at-hero h1 { margin: 0; color: var(--at-orange); font-size: clamp(3.5rem, 11vw, 9.5rem); line-height: .86; letter-spacing: -.045em; }
 .at-hero h1 > span, .at-hero h1 > em { display: inline-block; white-space: nowrap; }
 .at-hero h1 em { color: var(--at-coral); font-family: Georgia, serif; font-size: .32em; line-height: 1.5; letter-spacing: -.04em; font-style: normal; text-transform: lowercase; }
 .at-lead { max-width: 36rem; margin: 1.8rem 0 0; color: var(--at-brown); font-family: Georgia, serif; font-size: clamp(1.1rem, 2vw, 1.45rem); }
@@ -80,7 +84,7 @@ a:hover { color: var(--at-orange); }
 .at-quote { max-width: 45rem; margin: 0 auto; color: var(--at-brown); font-family: Georgia, serif; font-size: clamp(1.5rem, 3vw, 2.5rem); line-height: 1.12; text-align: center; }
 
 .at-page-header { padding: 4.5rem 0 2rem; }
-.at-page-header h1 { margin: 0; color: var(--at-orange); font-size: clamp(3rem, 8vw, 6.5rem); line-height: .85; letter-spacing: -.08em; }
+.at-page-header h1 { margin: 0; color: var(--at-orange); font-size: clamp(3rem, 8vw, 6.5rem); line-height: .92; letter-spacing: -.045em; }
 .at-page-header p { max-width: 38rem; margin: 1.25rem 0 0; font-family: Georgia, serif; font-size: 1.2rem; }
 .at-content-card { padding: clamp(1.25rem, 4vw, 3rem); border-radius: 1.5rem; background: rgba(255,255,255,.5); box-shadow: var(--at-shadow); }
 .at-content-card h2 { color: var(--at-brown); }
@@ -92,7 +96,28 @@ a:hover { color: var(--at-orange); }
 /* bbPress: let the classic forum structure borrow the flyer palette. */
 #bbpress-forums, .bbp-user-page { color: var(--at-ink); }
 #bbpress-forums .bbp-breadcrumb { display: none; }
-#bbpress-forums .bbp-forum-description, #bbpress-forums .bbp-topic-description { display: none; }
+#bbpress-forums .bbp-forum-description, #bbpress-forums .bbp-topic-description,
+#bbpress-forums .bbp-pagination-count,
+#bbpress-forums .bbp-template-notice.info,
+#bbpress-forums .bbp-topic-form .bbp-template-notice,
+#bbpress-forums .bbp-forum-topic-count, #bbpress-forums .bbp-forum-reply-count,
+#bbpress-forums .bbp-forum-freshness, #bbpress-forums .bbp-topic-voice-count,
+#bbpress-forums .bbp-topic-reply-count, #bbpress-forums .bbp-topic-freshness,
+#bbpress-forums .bbp-topic-meta, #bbpress-forums .bbp-author-role,
+#bbpress-forums .bbp-reply-ip, #bbpress-forums .bbp-admin-links,
+#bbpress-forums .bbp-subscribe-link, #bbpress-forums .subscription-toggle,
+#bbpress-forums [id^="subscribe-"], #bbpress-forums .bbp-topic-favorite-link,
+#bbpress-forums li.bbp-footer, #bbpress-forums .bbp-topic-tags,
+#bbpress-forums .bbp-topic-type, #bbpress-forums .bbp-topic-status,
+#bbpress-forums .bbp-topic-form .bbp-topic-tags,
+#bbpress-forums .bbp-topic-form .bbp-topic-type,
+#bbpress-forums .bbp-topic-form .bbp-topic-status { display: none; }
+#bbpress-forums p:has(#bbp_topic_tags),
+#bbpress-forums p:has(#bbp_stick_topic_select),
+#bbpress-forums p:has(#bbp_topic_status_select) { display: none; }
+#bbpress-forums .bbp-forum-info, #bbpress-forums .bbp-topic-title { width: 100%; }
+#bbpress-forums .bbp-reply-content, #bbpress-forums .bbp-topic-content { font-family: Georgia, 'Times New Roman', serif; font-size: 1.05rem; }
+#bbpress-forums .bbp-author-name { font-weight: 700; }
 #bbpress-forums a { color: var(--at-brown); }
 #bbpress-forums .bbp-forum-title, #bbpress-forums .bbp-topic-permalink { color: var(--at-orange); font-weight: 800; }
 #bbpress-forums li.bbp-header, #bbpress-forums li.bbp-footer { background: var(--at-olive); color: #fff; border: 0; }
@@ -112,8 +137,24 @@ a:hover { color: var(--at-orange); }
 .wppa-container .wppa-box { background: rgba(255,255,255,.48) !important; border-color: rgba(76,37,24,.14) !important; }
 .wppa-container .wppa-title { color: var(--at-orange) !important; }
 .wppa-container .wppa-cover-box * { max-width: 100%; overflow-wrap: break-word; word-break: normal; }
+.wppa-container .wppa-nav, .wppa-container .wppa-bc, .wppa-container .wppa-metadata,
+.wppa-container .wppa-owner, .wppa-container .wppa-help, .wppa-container .wppa-comment-count { display: none !important; }
+.wppa-container .wppa-thumb, .wppa-container .wppa-cover-box { background: #fffaf4 !important; }
+.wppa-container input, .wppa-container select, .wppa-container textarea { font: inherit; border-radius: .7rem; }
+.wppa-container button, .wppa-container input[type="submit"], .wppa-container .wppa-button, .wppa-container .wppa-upload-button { min-height: 2.7rem; padding: .65rem 1.1rem; }
 
-@media (max-width: 700px) {
+/* A topic is still useful, but the forum should feel like a small gathering
+ * board rather than a general-purpose message-board administration screen. */
+#bbpress-forums li.bbp-header, #bbpress-forums li.bbp-footer { font-family: Georgia, 'Times New Roman', serif; }
+#bbpress-forums .bbp-form { box-shadow: none; }
+
+@media (max-width: 850px) {
+  #bbpress-forums .bbp-reply-author { width: auto; float: none; min-height: 0; padding: .8rem 0 0; text-align: left; }
+  #bbpress-forums .bbp-reply-content { margin-left: 0; padding: 1rem 0; }
+  #bbpress-forums .bbp-body div.bbp-reply-content { margin-left: 0; }
+}
+
+@media (max-width: 850px) {
   .at-header-inner, .at-footer-inner { align-items: flex-start; flex-direction: column; }
   .at-nav { justify-content: flex-start; }
   .at-hero { padding-top: 3rem; }
@@ -124,7 +165,7 @@ a:hover { color: var(--at-orange); }
   .at-section-heading { align-items: flex-start; flex-direction: column; }
 }
 
-@media (min-width: 701px) and (max-width: 1200px) {
+@media (min-width: 851px) and (max-width: 1200px) {
   .at-hero { padding: 4.5rem 0 3.5rem; }
   .at-hero-grid { gap: 3rem; }
   .at-hero h1 { font-size: clamp(4rem, 9vw, 7rem); }

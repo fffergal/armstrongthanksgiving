@@ -27,7 +27,7 @@
     "color": { "background": "var:preset|color|cream", "text": "var:preset|color|ink" },
     "typography": { "fontFamily": "var:preset|font-family|rounded", "lineHeight": "1.5" },
     "elements": {
-      "heading": { "fontFamily": "var:preset|font-family|rounded", "fontWeight": "700" },
+      "heading": { "fontFamily": "var:preset|font-family|serif", "fontWeight": "700" },
       "button": { "border": { "radius": "999px" } }
     }
   }

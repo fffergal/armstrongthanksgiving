@@ -32,6 +32,8 @@ export default defineConfig({
     { name: 'login', testMatch: /login\.spec\.ts/, use: { ...devices['Desktop Chrome'] } },
     { name: 'accessibility', testMatch: /a11y\.spec\.ts/, use: { ...devices['Desktop Chrome'] } },
     { name: 'visual', testMatch: /visual\.spec\.ts/, use: { ...devices['Desktop Chrome'] } },
-    { name: 'member', testMatch: /member\.spec\.ts/, use: { ...devices['Desktop Chrome'] } }
+    { name: 'member', testMatch: /member\.spec\.ts/, use: { ...devices['Desktop Chrome'] } },
+    { name: 'rsvp', testMatch: /rsvp\.spec\.ts/, use: { ...devices['Desktop Chrome'] } },
+    { name: 'rsvp-mobile', testMatch: /rsvp\.spec\.ts/, use: { ...devices['iPhone 13'] } }
   ]
 });

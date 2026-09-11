@@ -31,7 +31,7 @@ are promoted, because a plugin can supply its own content type or markup.
 3. The friend signs in at the site with that username/email and password. If
    needed, the standard “Lost your password?” link sends a reset email.
 4. After signing in, the friend should check the private home page, forum,
-   albums, RSVP, food, and memories links at both desktop and phone widths.
+   albums, RSVP, food, and forum links at both desktop and phone widths.
 
 The first production test account is `anna` (`armstronganna1@gmail.com`). Do
 not put a password or a one-time login token in Git, issue trackers, or chat.

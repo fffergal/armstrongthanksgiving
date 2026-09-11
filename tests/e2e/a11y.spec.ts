@@ -16,3 +16,11 @@ test('member home has no serious accessibility violations', async ({ page }) => 
   const serious = result.violations.filter(v => ['serious', 'critical'].includes(v.impact ?? ''));
   expect(serious).toEqual([]);
 });
+
+test('the signed-in RSVP form has no serious accessibility violations', async ({ page }) => {
+  await logIn(page);
+  await page.goto('/rsvp/');
+  const result = await new AxeBuilder({ page }).analyze();
+  const serious = result.violations.filter(v => ['serious', 'critical'].includes(v.impact ?? ''));
+  expect(serious).toEqual([]);
+});

@@ -6,12 +6,11 @@ test('a signed-in friend can use the gathering pages', async ({ page }) => {
 
   const pages = [
     ['/', 'Thanksgiving'],
-    ['/rsvp/', 'Count me in'],
-    ['/food/', 'What shall we bring?'],
+    ['/rsvp/', 'Will you join us?'],
+    ['/food/', 'Plan the table'],
     ['/albums/', 'Shared Albums'],
-    ['/memories/', 'Thanksgivings past'],
     ['/forum/', 'The Gathering'],
-    ['/community/topic/rsvp-and-food/', 'RSVP and food']
+    ['/community/topic/say-hello/', 'Say hello']
   ] as const;
 
   for (const [path, heading] of pages) {

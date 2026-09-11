@@ -22,6 +22,22 @@ test('hero keeps long words intact at tablet width', async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 });
 
+test('front page keeps the navigation and content focused', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: 'Memories' })).toHaveCount(0);
+  await expect(page.locator('.at-wordmark')).toBeHidden();
+  await expect(page.locator('body')).not.toContainText('armstrongthanksgiving.com');
+  await expect(page.locator('.at-hero h1')).toHaveCSS('font-family', /Georgia/i);
+});
+
+test('front page has no horizontal overflow on phone and tablet', async ({ page }) => {
+  for (const viewport of [{ width: 375, height: 812 }, { width: 768, height: 1024 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), viewport.width.toString()).toBeLessThanOrEqual(0);
+  }
+});
+
 test('private routes do not disclose content anonymously', async ({ request }) => {
   for (const path of ['/forums/', '/albums/', '/wp-json/wp/v2/posts']) {
     const response = await request.get(path, { maxRedirects: 0 });
