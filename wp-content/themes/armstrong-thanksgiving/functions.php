@@ -34,7 +34,7 @@ function armstrong_thanksgiving_theme_login_branding() {
 add_action( 'login_head', 'armstrong_thanksgiving_theme_login_branding' );
 
 function armstrong_thanksgiving_theme_login_message() {
-	return '<p class="message at-login-message"><strong>Friends’ sign in</strong><br>Use the username or email address and password the host gave you. If you need access, ask the host to create your account.</p>';
+	return '<p class="message at-login-message"><strong>Friends’ sign in</strong><br>Use the username or email address and password you chose with your RSVP. New here? Ask the hosts for your private RSVP link.</p>';
 }
 add_filter( 'login_message', 'armstrong_thanksgiving_theme_login_message' );
 

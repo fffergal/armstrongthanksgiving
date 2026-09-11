@@ -1,28 +1,36 @@
-.at-rsvp-app { display: grid; gap: 1.5rem; }
-.at-rsvp-intro { padding: 1.5rem; border-radius: 1.25rem; background: #706e3d; color: #fffaf4; }
-.at-rsvp-intro .at-kicker { color: #fffaf4; }
-.at-content-card .at-rsvp-intro h2, .at-rsvp-intro h2 { margin: .25rem 0 .5rem; color: #fffaf4 !important; font-size: clamp(2rem, 5vw, 3.5rem); }
-.at-rsvp-intro p:last-child { margin-bottom: 0; }
+.at-rsvp-page .at-content-card { background: #ead7bf; }
+.at-rsvp-page .entry-content { max-width: 58rem; }
+.at-rsvp-app { display: grid; }
 .at-rsvp-form { display: grid; gap: 1.25rem; }
-.at-rsvp-form fieldset { margin: 0; padding: 1.1rem; border: 1px solid rgba(76,37,24,.16); border-radius: 1rem; background: #fffaf4; }
+.at-rsvp-intro { margin: -1.5rem -1.5rem .25rem; padding: 1.7rem 1.5rem; border-radius: 1.2rem 1.2rem .25rem .25rem; background: #4c2518; color: #fff8ed; }
+.at-content-card .at-rsvp-intro h2 { margin: 0 0 .55rem; color: #fff8ed; font-size: clamp(2rem, 5vw, 3.5rem); }
+.at-rsvp-intro p { margin: 0; color: #fff8ed; font-weight: 700; }
+.at-rsvp-form fieldset { margin: 0; padding: 1.1rem; border: 1px solid #c8ad90; border-radius: 1rem; background: #f4e6d4; }
 .at-rsvp-form legend { padding: 0 .35rem; color: #4c2518; font-family: Georgia,serif; font-size: 1.35rem; font-weight: 700; }
 .at-rsvp-form label { display: grid; gap: .4rem; color: #4c2518; font-weight: 700; }
-.at-rsvp-form input[type="text"], .at-rsvp-form select, .at-rsvp-form textarea { width: 100%; border: 1px solid rgba(76,37,24,.25); border-radius: .7rem; background: #fff; color: #2f201a; font: inherit; padding: .7rem .8rem; }
-.at-rsvp-form input:focus, .at-rsvp-form select:focus, .at-rsvp-form textarea:focus { outline: 3px solid #f4b62f; outline-offset: 2px; }
+.at-rsvp-form input[type="text"], .at-rsvp-form input[type="email"], .at-rsvp-form input[type="password"], .at-rsvp-form select, .at-rsvp-form textarea { box-sizing: border-box; width: 100%; min-width: 0; border: 1px solid #9b7967; border-radius: .7rem; background: #fffaf3; color: #2f201a; font: inherit; padding: .7rem .8rem; }
+.at-rsvp-form input:focus, .at-rsvp-form select:focus, .at-rsvp-form textarea:focus { outline: 3px solid #7a4816; outline-offset: 2px; }
 .at-choice-row { display: flex; flex-wrap: wrap; gap: .75rem; }
-.at-choice-row label { display: inline-flex; align-items: center; gap: .45rem; padding: .7rem .8rem; border: 1px solid rgba(76,37,24,.16); border-radius: 999px; background: #f6ede1; }
+.at-choice-row label { display: inline-flex; align-items: center; gap: .45rem; padding: .7rem .8rem; border: 1px solid #c8ad90; border-radius: 999px; background: #ead7bf; }
 .at-rsvp-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1rem; }
 .at-field-help { margin-top: 0; color: #4c2518; font-family: Georgia,serif; }
 .at-food-list { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: .65rem; margin-bottom: 1rem; }
-.at-food-list label { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .5rem; padding: .7rem; border: 1px solid rgba(76,37,24,.12); border-radius: .75rem; background: #f6ede1; font-weight: 700; }
-.at-food-list small { color: #706e3d; font-size: .78rem; font-weight: 700; white-space: nowrap; }
+.at-food-list label { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .5rem; padding: .7rem; border: 1px solid #c8ad90; border-radius: .75rem; background: #ead7bf; font-weight: 700; }
+.at-food-list small { color: #4c2518; font-size: .78rem; font-weight: 700; white-space: nowrap; }
 .at-form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .9rem; }
-.at-form-actions > span { color: #4c2518; font-family: Georgia,serif; }
-.at-success { padding: 1rem 1.15rem; border-left: .35rem solid #706e3d; border-radius: .7rem; background: #fff8ef; color: #4c2518; }
-.at-access-note { padding: 1.25rem; border-radius: 1rem; background: #fff8ef; }
+.at-success { margin-bottom: 1.25rem; padding: 1rem 1.15rem; border-left: .35rem solid #706e3d; border-radius: .7rem; background: #fff8ef; color: #4c2518; }
+.at-access-note { padding: 1.25rem; border-radius: 1rem; background: #ead7bf; }
 .at-access-note p:last-child { margin-bottom: 0; }
 .bbp-author-avatar img, #bbpress-forums img.avatar { width: 2.75rem; height: 2.75rem; border-radius: 50%; object-fit: cover; }
 .at-gathering-admin .at-admin-foods { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1rem 0; }
 .at-gathering-admin .at-admin-foods span { padding: .6rem .75rem; border-radius: 999px; background: #f6ede1; }
 .at-gathering-admin .at-add-food { display: flex; gap: .5rem; margin: 1rem 0; }
-@media (max-width: 700px) { .at-rsvp-grid, .at-food-list { grid-template-columns: 1fr; } .at-choice-row { display: grid; } .at-choice-row label { border-radius: .7rem; } .at-form-actions { align-items: flex-start; flex-direction: column; } .at-gathering-admin .at-add-food { flex-direction: column; } }
+@media (max-width: 700px) {
+  .at-rsvp-page .at-content-card { padding: 1rem; }
+  .at-rsvp-intro { margin: -1rem -1rem .25rem; padding: 1.35rem 1rem; }
+  .at-rsvp-grid, .at-food-list { grid-template-columns: 1fr; }
+  .at-choice-row { display: grid; }
+  .at-choice-row label { border-radius: .7rem; }
+  .at-form-actions { align-items: flex-start; flex-direction: column; }
+  .at-gathering-admin .at-add-food { flex-direction: column; }
+}

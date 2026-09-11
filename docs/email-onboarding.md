@@ -33,8 +33,8 @@ are promoted, because a plugin can supply its own content type or markup.
 4. After signing in, the friend should check the private home page, forum,
    albums, RSVP, food, and forum links at both desktop and phone widths.
 
-The first production test account is `anna` (`armstronganna1@gmail.com`). Do
-not put a password or a one-time login token in Git, issue trackers, or chat.
+The first production test account is reserved for smoke testing. Do not put a
+password or a one-time login token in Git, issue trackers, or chat.
 
 ## Deliverability checks
 
