@@ -1,6 +1,7 @@
 .at-rsvp-app { display: grid; gap: 1.5rem; }
 .at-rsvp-intro { padding: 1.5rem; border-radius: 1.25rem; background: #706e3d; color: #fffaf4; }
-.at-rsvp-intro h2 { margin: .25rem 0 .5rem; color: #fffaf4; font-size: clamp(2rem, 5vw, 3.5rem); }
+.at-rsvp-intro .at-kicker { color: #fffaf4; }
+.at-content-card .at-rsvp-intro h2, .at-rsvp-intro h2 { margin: .25rem 0 .5rem; color: #fffaf4 !important; font-size: clamp(2rem, 5vw, 3.5rem); }
 .at-rsvp-intro p:last-child { margin-bottom: 0; }
 .at-rsvp-form { display: grid; gap: 1.25rem; }
 .at-rsvp-form fieldset { margin: 0; padding: 1.1rem; border: 1px solid rgba(76,37,24,.16); border-radius: 1rem; background: #fffaf4; }

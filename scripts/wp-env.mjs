@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sourceTheme = path.join(root, 'wp-content/themes/armstrong-thanksgiving');
+const sourceGatheringPlugin = path.join(root, 'wp-content/plugins/armstrong-gathering');
 const sourceMuPlugins = path.join(root, 'wp-content/mu-plugins');
 // Docker Desktop shares /private/tmp by default on macOS, while the system
 // temporary directory can resolve into a per-user /var/folders path that is
@@ -13,6 +14,7 @@ const sourceMuPlugins = path.join(root, 'wp-content/mu-plugins');
 const stagingBase = process.platform === 'darwin' ? '/private/tmp' : os.tmpdir();
 const stagingRoot = path.join(stagingBase, 'armstrong-thanksgiving-wp-env-v2');
 const stagedTheme = path.join(stagingRoot, 'armstrong-thanksgiving');
+const stagedGatheringPlugin = path.join(stagingRoot, 'armstrong-gathering');
 const stagedMuPlugins = path.join(stagingRoot, 'mu-plugins');
 const stagedConfig = path.join(stagingRoot, 'wp-env.json');
 const command = process.argv.slice(2);
@@ -21,6 +23,10 @@ await fs.mkdir(stagingRoot, { recursive: true });
 if (command[0] === 'start' || !(await fs.stat(stagedTheme).catch(() => false))) {
   await fs.rm(stagedTheme, { recursive: true, force: true });
   await fs.cp(sourceTheme, stagedTheme, { recursive: true });
+}
+if (command[0] === 'start' || !(await fs.stat(stagedGatheringPlugin).catch(() => false))) {
+  await fs.rm(stagedGatheringPlugin, { recursive: true, force: true });
+  await fs.cp(sourceGatheringPlugin, stagedGatheringPlugin, { recursive: true });
 }
 if (command[0] === 'start' || !(await fs.stat(stagedMuPlugins).catch(() => false))) {
   await fs.rm(stagedMuPlugins, { recursive: true, force: true });
@@ -94,6 +100,7 @@ async function copyProjectIntoContainer() {
 
   const targets = [
     { source: stagedTheme, target: '/var/www/html/wp-content/themes/armstrong-thanksgiving' },
+    { source: stagedGatheringPlugin, target: '/var/www/html/wp-content/plugins/armstrong-gathering' },
     { source: stagedMuPlugins, target: '/var/www/html/wp-content/mu-plugins' },
     ...cachedPlugins.map(({ slug, source }) => ({ source, target: `/var/www/html/wp-content/plugins/${slug}` }))
   ];

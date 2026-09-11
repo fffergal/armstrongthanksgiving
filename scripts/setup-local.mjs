@@ -35,6 +35,8 @@ wp(['plugin', 'activate', 'armstrong-gathering']);
 wp(['plugin', 'deactivate', 'magic-login.latest-stable'], { allowFailure: true });
 wp(['option', 'update', 'blogname', 'Armstrong Thanksgiving']);
 wp(['option', 'update', 'users_can_register', '0']);
+wp(['option', 'update', '_bbp_root_slug', 'community']);
+wp(['option', 'update', '_bbp_topic_slug', 'topic']);
 wp(['rewrite', 'structure', '/%postname%/']);
 wp([
   'eval',
@@ -50,6 +52,8 @@ ensurePage('food', 'Food & Friends', '<h2>Plan the table</h2><p>Choose what you 
 ensurePage('albums', 'Shared Albums', '<p>Photos from this dinner and the people around the table.</p><p class="at-form-note"><strong>Signed-in friends:</strong> add a photo below.</p>[wppa type="generic"]<p>[wppa type="upload" album="1"]</p>');
 const forumPageId = ensurePage('forum', 'The Gathering', '<p>Use this forum for hellos, small plans, and anything that does not belong on the RSVP.</p>[bbp-forum-index]');
 ensurePage('rsvp', 'RSVP', '<p class="at-form-note"><strong>One quick form</strong><br>Tell us who is coming, choose something for the table, and add any notes for the host.</p>[at_rsvp]');
+const memoriesId = existingId(['post', 'list', '--post_type=page', '--name=memories', '--field=ID', '--format=ids']);
+if (memoriesId) wp(['post', 'update', memoriesId, '--post_status=draft']);
 if (homeId) {
   wp(['option', 'update', 'show_on_front', 'page']);
   wp(['option', 'update', 'page_on_front', homeId]);

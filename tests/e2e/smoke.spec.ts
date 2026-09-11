@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { logIn } from './helpers/auth';
 
 test('public entry point renders without browser errors', async ({ page }) => {
   const errors: string[] = [];
@@ -15,6 +16,7 @@ test('public entry point renders without browser errors', async ({ page }) => {
 
 test('hero keeps long words intact at tablet width', async ({ page }) => {
   await page.setViewportSize({ width: 1194, height: 834 });
+  await logIn(page);
   await page.goto('/');
   const word = page.locator('.at-hero h1 > span');
   await expect(word).toHaveCSS('white-space', 'nowrap');
@@ -23,6 +25,7 @@ test('hero keeps long words intact at tablet width', async ({ page }) => {
 });
 
 test('front page keeps the navigation and content focused', async ({ page }) => {
+  await logIn(page);
   await page.goto('/');
   await expect(page.getByRole('link', { name: 'Memories' })).toHaveCount(0);
   await expect(page.locator('.at-wordmark')).toBeHidden();
@@ -31,6 +34,7 @@ test('front page keeps the navigation and content focused', async ({ page }) => 
 });
 
 test('front page has no horizontal overflow on phone and tablet', async ({ page }) => {
+  await logIn(page);
   for (const viewport of [{ width: 375, height: 812 }, { width: 768, height: 1024 }]) {
     await page.setViewportSize(viewport);
     await page.goto('/');

@@ -18,4 +18,7 @@ test('a signed-in friend can use the gathering pages', async ({ page }) => {
     expect(response?.status(), path).toBeLessThan(500);
     await expect(page.getByRole('heading', { name: heading, exact: false })).toBeVisible();
   }
+
+  await page.goto('/forum/');
+  expect(await page.locator('img.avatar[src*="turkey-"]').count()).toBeGreaterThan(0);
 });

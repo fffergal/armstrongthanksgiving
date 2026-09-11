@@ -31,6 +31,10 @@ Synthetic tests catch regressions before deployment. Once production exists, the
 
 The local benchmark covers the anonymous redirect/login experience and runs three times with median budgets. The current themed login median is comfortably below the 2.5-second LCP budget after removing album and admin assets that do not belong on a friend sign-in page.
 
+The included turkey avatar pool contains 50 illustrated avatars, intended for the
+private guest list. If the list grows beyond 50 friends, extend the pool before
+inviting the next person so every account can keep a distinct turkey.
+
 `@wordpress/env` is development-only. Its current upstream dependency tree has moderate advisories in archive extraction and an optional preview server; it must never be installed or exposed on production. We track upstream releases and audit upgrades, but do not downgrade to the older release npm suggests because that version has more severe known issues.
 
 ## Required production checks

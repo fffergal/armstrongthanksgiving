@@ -52,6 +52,12 @@ Value: v=DMARC1; p=none; rua=mailto:turkeyteam@armstrongthanksgiving.com
 Review aggregate reports before considering `quarantine` or `reject`. Do not
 change the policy as part of a routine plugin deployment.
 
+Before sending a broad invitation, manually open one password email and one RSVP
+confirmation in Gmail and iOS Mail at a narrow width. Check that the 560px table
+stays within the viewport, long links wrap without horizontal scrolling, and the
+cream/brown palette remains legible in dark mode. Check Outlook too if it is used
+by any of the guest list; the HTML uses presentation tables for that reason.
+
 ## Acceptance evidence
 
 Automated local tests cover the login request state, access control, responsive
