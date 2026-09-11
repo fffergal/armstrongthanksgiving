@@ -70,7 +70,9 @@ function armstrong_thanksgiving_theme_email( $args ) {
 
 	$headers = $args['headers'] ?? array();
 	$header_text = is_array( $headers ) ? implode( "\n", $headers ) : (string) $headers;
-	if ( preg_match( '/content-type\s*:\s*(text\/calendar|application\/)/i', $header_text ) ) {
+	// This wrapper emits one HTML document. Leave calendar, application, and
+	// multipart messages to their original handlers instead of corrupting them.
+	if ( preg_match( '/content-type\s*:\s*(text\/calendar|application\/|multipart\/)/i', $header_text ) ) {
 		return $args;
 	}
 
@@ -92,7 +94,23 @@ function armstrong_thanksgiving_theme_email( $args ) {
 		. '</td></tr></table></td></tr></table></body></html>';
 
 	$args['message'] = $body;
-	if ( ! preg_match( '/^content-type\s*:/im', $header_text ) ) {
+	if ( preg_match( '/^content-type\s*:\s*text\/plain\b[^\r\n]*/im', $header_text ) ) {
+		// Some plugins explicitly mark an otherwise ordinary message as plain
+		// text. Replace that header because the themed wrapper is HTML now.
+		if ( is_array( $headers ) ) {
+			$headers = array_map(
+				static function ( $header ) {
+					return preg_match( '/^content-type\s*:\s*text\/plain\b/i', (string) $header )
+						? 'Content-Type: text/html; charset=UTF-8'
+						: $header;
+				},
+				$headers
+			);
+		} else {
+			$headers = preg_replace( '/^content-type\s*:\s*text\/plain[^\r\n]*/im', 'Content-Type: text/html; charset=UTF-8', $header_text );
+		}
+		$args['headers'] = $headers;
+	} elseif ( ! preg_match( '/^content-type\s*:/im', $header_text ) ) {
 		if ( is_array( $headers ) ) {
 			$headers[] = 'Content-Type: text/html; charset=UTF-8';
 		} else {
