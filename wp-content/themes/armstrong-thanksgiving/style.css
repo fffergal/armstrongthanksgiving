@@ -1,7 +1,7 @@
 /*
 Theme Name: Armstrong Thanksgiving
 Description: Private gathering theme; visual direction to be based on the event flyers.
-Version: 0.1.8
+Version: 0.1.11
 Requires at least: 6.8
 Requires PHP: 8.1
 Text Domain: armstrong-thanksgiving
@@ -48,8 +48,9 @@ a:hover { color: var(--at-orange); }
 .at-hero { position: relative; padding: clamp(3.5rem, 9vw, 8rem) 0 5rem; }
 .at-hero-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(16rem, .95fr); align-items: center; gap: clamp(2rem, 6vw, 6rem); }
 .at-kicker { margin: 0 0 1rem; color: var(--at-orange); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: .78rem; }
-.at-hero h1 { max-width: 11ch; margin: 0; color: var(--at-orange); font-size: clamp(3.5rem, 11vw, 9.5rem); line-height: .86; letter-spacing: -.085em; }
-.at-hero h1 em { display: block; color: var(--at-coral); font-family: Georgia, serif; font-size: .32em; line-height: 1.5; letter-spacing: -.04em; font-style: normal; text-transform: lowercase; }
+.at-hero h1 { margin: 0; color: var(--at-orange); font-size: clamp(3.5rem, 11vw, 9.5rem); line-height: .86; letter-spacing: -.085em; }
+.at-hero h1 > span, .at-hero h1 > em { display: inline-block; white-space: nowrap; }
+.at-hero h1 em { color: var(--at-coral); font-family: Georgia, serif; font-size: .32em; line-height: 1.5; letter-spacing: -.04em; font-style: normal; text-transform: lowercase; }
 .at-lead { max-width: 36rem; margin: 1.8rem 0 0; color: var(--at-brown); font-family: Georgia, serif; font-size: clamp(1.1rem, 2vw, 1.45rem); }
 .at-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.8rem; }
 .at-button { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: .65rem 1.15rem; border-radius: 999px; background: var(--at-coral); color: #fff; font-weight: 800; text-decoration: none; box-shadow: 0 6px 0 rgba(76, 37, 24, .12); }
@@ -91,6 +92,7 @@ a:hover { color: var(--at-orange); }
 /* bbPress: let the classic forum structure borrow the flyer palette. */
 #bbpress-forums, .bbp-user-page { color: var(--at-ink); }
 #bbpress-forums .bbp-breadcrumb { display: none; }
+#bbpress-forums .bbp-forum-description, #bbpress-forums .bbp-topic-description { display: none; }
 #bbpress-forums a { color: var(--at-brown); }
 #bbpress-forums .bbp-forum-title, #bbpress-forums .bbp-topic-permalink { color: var(--at-orange); font-weight: 800; }
 #bbpress-forums li.bbp-header, #bbpress-forums li.bbp-footer { background: var(--at-olive); color: #fff; border: 0; }
@@ -120,6 +122,13 @@ a:hover { color: var(--at-orange); }
   .at-cards { grid-template-columns: 1fr; }
   .at-card:nth-child(2) { transform: none; }
   .at-section-heading { align-items: flex-start; flex-direction: column; }
+}
+
+@media (min-width: 701px) and (max-width: 1200px) {
+  .at-hero { padding: 4.5rem 0 3.5rem; }
+  .at-hero-grid { gap: 3rem; }
+  .at-hero h1 { font-size: clamp(4rem, 9vw, 7rem); }
+  .at-illustration { min-height: 18rem; }
 }
 
 :focus-visible { outline: 3px solid var(--at-mustard); outline-offset: 3px; }
