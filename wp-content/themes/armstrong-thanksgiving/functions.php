@@ -83,13 +83,16 @@ function armstrong_thanksgiving_theme_email( $args ) {
 
 	$site_name = esc_html( get_bloginfo( 'name' ) ?: 'Armstrong Thanksgiving' );
 	$home_url  = esc_url( home_url( '/' ) );
-	$body      = '<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f6ede1;color:#3d2a22;font-family:Arial,Helvetica,sans-serif;line-height:1.6;" data-at-email-theme="armstrong-thanksgiving">'
-		. '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#f6ede1;margin:0;padding:0;"><tr><td align="center" style="padding:32px 16px;">'
-		. '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:640px;"><tr><td style="padding:0 0 18px;text-align:center;">'
+	$body      = '<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"><style type="text/css">'
+		. '@media only screen and (max-width:640px){.at-email-pad{padding:24px 12px!important}.at-email-card{padding:24px 18px!important;border-radius:16px!important}}'
+		. '@media (prefers-color-scheme:dark){.at-email-body,.at-email-outer{background:#211915!important;color:#fffaf4!important}.at-email-card{background:#382b25!important;color:#fffaf4!important;border-color:#705446!important}.at-email-brand,.at-email-card a,.at-email-footer a{color:#ffd0a8!important}.at-email-footer{color:#e2c8b4!important}}'
+		. '</style></head><body class="at-email-body" style="margin:0;min-width:100%;background:#f6ede1;color:#3d2a22;font-family:Arial,Helvetica,sans-serif;line-height:1.6;-webkit-text-size-adjust:100%;" data-at-email-theme="armstrong-thanksgiving">'
+		. '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="at-email-outer" style="width:100%!important;min-width:100%;background:#f6ede1;margin:0;padding:0;border-collapse:collapse;"><tr><td width="100%" align="center" class="at-email-pad" style="width:100%;padding:32px 16px;">'
+		. '<table role="presentation" width="640" align="center" cellspacing="0" cellpadding="0" border="0" class="at-email-container" style="width:100%!important;max-width:640px;margin:0 auto;border-collapse:separate;"><tr><td class="at-email-brand" style="padding:0 0 18px;text-align:center;color:#4c2518;">'
 		. '<a href="' . $home_url . '" style="color:#4c2518;font-size:20px;font-weight:700;letter-spacing:.08em;text-decoration:none;">' . $site_name . '</a>'
-		. '</td></tr><tr><td style="background:#fffaf4;border:1px solid rgba(76,37,24,.14);border-radius:20px;padding:28px 24px;box-shadow:0 12px 30px rgba(76,37,24,.10);">'
+		. '</td></tr><tr><td class="at-email-card" style="width:100%;background:#fffaf4;border:1px solid rgba(76,37,24,.14);border-radius:20px;padding:28px 24px;box-shadow:0 12px 30px rgba(76,37,24,.10);font-size:16px;">'
 		. $message
-		. '</td></tr><tr><td style="padding:18px 12px 0;color:#777844;font-size:13px;text-align:center;">'
+		. '</td></tr><tr><td class="at-email-footer" style="padding:18px 12px 0;color:#777844;font-size:13px;text-align:center;">'
 		. 'Friends-only gathering · <a href="' . $home_url . '" style="color:#4c2518;">Visit the site</a>'
 		. '</td></tr></table></td></tr></table></body></html>';
 
