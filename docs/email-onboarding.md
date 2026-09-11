@@ -25,11 +25,11 @@ are promoted, because a plugin can supply its own content type or markup.
 
 1. Create the friend as a WordPress Subscriber and bbPress Participant, using
    the email address they will use to sign in.
-2. Leave the default WordPress new-user notification off. The host sends the
-   branded Magic Login invite instead.
-3. The friend visits the link in the invite. The login page explains that they
-   should use their invited email address and request another login link if
-   needed.
+2. Send the friend the normal WordPress account email or a separate note with
+   the username and temporary password. The host does not need to explain a
+   second login system.
+3. The friend signs in at the site with that username/email and password. If
+   needed, the standard “Lost your password?” link sends a reset email.
 4. After signing in, the friend should check the private home page, forum,
    albums, RSVP, food, and memories links at both desktop and phone widths.
 

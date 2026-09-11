@@ -1,7 +1,7 @@
 /*
 Theme Name: Armstrong Thanksgiving
 Description: Private gathering theme; visual direction to be based on the event flyers.
-Version: 0.1.7
+Version: 0.1.8
 Requires at least: 6.8
 Requires PHP: 8.1
 Text Domain: armstrong-thanksgiving
@@ -24,6 +24,8 @@ body {
   background: var(--at-cream);
   color: var(--at-ink);
   overflow-x: hidden;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 a { color: var(--at-brown); text-decoration-thickness: .12em; text-underline-offset: .16em; }
 a:hover { color: var(--at-orange); }
@@ -34,22 +36,8 @@ a:hover { color: var(--at-orange); }
   padding: 1.2rem clamp(1rem, 4vw, 4rem) 1rem;
   border-bottom: 1px solid rgba(76, 37, 24, .12);
 }
-.at-site-header::before,
-.at-site-header::after {
-  content: "";
-  position: absolute;
-  width: 6rem;
-  height: 2.5rem;
-  top: -1rem;
-  border-radius: 100% 0 100% 0;
-  transform: rotate(-18deg);
-  opacity: .9;
-  pointer-events: none;
-}
-.at-site-header::before { left: 2%; background: var(--at-mustard); }
-.at-site-header::after { right: 4%; background: var(--at-olive); transform: rotate(28deg); }
-.at-header-inner { max-width: 76rem; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 1.25rem; }
-.at-wordmark { text-decoration: none; font-size: clamp(1.05rem, 2vw, 1.5rem); font-weight: 700; letter-spacing: -.04em; color: var(--at-orange); }
+.at-header-inner { position: relative; z-index: 1; max-width: 76rem; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 1.25rem; }
+.at-wordmark { display: inline-block; white-space: nowrap; text-decoration: none; font-size: clamp(1.05rem, 2vw, 1.5rem); font-weight: 700; letter-spacing: -.04em; color: var(--at-orange); }
 .at-wordmark span { color: var(--at-brown); }
 .at-nav { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .45rem; font-size: .86rem; font-weight: 700; }
 .at-nav a { display: inline-block; padding: .45rem .7rem; color: var(--at-brown); text-decoration: none; border-radius: 999px; }
@@ -60,7 +48,7 @@ a:hover { color: var(--at-orange); }
 .at-hero { position: relative; padding: clamp(3.5rem, 9vw, 8rem) 0 5rem; }
 .at-hero-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(16rem, .95fr); align-items: center; gap: clamp(2rem, 6vw, 6rem); }
 .at-kicker { margin: 0 0 1rem; color: var(--at-orange); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: .78rem; }
-.at-hero h1 { max-width: 12ch; margin: 0; color: var(--at-orange); font-size: clamp(4.25rem, 11vw, 9.5rem); line-height: .78; letter-spacing: -.085em; }
+.at-hero h1 { max-width: 11ch; margin: 0; color: var(--at-orange); font-size: clamp(3.5rem, 11vw, 9.5rem); line-height: .86; letter-spacing: -.085em; }
 .at-hero h1 em { display: block; color: var(--at-coral); font-family: Georgia, serif; font-size: .32em; line-height: 1.5; letter-spacing: -.04em; font-style: normal; text-transform: lowercase; }
 .at-lead { max-width: 36rem; margin: 1.8rem 0 0; color: var(--at-brown); font-family: Georgia, serif; font-size: clamp(1.1rem, 2vw, 1.45rem); }
 .at-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.8rem; }
@@ -121,7 +109,7 @@ a:hover { color: var(--at-orange); }
 .wppa-container .wppa-cover-box { background: #fff8ef !important; border: 1px solid rgba(76,37,24,.14) !important; }
 .wppa-container .wppa-box { background: rgba(255,255,255,.48) !important; border-color: rgba(76,37,24,.14) !important; }
 .wppa-container .wppa-title { color: var(--at-orange) !important; }
-.wppa-container .wppa-cover-box * { max-width: 100%; overflow-wrap: anywhere; }
+.wppa-container .wppa-cover-box * { max-width: 100%; overflow-wrap: break-word; word-break: normal; }
 
 @media (max-width: 700px) {
   .at-header-inner, .at-footer-inner { align-items: flex-start; flex-direction: column; }

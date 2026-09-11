@@ -5,11 +5,11 @@ test('a signed-in friend can use the gathering pages', async ({ page }) => {
   await logIn(page);
 
   const pages = [
-    ['/', 'Thanks'],
+    ['/', 'Thanksgiving'],
     ['/rsvp/', 'Count me in'],
     ['/food/', 'What shall we bring?'],
     ['/albums/', 'Shared Albums'],
-    ['/memories/', 'Reminisce on Thanksgivings past'],
+    ['/memories/', 'Thanksgivings past'],
     ['/forum/', 'The Gathering']
   ] as const;
 

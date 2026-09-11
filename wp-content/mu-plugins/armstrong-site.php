@@ -24,8 +24,7 @@ function armstrong_thanksgiving_login_assets() {
 	global $wp_scripts, $wp_styles;
 	if ( is_object( $wp_scripts ) && isset( $wp_scripts->queue ) ) {
 		foreach ( $wp_scripts->queue as $handle ) {
-			// The login form and Magic Login's inline enhancement are native JS;
-			// no enqueued front-end scripts are needed on this page.
+			// The login form needs no enqueued front-end scripts on this page.
 			wp_dequeue_script( $handle );
 			wp_deregister_script( $handle );
 		}
