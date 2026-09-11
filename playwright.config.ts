@@ -18,7 +18,13 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     actionTimeout: 10_000,
-    navigationTimeout: 30_000
+    navigationTimeout: 30_000,
+    launchOptions: {
+      // The login page is intentionally exercised with known fixture
+      // credentials. Prevent Chromium's password manager from carrying a
+      // saved value between projects and overwriting the test fields.
+      args: ['--disable-save-password-bubble', '--disable-features=PasswordManagerOnboarding,AutofillServerCommunication']
+    }
   },
   projects: [
     { name: 'desktop-chromium', testMatch: /smoke\.spec\.ts/, use: { ...devices['Desktop Chrome'] } },
