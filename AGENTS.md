@@ -72,6 +72,12 @@ coherent history before handoff or removal. Do not rewrite a shared or already
 published branch; preserve user-authored commits and ask before discarding
 uncommitted work.
 
+For production-scoped changes, deployment is part of closeout: run the
+relevant checks and tests first (or confirm they already passed), then deploy
+the verified theme/plugin changes and validate the canonical production site
+before removing the worktree. If deployment is not authorized or is blocked,
+state that explicitly instead of treating the worktree as finished.
+
 ## WordPress admin uploads and browser controls
 
 For production theme or plugin changes, use the repository deployment command
