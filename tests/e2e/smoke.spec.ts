@@ -24,6 +24,21 @@ test('hero keeps long words intact at tablet width', async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 });
 
+test('hero heading does not occlude the illustration at desktop width', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/');
+  const heading = page.locator('.at-hero h1');
+  const illustration = page.locator('.at-illustration');
+  const [headingBox, illustrationBox] = await Promise.all([
+    heading.boundingBox(),
+    illustration.boundingBox()
+  ]);
+
+  expect(headingBox).not.toBeNull();
+  expect(illustrationBox).not.toBeNull();
+  expect(headingBox!.x + headingBox!.width).toBeLessThanOrEqual(illustrationBox!.x);
+});
+
 test('front page keeps the navigation and content focused', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('link', { name: 'Memories' })).toHaveCount(0);

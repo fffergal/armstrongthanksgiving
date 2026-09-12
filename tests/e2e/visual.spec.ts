@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { logIn } from './helpers/auth';
 
 test('entry page visual contract', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/');
   await page.evaluate(() => document.fonts.ready);
   await expect(page).toHaveScreenshot('entry-page.png', { fullPage: true });

@@ -49,10 +49,13 @@ a:hover { color: var(--at-orange); }
 .at-shell { width: min(100% - 2rem, 76rem); margin: 0 auto; }
 .at-hero { position: relative; padding: clamp(3.5rem, 9vw, 8rem) 0 5rem; }
 .at-hero-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(16rem, .95fr); align-items: center; gap: clamp(2rem, 6vw, 6rem); }
+.at-hero-copy { min-width: 0; container-type: inline-size; }
 .at-kicker { margin: 0 0 1rem; color: var(--at-orange); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: .78rem; }
 .home .at-wordmark { display: none; }
 .home .at-header-inner { justify-content: flex-end; }
-.at-hero h1 { margin: 0; color: var(--at-orange); font-size: clamp(3.5rem, 11vw, 9.5rem); line-height: .86; letter-spacing: -.045em; }
+/* Keep the unbroken word sized to its own grid track so it cannot paint into
+ * the illustration track at wide desktop widths. */
+.at-hero h1 { max-inline-size: 100%; margin: 0; color: var(--at-orange); font-size: clamp(3.5rem, 16cqw, 9.5rem); line-height: .86; letter-spacing: -.045em; }
 .at-hero h1 > span, .at-hero h1 > em { display: inline-block; white-space: nowrap; }
 .at-hero h1 em { color: var(--at-coral); font-family: Georgia, serif; font-size: .32em; line-height: 1.5; letter-spacing: -.04em; font-style: normal; text-transform: lowercase; }
 .at-lead { max-width: 36rem; margin: 1.8rem 0 0; color: var(--at-brown); font-family: Georgia, serif; font-size: clamp(1.1rem, 2vw, 1.45rem); }
