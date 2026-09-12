@@ -7,7 +7,6 @@ test('a signed-in friend can use the gathering pages', async ({ page }) => {
   const pages = [
     ['/', 'Thanksgiving'],
     ['/rsvp/', 'Will you join us?'],
-    ['/food/', 'Plan the table'],
     ['/albums/', 'Shared Albums'],
     ['/forum/', 'The Gathering'],
     ['/community/topic/say-hello/', 'Say hello']
@@ -18,6 +17,9 @@ test('a signed-in friend can use the gathering pages', async ({ page }) => {
     expect(response?.status(), path).toBeLessThan(500);
     await expect(page.getByRole('heading', { name: heading, exact: false })).toBeVisible();
   }
+
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: 'Sign out' })).toBeVisible();
 
   await page.goto('/forum/');
   expect(await page.locator('img.avatar[src*="turkey-"]').count()).toBeGreaterThan(0);

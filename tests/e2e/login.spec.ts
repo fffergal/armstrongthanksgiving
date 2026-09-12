@@ -7,6 +7,7 @@ test('login page explains sign-in and uses the standard form', async ({ page }) 
   await expect(page.getByText('password you chose when you completed your RSVP')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Start your RSVP' })).toHaveAttribute('href', /\/rsvp\/$/);
   await expect(page.locator('#wp-submit')).toBeVisible();
+  await expect(page.locator('form p.submit')).toHaveCSS('padding-top', '20px');
   await expect(page.locator('#magic-login-button')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Lost your password?' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Go to home page' })).toHaveAttribute('href', /\/$/);

@@ -24,7 +24,9 @@ function armstrong_thanksgiving_theme_login_branding() {
 		body.login #login { width:min(92%, 420px); padding-top:8vh; }
 		.login h1 a { width:auto; max-width:100%; height:auto; margin:0 0 1.5rem; background-image:none !important; color:var(--at-brown); font:700 clamp(1.35rem,7vw,2rem)/1.1 ui-rounded,"Trebuchet MS",system-ui,sans-serif; text-indent:0; text-decoration:none; white-space:normal; overflow-wrap:break-word; word-break:normal; }
 		.login form { border:0; border-radius:1.25rem; box-shadow:0 18px 45px rgba(76,37,24,.12); background:#fffaf4; }
+		.login form .submit { clear:both; padding-top:1.25rem !important; }
 		.login #wp-submit, .login #wp-login-submit { width:100%; border:0; border-radius:999px; background:var(--at-coral) !important; border-color:var(--at-coral) !important; color:#fff; text-shadow:none; box-shadow:none; }
+		.login form #wp-submit, .login form #wp-login-submit { float:none; }
 		.login #wp-submit:hover, .login #wp-submit:focus, .login #wp-login-submit:hover, .login #wp-login-submit:focus { background:var(--at-brown) !important; }
 		.login a { color:var(--at-brown); }
 		.login .message { border-left-color:var(--at-olive); background:#fff8ef; color:var(--at-brown); }
@@ -52,6 +54,19 @@ function armstrong_thanksgiving_theme_login_site_html_link() {
 	return '<a href="' . esc_url( home_url( '/' ) ) . '">&larr; Go to home page</a>';
 }
 add_filter( 'login_site_html_link', 'armstrong_thanksgiving_theme_login_site_html_link' );
+
+function armstrong_thanksgiving_sign_out_shortcode() {
+	if ( ! is_user_logged_in() ) {
+		return '';
+	}
+
+	return sprintf(
+		'<a class="at-sign-out" href="%s">%s</a>',
+		esc_url( wp_logout_url( home_url( '/' ) ) ),
+		esc_html__( 'Sign out', 'armstrong-thanksgiving' )
+	);
+}
+add_shortcode( 'at_sign_out', 'armstrong_thanksgiving_sign_out_shortcode' );
 
 /**
  * Give site emails the same warm, flyer-inspired treatment as the front end.

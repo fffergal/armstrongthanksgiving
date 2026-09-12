@@ -92,6 +92,8 @@ a:hover { color: var(--at-orange); }
 .at-footer { margin-top: 4rem; padding: 2rem 1rem; background: var(--at-brown); color: #fff; }
 .at-footer-inner { width: min(100%, 76rem); margin: 0 auto; display: flex; justify-content: space-between; gap: 1rem; font-size: .9rem; }
 .at-footer a { color: #fff; }
+.at-footer-links:empty { display: none; }
+.at-sign-out { text-underline-offset: .18em; }
 
 /* bbPress: let the classic forum structure borrow the flyer palette. */
 #bbpress-forums, .bbp-user-page { color: var(--at-ink); }

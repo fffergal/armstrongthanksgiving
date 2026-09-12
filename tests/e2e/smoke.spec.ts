@@ -27,12 +27,17 @@ test('hero keeps long words intact at tablet width', async ({ page }) => {
 test('front page keeps the navigation and content focused', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('link', { name: 'Memories' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Food', exact: true })).toHaveCount(0);
   await expect(page.locator('.at-wordmark')).toBeHidden();
   await expect(page.locator('body')).not.toContainText('armstrongthanksgiving.com');
   await expect(page.locator('.at-hero')).not.toContainText('Priestfield');
   await expect(page.getByRole('link', { name: 'Open the forum' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'RSVP' }).first()).toBeVisible();
+  await expect(page.locator('.at-cards article').nth(0)).toContainText('Photos');
+  await expect(page.locator('.at-cards article').nth(1)).toContainText('Forum');
+  await expect(page.locator('.at-cards article').nth(2)).toContainText('RSVP');
   await expect(page.locator('.at-hero h1')).toHaveCSS('font-family', /Georgia/i);
+  await expect(page.getByRole('link', { name: 'Sign out' })).toHaveCount(0);
 });
 
 test('front page has no horizontal overflow on phone and tablet', async ({ page }) => {
@@ -49,4 +54,10 @@ test('private routes do not disclose content anonymously', async ({ request }) =
     const response = await request.get(path, { maxRedirects: 0 });
     expect([301, 302, 303, 307, 308, 401, 403, 404]).toContain(response.status());
   }
+});
+
+test('the removed food route points visitors to the RSVP', async ({ request }) => {
+  const response = await request.get('/food/', { maxRedirects: 0 });
+  expect(response.status()).toBe(301);
+  expect(response.headers().location).toMatch(/\/rsvp\/$/);
 });

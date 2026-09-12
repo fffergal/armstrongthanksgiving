@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Armstrong Gathering
  * Description: The small, first-party RSVP and potluck layer for Armstrong Thanksgiving.
- * Version: 0.3.1
+ * Version: 0.3.2
  * Requires at least: 6.8
  * Requires PHP: 8.1
  * Author: Armstrong Thanksgiving
@@ -11,7 +11,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'AT_GATHERING_VERSION', '0.3.1' );
+define( 'AT_GATHERING_VERSION', '0.3.2' );
 define( 'AT_GATHERING_FILE', __FILE__ );
 define( 'AT_GATHERING_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AT_GATHERING_URL', plugin_dir_url( __FILE__ ) );
@@ -291,6 +291,17 @@ function at_gathering_enqueue_assets() {
 	wp_enqueue_style( 'armstrong-gathering', AT_GATHERING_URL . 'assets/gathering.css', array(), AT_GATHERING_VERSION );
 }
 add_action( 'wp_enqueue_scripts', 'at_gathering_enqueue_assets' );
+
+function at_gathering_redirect_removed_food_page() {
+	$request_path = trim( (string) wp_parse_url( $_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH ), '/' );
+	if ( 'food' !== $request_path && ! is_page( 'food' ) ) {
+		return;
+	}
+
+	wp_safe_redirect( home_url( '/rsvp/' ), 301 );
+	exit;
+}
+add_action( 'template_redirect', 'at_gathering_redirect_removed_food_page', 1 );
 
 // WP Photo Album Plus registers its full interaction bundle during `init`,
 // even on pages that do not contain an album. Keep that bundle on the album

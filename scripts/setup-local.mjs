@@ -29,6 +29,11 @@ function ensurePage(slug, title, content) {
   return wp(['post', 'create', '--post_type=page', `--post_title=${title}`, `--post_name=${slug}`, '--post_status=publish', `--post_content=${content}`, '--porcelain']).stdout?.match(/(\d+)\s*$/)?.[1] ?? '';
 }
 
+function removePage(slug) {
+  const id = existingId(['post', 'list', '--post_type=page', `--name=${slug}`, '--field=ID', '--format=ids']);
+  if (id) wp(['post', 'delete', id, '--force']);
+}
+
 wp(['theme', 'activate', 'armstrong-thanksgiving']);
 wp(['plugin', 'activate', 'bbpress.latest-stable', 'wp-photo-album-plus.latest-stable', 'jonradio-private-site.latest-stable']);
 wp(['plugin', 'activate', 'armstrong-gathering']);
@@ -48,7 +53,7 @@ if (wp(['user', 'get', 'guest', '--field=ID'], { allowFailure: true }).status !=
 }
 
 const homeId = ensurePage('home', 'Home', '');
-ensurePage('food', 'Food & Friends', '<h2>Plan the table</h2><p>Choose what you can bring when you RSVP; the live counts stay with the host.</p><p><a class="at-button" href="/rsvp/">Open the RSVP</a></p>');
+removePage('food');
 ensurePage('albums', 'Shared Albums', '<p>After dinner, come back to share your photos and see the day through everyone else’s eyes.</p>[wppa type="generic"]<p>[wppa type="upload" album="1"]</p>');
 const forumPageId = ensurePage('forum', 'The Gathering', '<p>Use this forum for hellos, small plans, and anything that does not belong on the RSVP.</p>[bbp-forum-index]');
 ensurePage('rsvp', 'RSVP', '[at_rsvp]');

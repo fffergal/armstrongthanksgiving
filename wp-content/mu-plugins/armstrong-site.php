@@ -52,6 +52,7 @@ function armstrong_thanksgiving_login_branding() {
 		body.login { background:var(--at-cream); }
 		.login h1 a { width:100%; height:auto; margin-bottom:1.5rem; background:none; color:var(--at-brown); font:700 2rem/1 ui-rounded,"Trebuchet MS",system-ui,sans-serif; text-indent:0; text-decoration:none; }
 		.login form { border:0; border-radius:1.25rem; box-shadow:0 18px 45px rgba(76,37,24,.12); background:#fffaf4; }
+		.login form .submit { clear:both; padding-top:1.25rem !important; }
 		.login #wp-submit { border:0; border-radius:999px; background:var(--at-coral); text-shadow:none; box-shadow:none; }
 		.login #wp-submit:hover, .login #wp-submit:focus { background:var(--at-brown); }
 		.login a { color:var(--at-brown); }
