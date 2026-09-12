@@ -62,19 +62,25 @@ if (homeId) {
   wp(['option', 'update', 'page_on_front', homeId]);
 }
 
-const forumId = existingId(['post', 'list', '--post_type=forum', '--name=gathering', '--field=ID', '--format=ids']) || wp(['post', 'create', '--post_type=forum', '--post_title=The Gathering', '--post_name=gathering', '--post_status=publish', '--porcelain']).stdout?.match(/(\d+)\s*$/)?.[1];
+let forumId = existingId(['post', 'list', '--post_type=forum', '--name=gathering', '--field=ID', '--format=ids']);
+if (!forumId) {
+	wp(['post', 'create', '--post_type=forum', '--post_title=The Gathering', '--post_name=gathering', '--post_status=publish', '--porcelain']);
+	forumId = existingId(['post', 'list', '--post_type=forum', '--name=gathering', '--field=ID', '--format=ids']);
+}
 if (forumPageId && forumId) {
   wp(['post', 'update', forumPageId, '--post_title=The Gathering', `--post_content=<p>Use this forum for hellos, small plans, and anything that does not belong on the RSVP.</p><p>[bbp-single-forum id="${forumId}"]</p>`, '--post_status=publish']);
 }
-if (forumId && !existingId(['post', 'list', '--post_type=topic', '--name=say-hello', '--field=ID', '--format=ids'])) {
+let topicId = existingId(['post', 'list', '--post_type=topic', '--name=say-hello', '--field=ID', '--format=ids']);
+if (forumId && !topicId) {
 	wp(['post', 'create', '--post_type=topic', '--post_title=Say hello', '--post_name=say-hello', `--post_parent=${forumId}`, '--post_status=publish', '--post_author=1', '--post_content=Share a hello, a photo, or a small plan for the day. RSVP and food choices live on the RSVP page.']);
+	topicId = existingId(['post', 'list', '--post_type=topic', '--name=say-hello', '--field=ID', '--format=ids']);
 }
-if (forumId) {
+if (forumId && topicId) {
   // Seeded topics need bbPress's own metadata so the forum counts and topic
   // loop include them (a plain wp post is not enough for bbPress).
   wp([
     'eval',
-    `$topic = get_page_by_path('say-hello', OBJECT, 'topic'); if ($topic) { $topic_id = (int) $topic->ID; wp_update_post(array('ID' => $topic_id, 'post_parent' => ${forumId}, 'post_author' => 1)); update_post_meta($topic_id, '_bbp_forum_id', ${forumId}); update_post_meta($topic_id, '_bbp_topic_id', $topic_id); update_post_meta($topic_id, '_bbp_voice_count', 1); update_post_meta($topic_id, '_bbp_reply_count', 0); update_post_meta($topic_id, '_bbp_reply_count_hidden', 0); update_post_meta($topic_id, '_bbp_last_reply_id', 0); update_post_meta($topic_id, '_bbp_last_active_id', $topic_id); update_post_meta($topic_id, '_bbp_last_active_time', get_post_field('post_date', $topic_id, 'db')); bbp_update_forum_topic_count(${forumId}); bbp_update_forum_topic_count_hidden(${forumId}); }`,
+    `$topic_id = ${topicId}; wp_update_post(array('ID' => $topic_id, 'post_parent' => ${forumId}, 'post_author' => 1)); update_post_meta($topic_id, '_bbp_forum_id', ${forumId}); update_post_meta($topic_id, '_bbp_topic_id', $topic_id); update_post_meta($topic_id, '_bbp_voice_count', 1); update_post_meta($topic_id, '_bbp_reply_count', 0); update_post_meta($topic_id, '_bbp_reply_count_hidden', 0); update_post_meta($topic_id, '_bbp_last_reply_id', 0); update_post_meta($topic_id, '_bbp_last_active_id', $topic_id); update_post_meta($topic_id, '_bbp_last_active_time', get_post_field('post_date', $topic_id, 'db')); bbp_update_forum_topic_count(${forumId}); bbp_update_forum_topic_count_hidden(${forumId});`,
   ]);
 }
 
