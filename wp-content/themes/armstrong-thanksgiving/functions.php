@@ -34,7 +34,7 @@ function armstrong_thanksgiving_theme_login_branding() {
 add_action( 'login_head', 'armstrong_thanksgiving_theme_login_branding' );
 
 function armstrong_thanksgiving_theme_login_message() {
-	return '<p class="message at-login-message"><strong>Friends’ sign in</strong><br>Use the username or email address and password you chose with your RSVP. New here? Start on the RSVP page to create your account.</p>';
+	return '<p class="message at-login-message"><strong>Sign in</strong><br>Use the username or email address and password you chose when you completed your RSVP. New here? <a href="' . esc_url( home_url( '/rsvp/' ) ) . '">Start your RSVP</a> to create an account.</p>';
 }
 add_filter( 'login_message', 'armstrong_thanksgiving_theme_login_message' );
 
@@ -47,6 +47,11 @@ function armstrong_thanksgiving_theme_login_text() {
 	return 'Armstrong Thanksgiving';
 }
 add_filter( 'login_headertext', 'armstrong_thanksgiving_theme_login_text' );
+
+function armstrong_thanksgiving_theme_login_site_html_link() {
+	return '<a href="' . esc_url( home_url( '/' ) ) . '">&larr; Go to home page</a>';
+}
+add_filter( 'login_site_html_link', 'armstrong_thanksgiving_theme_login_site_html_link' );
 
 /**
  * Give site emails the same warm, flyer-inspired treatment as the front end.
