@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Armstrong Gathering
  * Description: The small, first-party RSVP and potluck layer for Armstrong Thanksgiving.
- * Version: 0.3.4
+ * Version: 0.3.5
  * Requires at least: 6.8
  * Requires PHP: 8.1
  * Author: Armstrong Thanksgiving
@@ -11,7 +11,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'AT_GATHERING_VERSION', '0.3.4' );
+define( 'AT_GATHERING_VERSION', '0.3.5' );
 define( 'AT_GATHERING_FILE', __FILE__ );
 define( 'AT_GATHERING_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AT_GATHERING_URL', plugin_dir_url( __FILE__ ) );
@@ -446,6 +446,26 @@ function at_gathering_rsvp_shortcode() {
 }
 add_shortcode( 'at_rsvp', 'at_gathering_rsvp_shortcode' );
 
+function at_gathering_confirmation_message( $user, $status, $guest_count, $guest_names, $foods, $dietary, $notes, $greeting_name = '' ) {
+	$details = at_gathering_event_details();
+	$food_text = $foods ? implode( ', ', $foods ) : 'Nothing chosen yet';
+	$greeting_name = $greeting_name ?: ( $user->display_name ?: $user->user_login );
+
+	return sprintf(
+		"Hi %s,\n\nThanks for letting us know about Thanksgiving.\n\nAttendance: %s\nPeople: %d\nNames: %s\nFood: %s\nDietary notes: %s\nNote for the hosts: %s\n\n%s · %s\n%s\n\nYou can update your RSVP any time from the site. Your account also gives you access to the forum and shared photos.\n\nSee you there!\nThe hosts",
+		$greeting_name,
+		at_gathering_status_label( $status ),
+		$guest_count,
+		$guest_names ?: '—',
+		$food_text,
+		$dietary ?: 'None noted',
+		$notes ?: 'None noted',
+		$details['date'],
+		$details['time'],
+		$details['address']
+	);
+}
+
 function at_gathering_save_rsvp() {
 	if ( ! isset( $_POST['at_rsvp_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['at_rsvp_nonce'] ) ), 'at_save_rsvp' ) ) {
 		wp_die( 'Sorry, we could not save that RSVP.' );
@@ -532,21 +552,7 @@ function at_gathering_save_rsvp() {
 		at_gathering_redirect_error( $return, 'Please try again. Your account was not created.', $form_values );
 	}
 
-	$details = at_gathering_event_details();
-	$food_text = $foods ? implode( ', ', $foods ) : 'Nothing chosen yet';
-	$message = sprintf(
-		"Hi %s,\n\nThanks for letting us know about Thanksgiving.\n\nAttendance: %s\nPeople: %d\nNames: %s\nFood: %s\nDietary notes: %s\nNote for the hosts: %s\n\n%s · %s\n%s\n\nYou can update your RSVP any time from the site. Your account also gives you access to the forum and shared photos.\n\nSee you there!\nThe hosts",
-		$user->display_name ?: $user->user_login,
-		at_gathering_status_label( $status ),
-		$guest_count,
-		$guest_names ?: '—',
-		$food_text,
-		$data['dietary'] ?: 'None noted',
-		$data['notes'] ?: 'None noted',
-		$details['date'],
-		$details['time'],
-		$details['address']
-	);
+	$message = at_gathering_confirmation_message( $user, $status, $guest_count, $guest_names, $foods, $data['dietary'], $data['notes'] );
 	$mail_ok = wp_mail( $user->user_email, 'Your Armstrong Thanksgiving RSVP', $message );
 	wp_safe_redirect( add_query_arg( array( 'at_rsvp' => 'saved', 'at_mail' => $mail_ok ? 'sent' : 'failed' ), $return ) );
 	exit;
@@ -584,10 +590,12 @@ function at_gathering_admin_page() {
 	$rows   = $wpdb->get_results( 'SELECT * FROM ' . at_gathering_table() . ' ORDER BY updated_at DESC' );
 	$foods  = at_gathering_foods();
 	$counts = at_gathering_food_counts();
+	$admins = get_users( array( 'role' => 'administrator', 'orderby' => 'display_name', 'order' => 'ASC' ) );
 	?>
 	<div class="wrap at-gathering-admin">
 		<h1>Gathering RSVPs</h1>
 		<p>Host view: attendance, notes, and what is coming to the table.</p>
+		<?php if ( 'sent' === ( $_GET['at_sample_mail'] ?? '' ) ) : ?><div class="notice notice-success is-dismissible"><p>Sample RSVP confirmation sent through WordPress mail.</p></div><?php elseif ( 'failed' === ( $_GET['at_sample_mail'] ?? '' ) ) : ?><div class="notice notice-error is-dismissible"><p>WordPress could not send the sample RSVP confirmation.</p></div><?php endif; ?>
 		<div class="at-admin-foods">
 			<?php foreach ( $foods as $food ) : ?><span><strong><?php echo esc_html( (int) ( $counts[ $food ] ?? 0 ) ); ?></strong> <?php echo esc_html( $food ); ?></span><?php endforeach; ?>
 		</div>
@@ -599,9 +607,39 @@ function at_gathering_admin_page() {
 		<?php foreach ( $rows as $row ) : $user = get_user_by( 'id', $row->user_id ); $row_foods = json_decode( $row->foods, true ); ?>
 			<tr><td><strong><?php echo esc_html( $user ? $user->display_name : 'Unknown friend' ); ?></strong><br><small><?php echo esc_html( $user ? $user->user_email : '' ); ?></small></td><td><?php echo esc_html( at_gathering_status_label( $row->status ) ); ?></td><td><?php echo esc_html( $row->guest_count ); ?><?php echo $row->guest_names ? '<br><small>' . esc_html( $row->guest_names ) . '</small>' : ''; ?></td><td><?php echo esc_html( implode( ', ', (array) $row_foods ) ?: '—' ); ?></td><td><?php echo esc_html( $row->dietary ?: '—' ); ?></td><td><?php echo esc_html( $row->notes ?: '—' ); ?></td><td><?php echo esc_html( mysql2date( 'j M, H:i', $row->updated_at ) ); ?></td></tr>
 		<?php endforeach; ?></tbody></table>
+		<?php if ( $admins ) : ?>
+			<hr>
+			<h2>Send a sample confirmation</h2>
+			<p>This sends the normal RSVP confirmation through WordPress mail without saving an RSVP.</p>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<input type="hidden" name="action" value="at_send_sample_rsvp_email">
+				<label for="at-sample-user">Recipient</label>
+				<select id="at-sample-user" name="at_sample_user_id">
+					<?php foreach ( $admins as $admin ) : ?><option value="<?php echo esc_attr( $admin->ID ); ?>" <?php selected( $admin->ID, 1 ); ?>><?php echo esc_html( $admin->display_name . ' · ' . $admin->user_email ); ?></option><?php endforeach; ?>
+				</select>
+				<button class="button button-primary" type="submit">Send sample RSVP confirmation</button>
+				<?php wp_nonce_field( 'at_send_sample_rsvp_email', 'at_sample_email_nonce' ); ?>
+			</form>
+		<?php endif; ?>
 	</div>
 	<?php
 }
+
+function at_gathering_send_sample_rsvp_email() {
+	if ( ! current_user_can( 'manage_options' ) || ! isset( $_POST['at_sample_email_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['at_sample_email_nonce'] ) ), 'at_send_sample_rsvp_email' ) ) {
+		wp_die( 'Sorry, the sample confirmation could not be sent.' );
+	}
+	$recipient = get_user_by( 'id', absint( $_POST['at_sample_user_id'] ?? 0 ) );
+	if ( ! $recipient || ! in_array( 'administrator', (array) $recipient->roles, true ) ) {
+		wp_die( 'Choose an administrator as the sample recipient.' );
+	}
+	$message = at_gathering_confirmation_message( $recipient, 'yes', 2, 'Fergal and a guest', array( 'Stuffing', 'Gravy' ), 'None noted', 'Looking forward to it.', 'Fergal' );
+	$sent = wp_mail( $recipient->user_email, 'Your Armstrong Thanksgiving RSVP', $message );
+	$url  = add_query_arg( array( 'page' => 'at-gathering', 'at_sample_mail' => $sent ? 'sent' : 'failed' ), admin_url( 'admin.php' ) );
+	wp_safe_redirect( $url );
+	exit;
+}
+add_action( 'admin_post_at_send_sample_rsvp_email', 'at_gathering_send_sample_rsvp_email' );
 
 function at_gathering_add_food() {
 	if ( ! current_user_can( 'manage_options' ) || ! isset( $_POST['at_food_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['at_food_nonce'] ) ), 'at_add_food' ) ) {
