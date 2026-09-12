@@ -85,6 +85,24 @@ test('the ordinary RSVP URL is public and explains account access', async ({ pag
   await expect(page.getByText('gathering forum and shared photos')).toBeVisible();
 });
 
+test('the sign-in option comes before registration and keeps the RSVP draft', async ({ page }) => {
+  await page.goto('/rsvp/');
+  const note = page.locator('.at-form-login-note-top');
+  const account = page.getByRole('group', { name: 'Create your account' });
+  await expect(note).toBeVisible();
+  expect(await note.evaluate((element, target) => Boolean(element.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING), await account.elementHandle())).toBe(true);
+  await page.getByLabel('Names').fill('Draft guest');
+  await page.getByLabel('Stuffing').check();
+  await page.getByRole('link', { name: 'Sign in first' }).click();
+  await expect(page).toHaveURL(/wp-login\.php/);
+  await page.goto('/rsvp/');
+  await expect(page.getByLabel('Names')).toHaveValue('Draft guest');
+  await expect(page.getByLabel('Stuffing')).toBeChecked();
+  await page.reload();
+  await expect(page.getByLabel('Names')).toHaveValue('Draft guest');
+  await expect(page.getByLabel('Stuffing')).toBeChecked();
+});
+
 test('private album access redirects signed-out visitors', async ({ browser }) => {
   const context = await browser.newContext();
   const page = await context.newPage();

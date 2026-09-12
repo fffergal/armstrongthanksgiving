@@ -61,3 +61,12 @@ test('the removed food route points visitors to the RSVP', async ({ request }) =
   expect(response.status()).toBe(301);
   expect(response.headers().location).toMatch(/\/rsvp\/$/);
 });
+
+test('unknown public routes explain what to do next', async ({ page, request }) => {
+  const response = await request.get('/randomblah-404', { maxRedirects: 0 });
+  expect(response.status()).toBe(404);
+  await page.goto('/randomblah-404');
+  await expect(page.locator('body')).toHaveClass(/error404/);
+  await expect(page.getByRole('heading', { name: 'That page wandered off.' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Go to home page' })).toHaveAttribute('href', /\/$/);
+});

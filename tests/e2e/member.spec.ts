@@ -23,4 +23,9 @@ test('a signed-in friend can use the gathering pages', async ({ page }) => {
 
   await page.goto('/forum/');
   expect(await page.locator('img.avatar[src*="turkey-"]').count()).toBeGreaterThan(0);
+
+  await page.goto('/randomblah-signed-in-404');
+  await expect(page.locator('body')).toHaveClass(/error404/);
+  await expect(page.getByRole('heading', { name: 'That page wandered off.' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Sign out' })).toBeVisible();
 });

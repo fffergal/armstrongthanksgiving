@@ -88,6 +88,10 @@ a:hover { color: var(--at-orange); }
 .at-page-header p { max-width: 38rem; margin: 1.25rem 0 0; font-family: Georgia, serif; font-size: 1.2rem; }
 .at-content-card { padding: clamp(1.25rem, 4vw, 3rem); border-radius: 1.5rem; background: rgba(255,255,255,.5); box-shadow: var(--at-shadow); }
 .at-content-card h2 { color: var(--at-brown); }
+.at-not-found { min-height: 58vh; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: clamp(4rem, 12vw, 8rem) 0; }
+.at-not-found h1 { max-width: 46rem; margin: 0; color: var(--at-orange); font-size: clamp(3rem, 9vw, 7rem); line-height: .92; }
+.at-not-found > p:not(.at-kicker) { max-width: 38rem; margin: 1.4rem 0 0; color: var(--at-brown); font-family: Georgia, serif; font-size: clamp(1.15rem, 2vw, 1.4rem); }
+.at-not-found .at-actions { margin-top: 2rem; }
 .at-form-note { padding: 1rem 1.25rem; border-left: .4rem solid var(--at-coral); background: #fff8ef; }
 .at-footer { margin-top: 4rem; padding: 2rem 1rem; background: var(--at-brown); color: #fff; }
 .at-footer-inner { width: min(100%, 76rem); margin: 0 auto; display: flex; justify-content: space-between; gap: 1rem; font-size: .9rem; }

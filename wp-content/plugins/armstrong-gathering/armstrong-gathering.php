@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Armstrong Gathering
  * Description: The small, first-party RSVP and potluck layer for Armstrong Thanksgiving.
- * Version: 0.3.2
+ * Version: 0.3.4
  * Requires at least: 6.8
  * Requires PHP: 8.1
  * Author: Armstrong Thanksgiving
@@ -11,7 +11,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'AT_GATHERING_VERSION', '0.3.2' );
+define( 'AT_GATHERING_VERSION', '0.3.4' );
 define( 'AT_GATHERING_FILE', __FILE__ );
 define( 'AT_GATHERING_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AT_GATHERING_URL', plugin_dir_url( __FILE__ ) );
@@ -289,6 +289,9 @@ function at_gathering_enqueue_assets() {
 		return;
 	}
 	wp_enqueue_style( 'armstrong-gathering', AT_GATHERING_URL . 'assets/gathering.css', array(), AT_GATHERING_VERSION );
+	if ( is_page( 'rsvp' ) ) {
+		wp_enqueue_script( 'armstrong-gathering-rsvp', AT_GATHERING_URL . 'assets/rsvp.js', array(), AT_GATHERING_VERSION, true );
+	}
 }
 add_action( 'wp_enqueue_scripts', 'at_gathering_enqueue_assets' );
 
@@ -423,6 +426,7 @@ function at_gathering_rsvp_shortcode() {
 				<textarea name="at_notes" rows="3" placeholder="Add a note for the hosts"><?php echo esc_textarea( $values['notes'] ?? ( $rsvp ? $rsvp->notes : '' ) ); ?></textarea>
 			</label>
 			<?php if ( ! $user->exists() ) : ?>
+				<p class="at-form-login-note at-form-login-note-top">Already have an account? <a data-at-rsvp-login href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>">Sign in first</a>. We’ll keep what you’ve entered here while you sign in.</p>
 				<fieldset class="at-account-fields">
 					<legend>Create your account</legend>
 					<p class="at-field-help">Create an account to RSVP. It will also give you access to the gathering forum and shared photos.</p>
@@ -434,7 +438,7 @@ function at_gathering_rsvp_shortcode() {
 					</div>
 				</fieldset>
 			<?php endif; ?>
-			<p class="at-form-actions"><button class="at-button" type="submit"><?php echo $rsvp ? 'Update my RSVP' : 'Save my RSVP'; ?></button><?php if ( ! $user->exists() ) : ?><span class="at-form-login-note">Already have an account? <a href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>">Sign in first</a>.</span><?php endif; ?></p>
+			<p class="at-form-actions"><button class="at-button" type="submit"><?php echo $rsvp ? 'Update my RSVP' : 'Save my RSVP'; ?></button></p>
 		</form>
 	</div>
 	<?php
