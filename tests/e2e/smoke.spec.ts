@@ -25,11 +25,13 @@ test('hero keeps long words intact at tablet width', async ({ page }) => {
 });
 
 test('front page keeps the navigation and content focused', async ({ page }) => {
-  await logIn(page);
   await page.goto('/');
   await expect(page.getByRole('link', { name: 'Memories' })).toHaveCount(0);
   await expect(page.locator('.at-wordmark')).toBeHidden();
   await expect(page.locator('body')).not.toContainText('armstrongthanksgiving.com');
+  await expect(page.locator('.at-hero')).not.toContainText('Priestfield');
+  await expect(page.getByRole('link', { name: 'Open the forum' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'RSVP' }).first()).toBeVisible();
   await expect(page.locator('.at-hero h1')).toHaveCSS('font-family', /Georgia/i);
 });
 
@@ -43,7 +45,7 @@ test('front page has no horizontal overflow on phone and tablet', async ({ page 
 });
 
 test('private routes do not disclose content anonymously', async ({ request }) => {
-  for (const path of ['/forums/', '/albums/', '/wp-json/wp/v2/posts']) {
+  for (const path of ['/forum/', '/albums/', '/community/topic/say-hello/', '/wp-json/wp/v2/posts']) {
     const response = await request.get(path, { maxRedirects: 0 });
     expect([301, 302, 303, 307, 308, 401, 403, 404]).toContain(response.status());
   }

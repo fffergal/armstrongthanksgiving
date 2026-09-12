@@ -18,6 +18,7 @@
 .at-food-list label { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .5rem; padding: .7rem; border: 1px solid #c8ad90; border-radius: .75rem; background: #ead7bf; font-weight: 700; }
 .at-food-list small { color: #4c2518; font-size: .78rem; font-weight: 700; white-space: nowrap; }
 .at-form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .9rem; }
+.at-form-login-note { color: #4c2518; font-size: .95rem; }
 .at-success { margin-bottom: 1.25rem; padding: 1rem 1.15rem; border-left: .35rem solid #706e3d; border-radius: .7rem; background: #fff8ef; color: #4c2518; }
 .at-access-note { padding: 1.25rem; border-radius: 1rem; background: #ead7bf; }
 .at-access-note p:last-child { margin-bottom: 0; }

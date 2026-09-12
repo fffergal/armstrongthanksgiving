@@ -40,7 +40,7 @@ wp(['option', 'update', '_bbp_topic_slug', 'topic']);
 wp(['rewrite', 'structure', '/%postname%/']);
 wp([
   'eval',
-  "$settings = get_option('jr_ps_settings', array()); $settings['private_site'] = true; $settings['private_api'] = true; $settings['compatibility_mode'] = 'ELEMENTOR'; update_option('jr_ps_settings', $settings);"
+  "$settings = get_option('jr_ps_settings', array()); $settings['private_site'] = false; $settings['private_api'] = true; $settings['compatibility_mode'] = 'ELEMENTOR'; update_option('jr_ps_settings', $settings);"
 ]);
 
 if (wp(['user', 'get', 'guest', '--field=ID'], { allowFailure: true }).status !== 0) {
@@ -49,10 +49,9 @@ if (wp(['user', 'get', 'guest', '--field=ID'], { allowFailure: true }).status !=
 
 const homeId = ensurePage('home', 'Home', '');
 ensurePage('food', 'Food & Friends', '<h2>Plan the table</h2><p>Choose what you can bring when you RSVP; the live counts stay with the host.</p><p><a class="at-button" href="/rsvp/">Open the RSVP</a></p>');
-ensurePage('albums', 'Shared Albums', '<p>Photos from this dinner and the people around the table.</p><p class="at-form-note"><strong>Signed-in friends:</strong> add a photo below.</p>[wppa type="generic"]<p>[wppa type="upload" album="1"]</p>');
+ensurePage('albums', 'Shared Albums', '<p>After dinner, come back to share your photos and see the day through everyone else’s eyes.</p>[wppa type="generic"]<p>[wppa type="upload" album="1"]</p>');
 const forumPageId = ensurePage('forum', 'The Gathering', '<p>Use this forum for hellos, small plans, and anything that does not belong on the RSVP.</p>[bbp-forum-index]');
 ensurePage('rsvp', 'RSVP', '[at_rsvp]');
-wp(['option', 'update', 'at_gathering_invite_key', 'test-invite']);
 if (homeId) {
   wp(['option', 'update', 'show_on_front', 'page']);
   wp(['option', 'update', 'page_on_front', homeId]);
@@ -64,6 +63,14 @@ if (forumPageId && forumId) {
 }
 if (forumId && !existingId(['post', 'list', '--post_type=topic', '--name=say-hello', '--field=ID', '--format=ids'])) {
 	wp(['post', 'create', '--post_type=topic', '--post_title=Say hello', '--post_name=say-hello', `--post_parent=${forumId}`, '--post_status=publish', '--post_author=1', '--post_content=Share a hello, a photo, or a small plan for the day. RSVP and food choices live on the RSVP page.']);
+}
+if (forumId) {
+  // Seeded topics need bbPress's own metadata so the forum counts and topic
+  // loop include them (a plain wp post is not enough for bbPress).
+  wp([
+    'eval',
+    `$topic = get_page_by_path('say-hello', OBJECT, 'topic'); if ($topic) { $topic_id = (int) $topic->ID; wp_update_post(array('ID' => $topic_id, 'post_parent' => ${forumId}, 'post_author' => 1)); update_post_meta($topic_id, '_bbp_forum_id', ${forumId}); update_post_meta($topic_id, '_bbp_topic_id', $topic_id); update_post_meta($topic_id, '_bbp_voice_count', 1); update_post_meta($topic_id, '_bbp_reply_count', 0); update_post_meta($topic_id, '_bbp_reply_count_hidden', 0); update_post_meta($topic_id, '_bbp_last_reply_id', 0); update_post_meta($topic_id, '_bbp_last_active_id', $topic_id); update_post_meta($topic_id, '_bbp_last_active_time', get_post_field('post_date', $topic_id, 'db')); bbp_update_forum_topic_count(${forumId}); bbp_update_forum_topic_count_hidden(${forumId}); }`,
+  ]);
 }
 
 wp(['rewrite', 'flush']);

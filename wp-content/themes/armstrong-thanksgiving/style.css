@@ -1,7 +1,7 @@
 /*
 Theme Name: Armstrong Thanksgiving
 Description: Private gathering theme; visual direction to be based on the event flyers.
-Version: 0.2.2
+Version: 0.2.6
 Requires at least: 6.8
 Requires PHP: 8.1
 Text Domain: armstrong-thanksgiving
@@ -98,7 +98,7 @@ a:hover { color: var(--at-orange); }
 #bbpress-forums .bbp-breadcrumb { display: none; }
 #bbpress-forums .bbp-forum-description, #bbpress-forums .bbp-topic-description,
 #bbpress-forums .bbp-pagination-count,
-#bbpress-forums .bbp-template-notice.info,
+#bbpress-forums .bbp-template-notice,
 #bbpress-forums .bbp-topic-form .bbp-template-notice,
 #bbpress-forums .bbp-forum-topic-count, #bbpress-forums .bbp-forum-reply-count,
 #bbpress-forums .bbp-forum-freshness, #bbpress-forums .bbp-topic-voice-count,
@@ -106,7 +106,10 @@ a:hover { color: var(--at-orange); }
 #bbpress-forums .bbp-topic-meta, #bbpress-forums .bbp-author-role,
 #bbpress-forums .bbp-reply-ip, #bbpress-forums .bbp-admin-links,
 #bbpress-forums .bbp-subscribe-link, #bbpress-forums .subscription-toggle,
+#bbpress-forums #subscription-toggle, #bbpress-forums #favorite-toggle,
 #bbpress-forums [id^="subscribe-"], #bbpress-forums .bbp-topic-favorite-link,
+#bbpress-forums .favorite-toggle, #bbpress-forums [id^="favorite-"],
+#bbpress-forums .bbp-reply-permalink,
 #bbpress-forums li.bbp-footer, #bbpress-forums .bbp-topic-tags,
 #bbpress-forums .bbp-topic-type, #bbpress-forums .bbp-topic-status,
 #bbpress-forums .bbp-topic-form .bbp-topic-tags,
@@ -129,14 +132,16 @@ a:hover { color: var(--at-orange); }
 /* WP Photo Album Plus: stable plugin selectors, kept in the theme for updates. */
 .wppa-container, .wppa-box { color: var(--at-ink); font-family: inherit; }
 .wppa-container a, .wppa-box a { color: var(--at-brown); }
-.wppa-thumb, .wppa-cover-box { border-radius: 1rem; overflow: hidden; box-shadow: 0 7px 20px rgba(76,37,24,.12); }
+.wppa-thumb, .wppa-cover-box { border-radius: 1rem; overflow: hidden; box-shadow: none !important; }
 .wppa-title, .wppa-album-title { color: var(--at-orange); font-weight: 800; }
 .wppa-button, .wppa-upload-button { border: 0; border-radius: 999px; background: var(--at-coral); color: #fff; font-weight: 800; }
 .wppa-container .wppa-nav.wppa-bc { background: transparent !important; border: 0 !important; padding: 0 0 .75rem !important; }
 .wppa-container .wppa-cover-box { background: #fff8ef !important; border: 1px solid rgba(76,37,24,.14) !important; }
-.wppa-container .wppa-box { background: rgba(255,255,255,.48) !important; border-color: rgba(76,37,24,.14) !important; }
+.wppa-container .wppa-box { background: rgba(255,255,255,.48) !important; border-color: rgba(76,37,24,.14) !important; border-radius: 1rem !important; box-shadow: none !important; }
+.wppa-container .wppa-cover-box, .wppa-container .wppa-thumb { border-radius: 1rem !important; box-shadow: none !important; }
 .wppa-container .wppa-title { color: var(--at-orange) !important; }
 .wppa-container .wppa-cover-box * { max-width: 100%; overflow-wrap: break-word; word-break: normal; }
+.wppa-container .wppa-box-text-desc { display: none !important; }
 .wppa-container .wppa-nav, .wppa-container .wppa-bc, .wppa-container .wppa-metadata,
 .wppa-container .wppa-owner, .wppa-container .wppa-help, .wppa-container .wppa-comment-count { display: none !important; }
 .wppa-container .wppa-thumb, .wppa-container .wppa-cover-box { background: #fffaf4 !important; }
@@ -147,6 +152,8 @@ a:hover { color: var(--at-orange); }
  * board rather than a general-purpose message-board administration screen. */
 #bbpress-forums li.bbp-header, #bbpress-forums li.bbp-footer { font-family: Georgia, 'Times New Roman', serif; }
 #bbpress-forums .bbp-form { box-shadow: none; }
+#bbpress-forums li.bbp-header > *, #bbpress-forums li.bbp-footer > * { font-size: .95rem; line-height: 1.35; }
+#bbpress-forums .bbp-meta a.bbp-reply-permalink { display: none !important; }
 
 @media (max-width: 850px) {
   #bbpress-forums .bbp-reply-author { width: auto; float: none; min-height: 0; padding: .8rem 0 0; text-align: left; }

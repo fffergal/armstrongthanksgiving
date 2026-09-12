@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Armstrong Gathering
  * Description: The small, first-party RSVP and potluck layer for Armstrong Thanksgiving.
- * Version: 0.2.0
+ * Version: 0.3.1
  * Requires at least: 6.8
  * Requires PHP: 8.1
  * Author: Armstrong Thanksgiving
@@ -11,7 +11,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'AT_GATHERING_VERSION', '0.2.0' );
+define( 'AT_GATHERING_VERSION', '0.3.1' );
 define( 'AT_GATHERING_FILE', __FILE__ );
 define( 'AT_GATHERING_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AT_GATHERING_URL', plugin_dir_url( __FILE__ ) );
@@ -131,6 +131,9 @@ function at_gathering_migrate_content() {
 	if ( false === get_option( 'at_gathering_invite_key', false ) ) {
 		update_option( 'at_gathering_invite_key', wp_generate_password( 32, false, false ) );
 	}
+	foreach ( get_users( array( 'fields' => 'ID' ) ) as $user_id ) {
+		at_gathering_assign_avatar( $user_id );
+	}
 	$page = get_page_by_path( 'rsvp' );
 	if ( $page && '[at_rsvp]' !== trim( $page->post_content ) ) {
 		wp_update_post( array( 'ID' => $page->ID, 'post_content' => '[at_rsvp]' ) );
@@ -157,11 +160,29 @@ function at_gathering_remember_invite() {
 add_action( 'init', 'at_gathering_remember_invite' );
 
 function at_gathering_allow_invited_rsvp() {
-	if ( at_gathering_invite_is_valid() && is_page( 'rsvp' ) ) {
-		remove_action( 'template_redirect', 'jr_ps_force_login' );
-	}
+	// The home page and RSVP are intentionally public. Friends create an
+	// account as the final step of the RSVP instead of using an invite URL.
 }
 add_action( 'wp', 'at_gathering_allow_invited_rsvp', 1 );
+
+function at_gathering_require_member_pages() {
+	if ( is_user_logged_in() || is_admin() || wp_doing_ajax() ) {
+		return;
+	}
+	if ( is_page( array( 'albums', 'forum' ) ) || is_singular( array( 'forum', 'topic', 'reply' ) ) ) {
+		wp_safe_redirect( wp_login_url( home_url( add_query_arg( array(), $GLOBALS['wp']->request ?? '' ) ) ) );
+		exit;
+	}
+}
+add_action( 'template_redirect', 'at_gathering_require_member_pages', 2 );
+
+function at_gathering_require_rest_member( $result ) {
+	if ( null !== $result || is_user_logged_in() ) {
+		return $result;
+	}
+	return new WP_Error( 'at_private_rest', 'You must be signed in to access this site data.', array( 'status' => 401 ) );
+}
+add_filter( 'rest_authentication_errors', 'at_gathering_require_rest_member', 20 );
 
 function at_gathering_hide_member_admin_bar( $show ) {
 	return current_user_can( 'manage_options' ) ? $show : false;
@@ -204,6 +225,19 @@ function at_gathering_user_id( $id_or_email ) {
 		return $user ? (int) $user->ID : 0;
 	}
 	return 0;
+}
+
+function at_gathering_unique_login( $email ) {
+	$base = sanitize_user( strstr( $email, '@', true ), true );
+	$base = $base ?: 'guest';
+	$base = substr( $base, 0, 55 );
+	$login = $base;
+	$suffix = 2;
+	while ( username_exists( $login ) ) {
+		$login = substr( $base, 0, 60 - strlen( (string) $suffix ) - 1 ) . '-' . $suffix;
+		$suffix++;
+	}
+	return $login;
 }
 
 function at_gathering_avatar_file( $user_id ) {
@@ -258,6 +292,20 @@ function at_gathering_enqueue_assets() {
 }
 add_action( 'wp_enqueue_scripts', 'at_gathering_enqueue_assets' );
 
+// WP Photo Album Plus registers its full interaction bundle during `init`,
+// even on pages that do not contain an album. Keep that bundle on the album
+// page only so the public entry point stays responsive on shared hosting.
+function at_gathering_trim_album_assets() {
+	if ( is_page( 'albums' ) ) {
+		return;
+	}
+	foreach ( array( 'wppa-decls', 'wppa-utils', 'wppa-main', 'wppa-slideshow', 'wppa-ajax-front', 'wppa-lightbox', 'wppa-popup', 'wppa-touch', 'wppa-zoom', 'wppa-spheric', 'wppa-flatpan', 'wppa' ) as $handle ) {
+		wp_dequeue_script( $handle );
+	}
+	wp_dequeue_style( 'wppa_style' );
+}
+add_action( 'wp_enqueue_scripts', 'at_gathering_trim_album_assets', 100 );
+
 function at_gathering_body_class( $classes ) {
 	if ( is_page( 'rsvp' ) ) {
 		$classes[] = 'at-rsvp-page';
@@ -296,15 +344,10 @@ function at_gathering_status_label( $status ) {
 }
 
 function at_gathering_rsvp_shortcode() {
-	if ( ! is_user_logged_in() && ! at_gathering_invite_is_valid() ) {
-		return '<div class="at-access-note"><strong>Friends’ RSVP</strong><p>Sign in to RSVP, choose something for the table, and see the shared forum and photos.</p><p><a class="at-button" href="' . esc_url( wp_login_url( get_permalink() ) ) . '">Member sign in</a></p></div>';
-	}
-
 	$user    = wp_get_current_user();
 	$rsvp    = $user->exists() ? at_gathering_get_rsvp( $user->ID ) : null;
 	$foods   = at_gathering_foods();
 	$counts  = at_gathering_food_counts();
-	$details = at_gathering_event_details();
 	$chosen  = $rsvp ? (array) json_decode( $rsvp->foods, true ) : array();
 	$values  = at_gathering_form_values();
 	if ( $values ) {
@@ -325,7 +368,7 @@ function at_gathering_rsvp_shortcode() {
 		<form class="at-rsvp-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post">
 			<div class="at-rsvp-intro">
 				<h2>Will you join us?</h2>
-				<p><?php echo esc_html( $details['date'] . ' · ' . $details['time'] . ' · ' . $details['address'] ); ?></p>
+				<p>Let us know if you can make it, who’s joining you, and what you might bring.</p>
 			</div>
 			<input type="hidden" name="action" value="at_save_rsvp">
 			<input type="hidden" name="at_return_url" value="<?php echo esc_url( get_permalink() ); ?>">
@@ -347,7 +390,7 @@ function at_gathering_rsvp_shortcode() {
 					</select>
 				</label>
 				<label>Names
-					<input type="text" name="at_guest_names" value="<?php echo esc_attr( $values['guest_names'] ?? ( $rsvp ? $rsvp->guest_names : '' ) ); ?>" placeholder="Everyone in your RSVP" required>
+					<input type="text" name="at_guest_names" value="<?php echo esc_attr( $values['guest_names'] ?? ( $rsvp ? $rsvp->guest_names : '' ) ); ?>" placeholder="Everyone in your RSVP">
 				</label>
 			</div>
 			<label>Dietary notes (optional)
@@ -370,17 +413,17 @@ function at_gathering_rsvp_shortcode() {
 			</label>
 			<?php if ( ! $user->exists() ) : ?>
 				<fieldset class="at-account-fields">
-					<legend>Your account</legend>
-					<p class="at-field-help">Use this to return to your RSVP, join the forum, and share photos.</p>
+					<legend>Create your account</legend>
+					<p class="at-field-help">Create an account to RSVP. It will also give you access to the gathering forum and shared photos.</p>
 					<div class="at-rsvp-grid">
-						<label>Username<input type="text" name="at_username" value="<?php echo esc_attr( $values['username'] ?? '' ); ?>" autocomplete="username" required></label>
 						<label>Display name<input type="text" name="at_display_name" value="<?php echo esc_attr( $values['display_name'] ?? '' ); ?>" autocomplete="name" required></label>
 						<label>Email<input type="email" name="at_email" value="<?php echo esc_attr( $values['email'] ?? '' ); ?>" autocomplete="email" required></label>
 						<label>Password<input type="password" name="at_password" autocomplete="new-password" minlength="10" required></label>
+						<label>Confirm password<input type="password" name="at_password_confirm" autocomplete="new-password" minlength="10" required></label>
 					</div>
 				</fieldset>
 			<?php endif; ?>
-			<p class="at-form-actions"><button class="at-button" type="submit"><?php echo $rsvp ? 'Update my RSVP' : 'Save my RSVP'; ?></button></p>
+			<p class="at-form-actions"><button class="at-button" type="submit"><?php echo $rsvp ? 'Update my RSVP' : 'Save my RSVP'; ?></button><?php if ( ! $user->exists() ) : ?><span class="at-form-login-note">Already have an account? <a href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>">Sign in first</a>.</span><?php endif; ?></p>
 		</form>
 	</div>
 	<?php
@@ -418,23 +461,18 @@ function at_gathering_save_rsvp() {
 
 	$created_user_id = 0;
 	if ( ! is_user_logged_in() ) {
-		if ( ! at_gathering_invite_is_valid() ) {
-			wp_die( 'Sorry, this invitation link is not valid.' );
-		}
-		$username = sanitize_user( wp_unslash( $_POST['at_username'] ?? '' ), true );
 		$name     = sanitize_text_field( wp_unslash( $_POST['at_display_name'] ?? '' ) );
 		$email    = sanitize_email( wp_unslash( $_POST['at_email'] ?? '' ) );
 		$password = (string) wp_unslash( $_POST['at_password'] ?? '' );
-		$form_values = array_merge( $form_values, array( 'username' => $username, 'display_name' => $name, 'email' => $email ) );
-		if ( ! $username || ! $name || ! is_email( $email ) || strlen( $password ) < 10 ) {
-			at_gathering_redirect_error( $return, 'Please complete all four account fields. Passwords need at least 10 characters.', $form_values );
-		}
-		if ( username_exists( $username ) ) {
-			at_gathering_redirect_error( $return, 'That username is already in use. Please choose another.', $form_values );
+		$password_confirm = (string) wp_unslash( $_POST['at_password_confirm'] ?? '' );
+		$form_values = array_merge( $form_values, array( 'display_name' => $name, 'email' => $email ) );
+		if ( ! $name || ! is_email( $email ) || strlen( $password ) < 10 || $password !== $password_confirm ) {
+			at_gathering_redirect_error( $return, 'Please complete your account details. Passwords need at least 10 characters and must match.', $form_values );
 		}
 		if ( email_exists( $email ) ) {
 			at_gathering_redirect_error( $return, 'There is already an account for that email. Please sign in instead.', $form_values );
 		}
+		$username = at_gathering_unique_login( $email );
 		$user_id = wp_insert_user( array( 'user_login' => $username, 'user_pass' => $password, 'user_email' => $email, 'display_name' => $name, 'role' => 'subscriber' ) );
 		if ( is_wp_error( $user_id ) ) {
 			at_gathering_redirect_error( $return, $user_id->get_error_message(), $form_values );
@@ -482,7 +520,7 @@ function at_gathering_save_rsvp() {
 	$details = at_gathering_event_details();
 	$food_text = $foods ? implode( ', ', $foods ) : 'Nothing chosen yet';
 	$message = sprintf(
-		"Hi %s,\n\nThanks for letting us know about Thanksgiving.\n\nAttendance: %s\nPeople: %d\nNames: %s\nFood: %s\nDietary notes: %s\nNote for the hosts: %s\n\n%s · %s\n%s\n\nYou can update your RSVP any time from the site. Your account also gives you access to the friends-only forum and shared photos.\n\nSee you there!\nThe hosts",
+		"Hi %s,\n\nThanks for letting us know about Thanksgiving.\n\nAttendance: %s\nPeople: %d\nNames: %s\nFood: %s\nDietary notes: %s\nNote for the hosts: %s\n\n%s · %s\n%s\n\nYou can update your RSVP any time from the site. Your account also gives you access to the forum and shared photos.\n\nSee you there!\nThe hosts",
 		$user->display_name ?: $user->user_login,
 		at_gathering_status_label( $status ),
 		$guest_count,
@@ -531,18 +569,10 @@ function at_gathering_admin_page() {
 	$rows   = $wpdb->get_results( 'SELECT * FROM ' . at_gathering_table() . ' ORDER BY updated_at DESC' );
 	$foods  = at_gathering_foods();
 	$counts = at_gathering_food_counts();
-	$invite = add_query_arg( 'invite', rawurlencode( (string) get_option( 'at_gathering_invite_key', '' ) ), home_url( '/rsvp/' ) );
 	?>
 	<div class="wrap at-gathering-admin">
 		<h1>Gathering RSVPs</h1>
-		<p>Private host view: attendance, notes, and what is coming to the table.</p>
-		<h2>Invite a friend</h2>
-		<p>Send this private link. It opens the RSVP and lets a friend create their account at the end.</p>
-		<p><input type="text" class="large-text code" readonly value="<?php echo esc_attr( $invite ); ?>" onclick="this.select()"></p>
-		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<input type="hidden" name="action" value="at_rotate_invite"><?php wp_nonce_field( 'at_rotate_invite', 'at_invite_nonce' ); ?>
-			<button class="button">Replace this invite link</button>
-		</form>
+		<p>Host view: attendance, notes, and what is coming to the table.</p>
 		<div class="at-admin-foods">
 			<?php foreach ( $foods as $food ) : ?><span><strong><?php echo esc_html( (int) ( $counts[ $food ] ?? 0 ) ); ?></strong> <?php echo esc_html( $food ); ?></span><?php endforeach; ?>
 		</div>

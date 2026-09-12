@@ -18,14 +18,14 @@ test('RSVP visual contract on desktop', async ({ page }) => {
   await logIn(page);
   await page.goto('/rsvp/');
   await page.evaluate(() => document.fonts.ready);
-  await expect(page).toHaveScreenshot('rsvp-desktop.png', { fullPage: true });
+  await expect(page).toHaveScreenshot('rsvp-desktop.png', { fullPage: true, mask: [page.locator('.at-food-list small')] });
 });
 
-test('invited signup and RSVP visual contract on mobile', async ({ page }) => {
+test('public signup and RSVP visual contract on mobile', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/rsvp/?invite=test-invite');
+  await page.goto('/rsvp/');
   await page.evaluate(() => document.fonts.ready);
-  await expect(page).toHaveScreenshot('rsvp-signup-mobile.png', { fullPage: true });
+  await expect(page).toHaveScreenshot('rsvp-signup-mobile.png', { fullPage: true, mask: [page.locator('.at-food-list small')] });
 });
 
 test('RSVP visual contract on iPad', async ({ page }) => {
@@ -33,5 +33,5 @@ test('RSVP visual contract on iPad', async ({ page }) => {
   await logIn(page);
   await page.goto('/rsvp/');
   await page.evaluate(() => document.fonts.ready);
-  await expect(page).toHaveScreenshot('rsvp-ipad.png', { fullPage: true });
+  await expect(page).toHaveScreenshot('rsvp-ipad.png', { fullPage: true, mask: [page.locator('.at-food-list small')] });
 });
