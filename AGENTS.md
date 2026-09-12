@@ -54,6 +54,18 @@ Docker-generated state out of commits. Never use a broad Docker prune command
 while another worktree is running; the wrappers scope cleanup to this
 worktree's generated environment.
 
+## Production and commits
+
+The production site is `https://www.armstrongthanksgiving.com/`. Use that
+canonical domain for deployment checks and production browser work; the local
+site URL comes from `.worktree/runtime.json` instead.
+
+Agents are explicitly free to make commits in this repository after verifying
+their changes. Use descriptive commits and leave the worktree with the source
+state recorded. This repository does not require GPG-signed commits; when the
+local Git configuration attempts signing, commit with
+`git -c commit.gpgsign=false commit -m "..."`.
+
 ## WordPress admin uploads and browser controls
 
 For production theme or plugin changes, prepare a ZIP locally and use the

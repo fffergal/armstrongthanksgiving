@@ -2,6 +2,8 @@
 
 This repository contains the custom WordPress theme, reproducible local environment, plugin inventory, and browser-based acceptance tests. The production database, uploads, caches, and secrets are backed up separately and are not stored in Git.
 
+Production site: <https://www.armstrongthanksgiving.com/>
+
 ## Local setup
 
 Requirements: Docker Desktop, Node.js 22+, and npm.
