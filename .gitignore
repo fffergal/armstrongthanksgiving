@@ -2,7 +2,8 @@
 .env
 .env.*
 !.env.example
-node_modules/
+node_modules
+.worktree/
 test-results/
 playwright-report/
 lighthouse-results/

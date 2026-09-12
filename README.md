@@ -8,14 +8,34 @@ Requirements: Docker Desktop, Node.js 22+, and npm.
 
 ```sh
 cp .env.example .env
-npm install
+npm run env:setup
 npx playwright install chromium
 npx playwright install webkit
 npm run wp:start
 npm run wp:setup
 ```
 
-Open `http://localhost:8888`. The bootstrap creates a local `guest` / `password` subscriber for the member journey; override `WP_TEST_USER` and `WP_TEST_PASSWORD` in `.env` when needed.
+Open the URL printed by `npm run wp:start`. The bootstrap creates a local `guest` / `password` subscriber for the member journey; override `WP_TEST_USER` and `WP_TEST_PASSWORD` in `.env` when needed.
+
+## Worktree environments
+
+Run `npm run env:setup` from each worktree. If the dependency metadata matches
+the primary worktree, it links the existing `node_modules` directory instead
+of creating another copy. A worktree with changed dependency metadata gets its
+own `npm ci` installation.
+
+`npm run wp:start` gives each worktree its own wp-env config/cache identity and
+Docker Compose project. It automatically chooses an available HTTP port and
+writes the resulting URL to `.worktree/runtime.json`, so the Playwright and
+Lighthouse commands follow the correct local WordPress instance. Use
+`npm run wp:stop` for a reversible pause and `npm run env:teardown` when the
+worktree is finished; the latter removes that worktree's containers, volumes,
+generated wp-env files, and runtime metadata while retaining Docker images.
+
+If `.env` was copied before this change, remove its default
+`BASE_URL=http://localhost:8888` line or set `BASE_URL=` so the per-worktree
+URL can be used. A non-default `BASE_URL` still takes precedence for production
+or other shared environments.
 
 The start wrapper stages the theme and must-use plugin in Docker Desktop's shared temporary directory, starts the stock WordPress volume, then copies the theme and cached community plugins into that volume. This avoids macOS Docker file-sharing and image-initialiser issues for projects stored in `Documents`; restart the environment after theme or mu-plugin changes so the mirror is refreshed. Plugin archives remain in wp-env's cache rather than Git.
 

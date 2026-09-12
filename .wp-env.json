@@ -2,6 +2,7 @@
   "core": null,
   "phpVersion": "8.3",
   "port": 8888,
+  "autoPort": true,
   "testsEnvironment": false,
   "themes": [
     "./wp-content/themes/armstrong-thanksgiving"

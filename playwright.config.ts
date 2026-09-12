@@ -1,7 +1,19 @@
 import 'dotenv/config';
+import fs from 'node:fs';
+import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 
-const baseURL = process.env.BASE_URL ?? 'http://localhost:8888';
+const runtimeFile = path.resolve('.worktree/runtime.json');
+let runtime: { url?: string } = {};
+try {
+  runtime = JSON.parse(fs.readFileSync(runtimeFile, 'utf8')) as { url?: string };
+} catch {
+  // The environment has not started yet; retain the default URL for diagnostics.
+}
+const configuredBaseURL = process.env.BASE_URL?.trim();
+const baseURL = process.env.USE_WORKTREE_RUNTIME === '0'
+  ? configuredBaseURL || 'http://localhost:8888'
+  : (runtime.url || (configuredBaseURL && configuredBaseURL !== 'http://localhost:8888' ? configuredBaseURL : 'http://localhost:8888'));
 
 export default defineConfig({
   testDir: './tests/e2e',

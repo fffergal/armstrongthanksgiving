@@ -2,8 +2,19 @@ import 'dotenv/config';
 import fs from 'node:fs/promises';
 import lighthouse from 'lighthouse';
 import * as chromeLauncher from 'chrome-launcher';
+import fsSync from 'node:fs';
+import path from 'node:path';
 
-const url = process.env.BASE_URL ?? 'http://localhost:8888/';
+let runtime = {};
+try {
+  runtime = JSON.parse(fsSync.readFileSync(path.resolve('.worktree/runtime.json'), 'utf8'));
+} catch {
+  // The environment has not started yet; retain the default URL for diagnostics.
+}
+const configuredBaseURL = process.env.BASE_URL?.trim();
+const url = (process.env.USE_WORKTREE_RUNTIME === '0'
+  ? configuredBaseURL
+  : runtime.url || (configuredBaseURL && configuredBaseURL !== 'http://localhost:8888' ? configuredBaseURL : 'http://localhost:8888')) ?? 'http://localhost:8888/';
 const outputDirectory = new URL('../lighthouse-results/', import.meta.url);
 const runs = [];
 
