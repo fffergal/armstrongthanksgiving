@@ -26,7 +26,8 @@ function ensurePage(slug, title, content) {
     wp(['post', 'update', id, `--post_title=${title}`, `--post_content=${content}`, '--post_status=publish']);
     return id;
   }
-  return wp(['post', 'create', '--post_type=page', `--post_title=${title}`, `--post_name=${slug}`, '--post_status=publish', `--post_content=${content}`, '--porcelain']).stdout?.match(/(\d+)\s*$/)?.[1] ?? '';
+  wp(['post', 'create', '--post_type=page', `--post_title=${title}`, `--post_name=${slug}`, '--post_status=publish', `--post_content=${content}`, '--porcelain']);
+  return existingId(['post', 'list', '--post_type=page', `--name=${slug}`, '--field=ID', '--format=ids']);
 }
 
 function removePage(slug) {
