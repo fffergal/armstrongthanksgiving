@@ -53,3 +53,29 @@ Keep `.worktree/`, `node_modules/`, test reports, Lighthouse reports, and
 Docker-generated state out of commits. Never use a broad Docker prune command
 while another worktree is running; the wrappers scope cleanup to this
 worktree's generated environment.
+
+## WordPress admin uploads and browser controls
+
+For production theme or plugin changes, prepare a ZIP locally and use the
+WordPress admin installer. The upload page has two controls: first open
+**Upload Theme** or **Upload Plugin**, then activate the nested **Theme zip
+file** or **Plugin zip file** control. In browser automation, wait for the file
+chooser from that nested control before setting the ZIP path. Do not use the
+online Theme File Editor for repository changes.
+
+If WordPress says the component is already installed, follow the
+**Replace current with uploaded** link and verify the success notice. WordPress
+may show a JavaScript confirmation dialog during replacement or deletion. A
+browser agent should inspect for an active page dialog and accept it only when
+it is the confirmation for the user-requested operation; otherwise dismiss it.
+Never repeatedly click while a dialog is open, because the page is blocked
+until the dialog is handled.
+
+After a production upload, purge WP Super Cache before validating the public
+site. Prefer a fresh public URL check (including an HTTP status check for 404s)
+over relying on a stale browser tab.
+
+The local setup script seeds a single bbPress forum and a `Say hello` topic;
+keep that fixture when changing setup code because the member test expects the
+topic and its turkey avatar. The RSVP tests deliberately mutate local users
+and food counts, so reset/reseed before diagnosing visual or member failures.

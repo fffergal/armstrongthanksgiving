@@ -47,6 +47,22 @@ The start wrapper stages the theme and must-use plugin in Docker Desktop's share
 - `npm run test:performance`: current Lighthouse engine, run three times with median budgets for LCP, layout shift, blocking time, accessibility, and best practices. Raw reports are retained locally.
 - `npm run test:all`: browser acceptance followed by Lighthouse budgets.
 
+The local browser suite changes its disposable database: RSVP tests create
+accounts and reservations. For a deterministic run after a reset, use:
+
+```sh
+npm run wp:reset
+npm run wp:start
+npm run wp:setup
+npm test
+```
+
+`npm run wp:setup` is also the repair step if a local forum, topic, or page
+fixture is missing. The suite verifies the RSVP journey, account creation,
+food-count updates, sign-in draft restoration, responsive layouts,
+accessibility, visuals, forums, albums, and 404 recovery. It does not prove
+delivery through the production SMTP service.
+
 Synthetic tests catch regressions before deployment. Once production exists, the same read-only suite can target it through `BASE_URL`. Real-user Web Vitals collection and geographic synthetic runs will be added only after the privacy implications and retention policy are agreed; neither should collect visitor identity or private page contents.
 
 The local benchmark covers the anonymous redirect/login experience and runs three times with median budgets. The current themed login median is comfortably below the 2.5-second LCP budget after removing album and admin assets that do not belong on a friend sign-in page.
@@ -65,3 +81,16 @@ See [plugin evaluation](docs/plugin-evaluation.md) for the theming and acceptanc
 
 See [email and friend onboarding](docs/email-onboarding.md) for the production mail settings,
 invite flow, deliverability follow-up, and the evidence needed to confirm a real invitation.
+
+## Production updates
+
+Build a ZIP from the relevant theme or plugin directory and upload it through
+the WordPress admin installer. When WordPress reports that the component is
+already installed, choose **Replace current with uploaded**. Do not edit the
+theme through the online Theme File Editor. After an upload, purge WP Super
+Cache before checking public pages.
+
+The **Gathering RSVPs** admin page includes **Send a sample confirmation**. It
+sends the normal RSVP confirmation through WordPress mail without creating or
+changing an RSVP, which is useful for proofing the rendered message. A
+successful WordPress handoff still needs to be checked in the recipient inbox.
