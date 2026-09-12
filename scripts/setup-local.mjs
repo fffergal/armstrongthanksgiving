@@ -20,6 +20,19 @@ function existingId(args) {
   return result.stdout?.match(/(\d+)\s*$/)?.[1] ?? '';
 }
 
+function ensureCliPackage(packageName) {
+  const installed = wp(['package', 'list', '--fields=name', '--format=csv'], { allowFailure: true });
+  const packages = installed.stdout?.split(/\r?\n/).map(value => value.trim()).filter(Boolean) ?? [];
+  if (!packages.includes(packageName)) wp(['package', 'install', packageName]);
+}
+
+function ensurePlugin(pluginSlug) {
+  if (wp(['plugin', 'is-installed', pluginSlug], { allowFailure: true }).status !== 0) {
+    wp(['plugin', 'install', pluginSlug]);
+  }
+  wp(['plugin', 'activate', pluginSlug]);
+}
+
 function ensurePage(slug, title, content) {
   const id = existingId(['post', 'list', '--post_type=page', `--name=${slug}`, '--field=ID', '--format=ids']);
   if (id) {
@@ -35,6 +48,8 @@ function removePage(slug) {
   if (id) wp(['post', 'delete', id, '--force']);
 }
 
+ensureCliPackage('wp-cli/wp-super-cache-cli');
+ensurePlugin('wp-super-cache');
 wp(['theme', 'activate', 'armstrong-thanksgiving']);
 wp(['plugin', 'activate', 'bbpress.latest-stable', 'wp-photo-album-plus.latest-stable', 'jonradio-private-site.latest-stable']);
 wp(['plugin', 'activate', 'armstrong-gathering']);

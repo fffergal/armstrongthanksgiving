@@ -86,11 +86,39 @@ invite flow, deliverability follow-up, and the evidence needed to confirm a real
 
 ## Production updates
 
-Build a ZIP from the relevant theme or plugin directory and upload it through
-the WordPress admin installer. When WordPress reports that the component is
-already installed, choose **Replace current with uploaded**. Do not edit the
-theme through the online Theme File Editor. After an upload, purge WP Super
-Cache before checking public pages.
+Production deployment uses the server's SSH-accessible WP-CLI. From a clean,
+committed source state, preview or deploy the relevant component with:
+
+```sh
+npm run deploy:production -- plugin --dry-run
+npm run deploy:production -- plugin --confirm
+npm run deploy:production -- theme --confirm --activate
+npm run verify:production
+```
+
+The local setup installs and activates WP Super Cache, and installs the WP-CLI
+package `wp-cli/wp-super-cache-cli`, when they are missing. The production
+prerequisites are the WP Super Cache plugin and that WP-CLI package; recreate
+the CLI package with:
+
+```sh
+ssh dh_mbpyvr@armstrongthanksgiving.com 'wp package install wp-cli/wp-super-cache-cli'
+```
+
+The current production and local installs resolve to `dev-main` commit
+`480d326`; check `wp package list` after recreating the package.
+
+The local page cache remains off by default so browser tests are deterministic;
+the `wp super-cache` commands are nevertheless available for cache-specific
+checks.
+
+The command creates a ZIP from `HEAD`, uploads it to the production server,
+exports the database, archives the previous component, replaces the component,
+preserves its current activation state, flushes both the WordPress object cache
+and WP Super Cache page cache, and verifies the production identity and archive
+digest. Use `--activate` when the deployment should activate the component
+explicitly. The WordPress admin installer remains the fallback deployment path.
+Do not edit the theme through the online Theme File Editor.
 
 The **Gathering RSVPs** admin page includes **Send a sample confirmation**. It
 sends the normal RSVP confirmation through WordPress mail without creating or

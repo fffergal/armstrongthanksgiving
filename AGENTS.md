@@ -68,12 +68,31 @@ local Git configuration attempts signing, commit with
 
 ## WordPress admin uploads and browser controls
 
-For production theme or plugin changes, prepare a ZIP locally and use the
-WordPress admin installer. The upload page has two controls: first open
-**Upload Theme** or **Upload Plugin**, then activate the nested **Theme zip
-file** or **Plugin zip file** control. In browser automation, wait for the file
-chooser from that nested control before setting the ZIP path. Do not use the
-online Theme File Editor for repository changes.
+For production theme or plugin changes, use the repository deployment command
+after verifying the relevant component and committing its source:
+
+```sh
+npm run deploy:production -- plugin --confirm
+npm run deploy:production -- theme --confirm --activate
+npm run verify:production
+```
+
+The production prerequisites are the WP Super Cache plugin and the WP-CLI
+package `wp-cli/wp-super-cache-cli`; recreate the CLI package with:
+
+```sh
+ssh dh_mbpyvr@armstrongthanksgiving.com 'wp package install wp-cli/wp-super-cache-cli'
+```
+
+The command builds the ZIP from committed source, uploads it over SSH, exports
+the production database, archives the previous component, replaces the
+component with WP-CLI, preserves its current activation state, flushes the
+WordPress object cache and WP Super Cache page cache, and verifies the
+production WordPress identity and archive digest. Pass `--activate` when a
+component should be activated explicitly. Run with `--dry-run` to build the
+archive without changing production. The WordPress admin installer remains
+the fallback when the CLI workflow is unavailable. Do not use the online Theme
+File Editor for repository changes.
 
 If WordPress says the component is already installed, follow the
 **Replace current with uploaded** link and verify the success notice. WordPress
