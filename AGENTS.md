@@ -87,6 +87,26 @@ After a production upload, purge WP Super Cache before validating the public
 site. Prefer a fresh public URL check (including an HTTP status check for 404s)
 over relying on a stale browser tab.
 
+## Email testing
+
+There are two different email checks:
+
+- Local WordPress does not deliver mail. The local `pre_wp_mail` hook captures
+  the final arguments after all mail filters have run, and the RSVP tests read
+  that captured message through `at_gathering_last_test_mail`. Use `npm run
+  wp:start`, `npm run wp:setup`, and the focused Playwright RSVP tests to verify
+  subjects, copy, HTML wrapping, and headers. A passing local test is not proof
+  that a message reached an inbox.
+- For a real inbox check, the changed theme/plugin must be uploaded to
+  `https://www.armstrongthanksgiving.com/` first. In the production WordPress
+  admin, open **Gathering RSVPs**, use **Send a sample confirmation**, choose
+  the intended administrator recipient, and submit the form. Confirm the
+  result both from the WordPress success notice and in that recipient's inbox;
+  inspect the message at a narrow width and check links, wrapping, copy, and
+  dark-mode legibility. Sending the sample is an external email action, so do
+  not click it unless the user has requested that send or confirmed it at the
+  point of action.
+
 The local setup script seeds a single bbPress forum and a `Say hello` topic;
 keep that fixture when changing setup code because the member test expects the
 topic and its turkey avatar. The RSVP tests deliberately mutate local users

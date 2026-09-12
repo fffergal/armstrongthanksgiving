@@ -452,7 +452,7 @@ function at_gathering_confirmation_message( $user, $status, $guest_count, $guest
 	$greeting_name = $greeting_name ?: ( $user->display_name ?: $user->user_login );
 
 	return sprintf(
-		"Hi %s,\n\nThanks for letting us know about Thanksgiving.\n\nAttendance: %s\nPeople: %d\nNames: %s\nFood: %s\nDietary notes: %s\nNote for the hosts: %s\n\n%s · %s\n%s\n\nYou can update your RSVP any time from the site. Your account also gives you access to the forum and shared photos.\n\nSee you there!\nThe hosts",
+		"Hi %s,\n\nThanks for letting us know about Thanksgiving.\n\nAttendance: %s\nPeople: %d\nNames: %s\nFood: %s\nDietary notes: %s\nNote for the hosts: %s\n\n%s · %s\n%s\n\nYou can update your RSVP any time from the site. Your account also gives you access to the forum and shared photos.\n\nSee you there!",
 		$greeting_name,
 		at_gathering_status_label( $status ),
 		$guest_count,

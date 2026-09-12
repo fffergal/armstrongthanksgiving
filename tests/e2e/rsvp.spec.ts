@@ -76,7 +76,9 @@ test('a new friend creates an account as the last step of RSVP', async ({ page }
   expect(payload.data.subject).toBe('Your Armstrong Thanksgiving RSVP');
   expect(payload.data.message).toContain('data-at-email-theme="armstrong-thanksgiving"');
   expect(payload.data.message).toContain('Names: New Friend');
-  expect(payload.data.message).toContain('The hosts');
+  expect(payload.data.message).not.toContain('Friends-only');
+  expect(payload.data.message).not.toMatch(/See you there!.*The hosts/s);
+  expect(payload.data.message).toContain('See you there!');
 });
 
 test('the ordinary RSVP URL is public and explains account access', async ({ page }) => {
