@@ -295,6 +295,14 @@ function at_gathering_enqueue_assets() {
 }
 add_action( 'wp_enqueue_scripts', 'at_gathering_enqueue_assets' );
 
+function at_gathering_admin_enqueue_assets( $hook_suffix ) {
+	if ( 'toplevel_page_at-gathering' !== $hook_suffix ) {
+		return;
+	}
+	wp_enqueue_style( 'armstrong-gathering-admin', AT_GATHERING_URL . 'assets/gathering.css', array(), AT_GATHERING_VERSION );
+}
+add_action( 'admin_enqueue_scripts', 'at_gathering_admin_enqueue_assets' );
+
 function at_gathering_redirect_removed_food_page() {
 	$request_path = trim( (string) wp_parse_url( $_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH ), '/' );
 	if ( 'food' !== $request_path && ! is_page( 'food' ) ) {
@@ -596,9 +604,12 @@ function at_gathering_admin_page() {
 		<h1>Gathering RSVPs</h1>
 		<p>Host view: attendance, notes, and what is coming to the table.</p>
 		<?php if ( 'sent' === ( $_GET['at_sample_mail'] ?? '' ) ) : ?><div class="notice notice-success is-dismissible"><p>Sample RSVP confirmation sent through WordPress mail.</p></div><?php elseif ( 'failed' === ( $_GET['at_sample_mail'] ?? '' ) ) : ?><div class="notice notice-error is-dismissible"><p>WordPress could not send the sample RSVP confirmation.</p></div><?php endif; ?>
-		<div class="at-admin-foods">
-			<?php foreach ( $foods as $food ) : ?><span><strong><?php echo esc_html( (int) ( $counts[ $food ] ?? 0 ) ); ?></strong> <?php echo esc_html( $food ); ?></span><?php endforeach; ?>
-		</div>
+		<table class="widefat striped at-admin-foods">
+			<thead><tr><th scope="col">Food</th><th scope="col">People bringing it</th></tr></thead>
+			<tbody>
+				<?php foreach ( $foods as $food ) : ?><tr><td><?php echo esc_html( $food ); ?></td><td><?php echo esc_html( (int) ( $counts[ $food ] ?? 0 ) ); ?></td></tr><?php endforeach; ?>
+			</tbody>
+		</table>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="at-add-food">
 			<input type="hidden" name="action" value="at_add_food"><input type="text" name="at_food" placeholder="Add another food"><button class="button button-primary">Add food</button><?php wp_nonce_field( 'at_add_food', 'at_food_nonce' ); ?>
 		</form>
@@ -611,12 +622,14 @@ function at_gathering_admin_page() {
 			<hr>
 			<h2>Send a sample confirmation</h2>
 			<p>This sends the normal RSVP confirmation through WordPress mail without saving an RSVP.</p>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="at-sample-rsvp-form">
 				<input type="hidden" name="action" value="at_send_sample_rsvp_email">
-				<label for="at-sample-user">Recipient</label>
-				<select id="at-sample-user" name="at_sample_user_id">
-					<?php foreach ( $admins as $admin ) : ?><option value="<?php echo esc_attr( $admin->ID ); ?>" <?php selected( $admin->ID, 1 ); ?>><?php echo esc_html( $admin->display_name . ' · ' . $admin->user_email ); ?></option><?php endforeach; ?>
-				</select>
+				<div class="at-sample-recipient">
+					<label for="at-sample-user">Recipient</label>
+					<select id="at-sample-user" name="at_sample_user_id">
+						<?php foreach ( $admins as $admin ) : ?><option value="<?php echo esc_attr( $admin->ID ); ?>" <?php selected( $admin->ID, 1 ); ?>><?php echo esc_html( $admin->display_name . ' · ' . $admin->user_email ); ?></option><?php endforeach; ?>
+					</select>
+				</div>
 				<button class="button button-primary" type="submit">Send sample RSVP confirmation</button>
 				<?php wp_nonce_field( 'at_send_sample_rsvp_email', 'at_sample_email_nonce' ); ?>
 			</form>

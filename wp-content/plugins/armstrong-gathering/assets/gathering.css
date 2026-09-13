@@ -24,9 +24,14 @@
 .at-access-note { padding: 1.25rem; border-radius: 1rem; background: #ead7bf; }
 .at-access-note p:last-child { margin-bottom: 0; }
 .bbp-author-avatar img, #bbpress-forums img.avatar { width: 2.75rem; height: 2.75rem; border-radius: 50%; object-fit: cover; }
-.at-gathering-admin .at-admin-foods { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1rem 0; }
-.at-gathering-admin .at-admin-foods span { padding: .6rem .75rem; border-radius: 999px; background: #f6ede1; }
-.at-gathering-admin .at-add-food { display: flex; gap: .5rem; margin: 1rem 0; }
+.at-gathering-admin .at-admin-foods { margin: 1.25rem 0 1.5rem; }
+.at-gathering-admin .at-admin-foods th:last-child, .at-gathering-admin .at-admin-foods td:last-child { width: 12rem; }
+.at-gathering-admin .at-add-food { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem; margin: 1rem 0 1.75rem; }
+.at-gathering-admin .at-sample-rsvp-form { display: grid; grid-template-columns: max-content max-content; align-items: end; justify-content: start; gap: .75rem; margin: 1rem 0 1.75rem; }
+.at-gathering-admin .at-add-food input[type="text"] { min-width: min(24rem, 100%); }
+.at-gathering-admin .at-add-food button, .at-gathering-admin .at-sample-rsvp-form button { margin-bottom: 0; }
+.at-gathering-admin .at-sample-recipient { display: grid; grid-template-columns: auto minmax(0, 28rem); align-items: center; gap: .75rem; min-width: 0; }
+.at-gathering-admin .at-sample-recipient select { box-sizing: border-box; width: 28rem; max-width: 100%; min-width: 0; }
 @media (max-width: 700px) {
   .at-rsvp-page .at-content-card { padding: 1rem; }
   .at-rsvp-intro { margin: -1rem -1rem .25rem; padding: 1.35rem 1rem; }
@@ -34,5 +39,12 @@
   .at-choice-row { display: grid; }
   .at-choice-row label { border-radius: .7rem; }
   .at-form-actions { align-items: flex-start; flex-direction: column; }
-  .at-gathering-admin .at-add-food { flex-direction: column; }
+  .at-gathering-admin .at-add-food { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; }
+  .at-gathering-admin .at-add-food input[type="text"] { min-width: 0; width: 100%; }
+  .at-gathering-admin .at-sample-rsvp-form { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: end; column-gap: .75rem; row-gap: 1rem; }
+  .at-gathering-admin .at-sample-recipient { display: contents; }
+  .at-gathering-admin .at-sample-recipient label { grid-column: 1; align-self: center; }
+  .at-gathering-admin .at-sample-recipient select { grid-column: 2; }
+  .at-gathering-admin .at-sample-recipient select { min-width: 0; width: 100%; }
+  .at-gathering-admin .at-sample-rsvp-form button { grid-column: 2; justify-self: start; }
 }
