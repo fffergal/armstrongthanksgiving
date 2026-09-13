@@ -66,11 +66,14 @@ state recorded. This repository does not require GPG-signed commits; when the
 local Git configuration attempts signing, commit with
 `git -c commit.gpgsign=false commit -m "..."`.
 
-When closing down a worktree, prefer rebasing its local branch onto the
-intended base and squashing related implementation commits into a small,
-coherent history before handoff or removal. Do not rewrite a shared or already
-published branch; preserve user-authored commits and ask before discarding
-uncommitted work.
+When the user says to close out a worktree, treat that as an integration task,
+not just a cleanup request. First run or confirm the relevant checks, rebase
+the worktree branch onto the intended base, and squash related implementation
+commits into a small, coherent history. Then bring the result into `main`,
+verify that `main` contains the changes, complete any required deployment and
+production verification, and only then remove the worktree and its disposable
+environment. Do not rewrite a shared or already published branch; preserve
+user-authored commits and ask before discarding uncommitted work.
 
 For production-scoped changes, deployment is part of closeout: run the
 relevant checks and tests first (or confirm they already passed), then deploy
