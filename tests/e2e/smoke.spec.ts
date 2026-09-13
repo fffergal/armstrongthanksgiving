@@ -51,6 +51,8 @@ test('front page keeps the navigation and content focused', async ({ page, reque
   await expect(page.locator('.at-hero')).not.toContainText('Priestfield');
   await expect(page.getByRole('link', { name: 'Open the forum' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'RSVP' }).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Sign up without RSVP' })).toHaveAttribute('href', /\/signup\/$/);
+  await expect(page.getByText('use the forum and shared photos')).toBeVisible();
   await expect(page.locator('.at-cards article').nth(0)).toContainText('Photos');
   await expect(page.locator('.at-cards article').nth(1)).toContainText('Forum');
   await expect(page.locator('.at-cards article').nth(2)).toContainText('RSVP');

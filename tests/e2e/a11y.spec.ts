@@ -31,3 +31,10 @@ test('the public signup and RSVP form has no serious accessibility violations', 
   const serious = result.violations.filter(v => ['serious', 'critical'].includes(v.impact ?? ''));
   expect(serious).toEqual([]);
 });
+
+test('the standalone signup form has no serious accessibility violations', async ({ page }) => {
+  await page.goto('/signup/');
+  const result = await new AxeBuilder({ page }).analyze();
+  const serious = result.violations.filter(v => ['serious', 'critical'].includes(v.impact ?? ''));
+  expect(serious).toEqual([]);
+});

@@ -23,15 +23,16 @@ are promoted, because a plugin can supply its own content type or markup.
 
 ## Onboarding flow
 
-1. Create the friend as a WordPress Subscriber and bbPress Participant, using
-   the email address they will use to sign in.
-2. Send the friend the normal WordPress account email or a separate note with
-   the username and temporary password. The host does not need to explain a
-   second login system.
-3. The friend signs in at the site with that username/email and password. If
+1. A friend can use the public RSVP form to create an account as part of
+   letting the hosts know they are coming. They can also use the public Sign up
+   page without an RSVP if they only want the forum and shared photos for now.
+2. Standalone signup creates the friend as a WordPress Subscriber and bbPress
+   Participant, using the email address they will use to sign in.
+3. The friend signs in at the site with that email/username and password. If
    needed, the standard “Lost your password?” link sends a reset email.
 4. After signing in, the friend should check the private home page, forum,
-   albums, RSVP, food, and forum links at both desktop and phone widths.
+   albums, and RSVP links at both desktop and phone widths. A group RSVP email
+   also includes the standalone signup link for the other people named in it.
 
 The first production test account is reserved for smoke testing. Do not put a
 password or a one-time login token in Git, issue trackers, or chat.

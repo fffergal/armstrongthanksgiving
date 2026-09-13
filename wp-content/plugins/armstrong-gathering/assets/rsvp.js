@@ -64,8 +64,21 @@
 
   var loginLink = form.querySelector('[data-at-rsvp-login]');
   if (loginLink) loginLink.addEventListener('click', saveDraft);
+
+  var guestCount = form.querySelector('[name="at_guest_count"]');
+  var guestNames = form.querySelector('[name="at_guest_names"]');
+  var groupSignupHint = form.querySelector('[data-at-rsvp-group-hint]');
+  function updateGroupSignupHint() {
+    if (!guestCount || !guestNames || !groupSignupHint) return;
+    var hasMultiplePeople = Number(guestCount.value) > 1;
+    var namesMentionMultiplePeople = /\band\b/i.test(guestNames.value);
+    groupSignupHint.hidden = !(hasMultiplePeople || namesMentionMultiplePeople);
+  }
+  if (guestCount) guestCount.addEventListener('change', updateGroupSignupHint);
+  if (guestNames) guestNames.addEventListener('input', updateGroupSignupHint);
   if (new URLSearchParams(window.location.search).get('at_rsvp') === 'saved') {
     try { sessionStorage.removeItem(storageKey); } catch (error) {}
   }
   restoreDraft();
+  updateGroupSignupHint();
 }());

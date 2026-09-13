@@ -26,6 +26,23 @@ test('the RSVP form remains usable on a phone', async ({ page }) => {
   await expect(submit).toBeInViewport();
 });
 
+test('a group RSVP explains that other people can sign up separately', async ({ page }) => {
+  await page.goto('/rsvp/');
+  const hint = page.locator('[data-at-rsvp-group-hint]');
+
+  await expect(hint).toBeHidden();
+  await page.getByLabel('How many people are coming?').selectOption('2');
+  await expect(hint).toBeVisible();
+  await expect(hint).toContainText('sign up');
+  await expect(hint).toContainText('double-counts what they’re bringing');
+
+  await page.getByLabel('How many people are coming?').selectOption('1');
+  await page.getByLabel('Names').fill('Fergal and Alex');
+  await expect(hint).toBeVisible();
+  await page.getByLabel('Names').fill('Fergal');
+  await expect(hint).toBeHidden();
+});
+
 test('the RSVP form has no overflow at iPad width and hides subscriber admin UI', async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 1024 });
   await logIn(page);
@@ -44,12 +61,32 @@ test('an RSVP saves and is still present after reload', async ({ page }) => {
   const submit = page.getByRole('button', { name: /RSVP/ });
   await submit.scrollIntoViewIfNeeded();
   await submit.click();
-  await page.waitForURL(/at_rsvp=saved/);
+  await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
+  await expect(page.getByRole('heading', { name: 'RSVP confirmation' })).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('on the list');
+  await page.goto('/rsvp/');
   await page.reload();
 
   await expect(page.getByLabel('How many people are coming?')).toHaveValue('2');
   await expect(page.getByLabel('Stuffing')).toBeChecked();
-  await expect(page.getByRole('status')).toContainText('on the list');
+});
+
+test('a standalone signup creates a member without an RSVP', async ({ page }, testInfo) => {
+  const unique = `${testInfo.project.name.replace(/\W/g, '')}${Date.now()}`.toLowerCase();
+  await page.goto('/signup/');
+
+  await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible();
+  await expect(page.getByText('before, during, or after Thanksgiving')).toBeVisible();
+  await page.getByLabel('Display name').fill('Forum Friend');
+  await page.getByLabel('Email').fill(`signup-${unique}@example.test`);
+  await page.getByLabel('Password', { exact: true }).fill('cranberry-sauce-2026');
+  await page.getByLabel('Confirm password').fill('cranberry-sauce-2026');
+  await page.getByRole('button', { name: 'Sign up' }).click();
+  await page.waitForURL(/at_signup=saved/);
+
+  await expect(page.getByRole('status')).toContainText('You’re signed up');
+  await expect(page.getByRole('link', { name: 'gathering forum' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Your details' })).toHaveCount(0);
 });
 
 test('a new friend creates an account as the last step of RSVP', async ({ page }, testInfo) => {
@@ -57,25 +94,28 @@ test('a new friend creates an account as the last step of RSVP', async ({ page }
   await page.goto('/rsvp/');
 
   await expect(page.getByRole('group', { name: 'Create your account' })).toBeVisible();
-  await page.getByLabel('Names').fill('New Friend');
+  await page.getByLabel('How many people are coming?').selectOption('2');
+  await page.getByLabel('Names').fill('New Friend and Alex');
   await page.getByLabel('Stuffing').check();
   await page.getByLabel('Display name').fill('New Friend');
   await page.getByLabel('Email').fill(`friend-${unique}@example.test`);
   await page.getByLabel('Password', { exact: true }).fill('cranberry-sauce-2026');
   await page.getByLabel('Confirm password').fill('cranberry-sauce-2026');
   await page.getByRole('button', { name: 'Save my RSVP' }).click();
-  await page.waitForURL(/at_rsvp=saved/);
+  await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
 
   await expect(page.getByRole('status')).toContainText('on the list');
+  await page.goto('/rsvp/');
   await expect(page.getByRole('group', { name: 'Create your account' })).toHaveCount(0);
-  await expect(page.getByLabel('Names')).toHaveValue('New Friend');
+  await expect(page.getByLabel('Names')).toHaveValue('New Friend and Alex');
   await expect(page.getByLabel('Stuffing')).toBeChecked();
 
   const mail = await page.request.get('/wp-admin/admin-ajax.php?action=at_gathering_last_test_mail');
   const payload = await mail.json();
   expect(payload.data.subject).toBe('Your Armstrong Thanksgiving RSVP');
   expect(payload.data.message).toContain('data-at-email-theme="armstrong-thanksgiving"');
-  expect(payload.data.message).toContain('Names: New Friend');
+  expect(payload.data.message).toContain('Names: New Friend and Alex');
+  expect(payload.data.message).toContain('/signup/');
   expect(payload.data.message).not.toContain('Friends-only');
   expect(payload.data.message).not.toMatch(/See you there!.*The hosts/s);
   expect(payload.data.message).toContain('See you there!');
@@ -160,11 +200,13 @@ test('a food count increments once and an RSVP update does not double-count it',
   await page.getByLabel('Password', { exact: true }).fill('cranberry-sauce-2026');
   await page.getByLabel('Confirm password').fill('cranberry-sauce-2026');
   await page.getByRole('button', { name: 'Save my RSVP' }).click();
-  await page.waitForURL(/at_rsvp=saved/);
+  await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
+  await page.goto('/rsvp/');
   await expect(page.getByLabel('Gravy').locator('..').locator('small')).toHaveText(`${before + 1} bringing`);
 
   await page.getByLabel('Names').fill('Count Test Friend Updated');
   await page.getByRole('button', { name: 'Update my RSVP' }).click();
-  await page.waitForURL(/at_rsvp=saved/);
+  await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
+  await page.goto('/rsvp/');
   await expect(page.getByLabel('Gravy').locator('..').locator('small')).toHaveText(`${before + 1} bringing`);
 });

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Armstrong Gathering
  * Description: The small, first-party RSVP and potluck layer for Armstrong Thanksgiving.
- * Version: 0.3.5
+ * Version: 0.4.1
  * Requires at least: 6.8
  * Requires PHP: 8.1
  * Author: Armstrong Thanksgiving
@@ -11,7 +11,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'AT_GATHERING_VERSION', '0.3.5' );
+define( 'AT_GATHERING_VERSION', '0.4.1' );
 define( 'AT_GATHERING_FILE', __FILE__ );
 define( 'AT_GATHERING_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AT_GATHERING_URL', plugin_dir_url( __FILE__ ) );
@@ -138,6 +138,34 @@ function at_gathering_migrate_content() {
 	if ( $page && '[at_rsvp]' !== trim( $page->post_content ) ) {
 		wp_update_post( array( 'ID' => $page->ID, 'post_content' => '[at_rsvp]' ) );
 	}
+	$signup_page = get_page_by_path( 'signup' );
+	if ( ! $signup_page ) {
+		wp_insert_post(
+			array(
+				'post_title'   => 'Sign up',
+				'post_name'    => 'signup',
+				'post_content' => '[at_signup]',
+				'post_status'  => 'publish',
+				'post_type'    => 'page',
+			)
+		);
+	} elseif ( false === strpos( (string) $signup_page->post_content, '[at_signup]' ) ) {
+		wp_update_post( array( 'ID' => $signup_page->ID, 'post_content' => '[at_signup]' ) );
+	}
+	$confirmation_page = get_page_by_path( 'rsvp-confirmation' );
+	if ( ! $confirmation_page ) {
+		wp_insert_post(
+			array(
+				'post_title'   => 'RSVP confirmation',
+				'post_name'    => 'rsvp-confirmation',
+				'post_content' => '[at_rsvp_confirmation]',
+				'post_status'  => 'publish',
+				'post_type'    => 'page',
+			)
+		);
+	} elseif ( false === strpos( (string) $confirmation_page->post_content, '[at_rsvp_confirmation]' ) ) {
+		wp_update_post( array( 'ID' => $confirmation_page->ID, 'post_content' => '[at_rsvp_confirmation]' ) );
+	}
 }
 
 function at_gathering_invite_is_valid() {
@@ -160,8 +188,7 @@ function at_gathering_remember_invite() {
 add_action( 'init', 'at_gathering_remember_invite' );
 
 function at_gathering_allow_invited_rsvp() {
-	// The home page and RSVP are intentionally public. Friends create an
-	// account as the final step of the RSVP instead of using an invite URL.
+	// The home page, RSVP, and standalone signup are intentionally public.
 }
 add_action( 'wp', 'at_gathering_allow_invited_rsvp', 1 );
 
@@ -285,7 +312,7 @@ function at_gathering_custom_avatar_url( $url, $id_or_email ) {
 add_filter( 'get_avatar_url', 'at_gathering_custom_avatar_url', 10, 2 );
 
 function at_gathering_enqueue_assets() {
-	if ( ! is_page( 'rsvp' ) && ! is_page( 'food' ) && ! is_singular( array( 'forum', 'topic', 'reply' ) ) ) {
+	if ( ! is_page( array( 'rsvp', 'rsvp-confirmation', 'signup', 'food' ) ) && ! is_singular( array( 'forum', 'topic', 'reply' ) ) ) {
 		return;
 	}
 	wp_enqueue_style( 'armstrong-gathering', AT_GATHERING_URL . 'assets/gathering.css', array(), AT_GATHERING_VERSION );
@@ -332,6 +359,9 @@ function at_gathering_body_class( $classes ) {
 	if ( is_page( 'rsvp' ) ) {
 		$classes[] = 'at-rsvp-page';
 	}
+	if ( is_page( 'rsvp-confirmation' ) ) {
+		$classes[] = 'at-rsvp-confirmation-page';
+	}
 	return $classes;
 }
 add_filter( 'body_class', 'at_gathering_body_class' );
@@ -339,6 +369,10 @@ add_filter( 'body_class', 'at_gathering_body_class' );
 function at_gathering_get_rsvp( $user_id ) {
 	global $wpdb;
 	return $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . at_gathering_table() . ' WHERE user_id = %d', absint( $user_id ) ) );
+}
+
+function at_gathering_rsvp_has_other_people( $guest_count, $guest_names ) {
+	return (int) $guest_count > 1 || (bool) preg_match( '/\band\b/i', (string) $guest_names );
 }
 
 function at_gathering_food_counts() {
@@ -377,14 +411,11 @@ function at_gathering_rsvp_shortcode() {
 	}
 	$form_status = $values['status'] ?? ( $rsvp ? $rsvp->status : 'yes' );
 	$form_count  = isset( $values['guest_count'] ) ? (int) $values['guest_count'] : ( $rsvp ? (int) $rsvp->guest_count : 1 );
-	$saved   = isset( $_GET['at_rsvp'] ) && 'saved' === sanitize_key( $_GET['at_rsvp'] );
 
 	ob_start();
 	?>
 	<div class="at-rsvp-app">
-		<?php if ( $saved ) : ?>
-			<div class="at-success" role="status"><strong>Thanks — you’re on the list.</strong><br><?php echo 'failed' === ( $_GET['at_mail'] ?? '' ) ? 'Your RSVP was saved, but the confirmation email could not be sent. Please tell the hosts.' : 'We sent a copy of your RSVP to ' . esc_html( $user->user_email ) . '.'; ?></div>
-		<?php elseif ( isset( $_GET['at_rsvp'] ) && 'error' === sanitize_key( $_GET['at_rsvp'] ) ) : ?>
+		<?php if ( isset( $_GET['at_rsvp'] ) && 'error' === sanitize_key( $_GET['at_rsvp'] ) ) : ?>
 			<div class="at-success at-error" role="alert"><strong>We could not save that RSVP.</strong><br><?php echo esc_html( sanitize_text_field( wp_unslash( $_GET['at_message'] ?? 'Please check the form and try again.' ) ) ); ?></div>
 		<?php endif; ?>
 		<form class="at-rsvp-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post">
@@ -415,6 +446,7 @@ function at_gathering_rsvp_shortcode() {
 					<input type="text" name="at_guest_names" value="<?php echo esc_attr( $values['guest_names'] ?? ( $rsvp ? $rsvp->guest_names : '' ) ); ?>" placeholder="Everyone in your RSVP">
 				</label>
 			</div>
+			<p class="at-field-help at-rsvp-group-signup-hint" data-at-rsvp-group-hint hidden>If this RSVP is for more than one person, the others can still <a href="<?php echo esc_url( home_url( '/signup/' ) ); ?>">sign up</a> separately for the forum and shared photos. If they RSVP too, make sure nobody double-counts what they’re bringing.</p>
 			<label>Dietary notes (optional)
 				<textarea name="at_dietary" rows="3" placeholder="Any allergies or dietary needs?"><?php echo esc_textarea( $values['dietary'] ?? ( $rsvp ? $rsvp->dietary : '' ) ); ?></textarea>
 			</label>
@@ -454,13 +486,154 @@ function at_gathering_rsvp_shortcode() {
 }
 add_shortcode( 'at_rsvp', 'at_gathering_rsvp_shortcode' );
 
+function at_gathering_rsvp_confirmation_shortcode() {
+	$user = wp_get_current_user();
+	$saved = isset( $_GET['at_rsvp'] ) && 'saved' === sanitize_key( $_GET['at_rsvp'] );
+	$mail_failed = 'failed' === ( $_GET['at_mail'] ?? '' );
+
+	ob_start();
+	?>
+	<div class="at-confirmation-app">
+		<?php if ( $saved ) : ?>
+			<div class="at-success at-confirmation-box" role="status">
+				<strong>Thanks — you’re on the list.</strong>
+				<?php if ( $mail_failed ) : ?>
+					<p>Your RSVP was saved, but the confirmation email could not be sent. Please tell the hosts.</p>
+				<?php else : ?>
+					<p>We sent a copy of your RSVP to <?php echo esc_html( $user->user_email ); ?>.</p>
+				<?php endif; ?>
+			</div>
+			<div class="at-confirmation-next-steps">
+				<p>You can update your RSVP any time, or visit the gathering spaces to say hello and share photos.</p>
+				<p class="at-actions">
+					<a class="at-button" href="<?php echo esc_url( home_url( '/rsvp/' ) ); ?>">Review my RSVP</a>
+					<a class="at-button is-secondary" href="<?php echo esc_url( home_url( '/forum/' ) ); ?>">Visit the forum</a>
+				</p>
+			</div>
+		<?php else : ?>
+			<div class="at-access-note">
+				<p>This page confirms an RSVP after it has been saved.</p>
+				<p><a href="<?php echo esc_url( home_url( '/rsvp/' ) ); ?>">Go to the RSVP form</a>.</p>
+			</div>
+		<?php endif; ?>
+	</div>
+	<?php
+	return ob_get_clean();
+}
+add_shortcode( 'at_rsvp_confirmation', 'at_gathering_rsvp_confirmation_shortcode' );
+
+function at_gathering_signup_form_values() {
+	$token = sanitize_key( wp_unslash( $_GET['at_signup_form'] ?? '' ) );
+	if ( ! $token ) {
+		return array();
+	}
+	$values = get_transient( 'at_gathering_signup_' . $token );
+	delete_transient( 'at_gathering_signup_' . $token );
+	return is_array( $values ) ? $values : array();
+}
+
+function at_gathering_signup_redirect_error( $return, $message, $values = array() ) {
+	$args = array( 'at_signup' => 'error', 'at_message' => $message );
+	if ( $values ) {
+		$token = strtolower( wp_generate_password( 20, false, false ) );
+		set_transient( 'at_gathering_signup_' . $token, $values, 10 * MINUTE_IN_SECONDS );
+		$args['at_signup_form'] = $token;
+	}
+	wp_safe_redirect( add_query_arg( $args, $return ) );
+	exit;
+}
+
+function at_gathering_signup_shortcode() {
+	$user   = wp_get_current_user();
+	$values = at_gathering_signup_form_values();
+	$saved  = isset( $_GET['at_signup'] ) && 'saved' === sanitize_key( $_GET['at_signup'] );
+
+	ob_start();
+	?>
+	<div class="at-signup-app">
+		<?php if ( $saved ) : ?>
+			<div class="at-success" role="status"><strong>You’re signed up.</strong><br>You can now visit the <a href="<?php echo esc_url( home_url( '/forum/' ) ); ?>">gathering forum</a> and <a href="<?php echo esc_url( home_url( '/albums/' ) ); ?>">shared photos</a>. If you’re coming to dinner, you can <a href="<?php echo esc_url( home_url( '/rsvp/' ) ); ?>">RSVP separately</a>.</div>
+		<?php elseif ( $user->exists() ) : ?>
+			<div class="at-success" role="status"><strong>You’re already signed up.</strong><br>Visit the <a href="<?php echo esc_url( home_url( '/forum/' ) ); ?>">gathering forum</a> or <a href="<?php echo esc_url( home_url( '/albums/' ) ); ?>">shared photos</a>, or <a href="<?php echo esc_url( home_url( '/rsvp/' ) ); ?>">add an RSVP</a> if you’re coming.</div>
+		<?php elseif ( isset( $_GET['at_signup'] ) && 'error' === sanitize_key( $_GET['at_signup'] ) ) : ?>
+			<div class="at-success at-error" role="alert"><strong>We could not create that account.</strong><br><?php echo esc_html( sanitize_text_field( wp_unslash( $_GET['at_message'] ?? 'Please check the form and try again.' ) ) ); ?></div>
+		<?php endif; ?>
+		<?php if ( ! $user->exists() && ! $saved ) : ?>
+			<form class="at-signup-form at-rsvp-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post">
+				<div class="at-rsvp-intro">
+					<h2>Create your account</h2>
+					<p>Sign up to use the gathering forum and shared photos before, during, or after Thanksgiving.</p>
+				</div>
+				<input type="hidden" name="action" value="at_signup">
+				<input type="hidden" name="at_return_url" value="<?php echo esc_url( get_permalink() ); ?>">
+				<?php wp_nonce_field( 'at_signup', 'at_signup_nonce' ); ?>
+				<p class="at-form-login-note">Already have an account? <a href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>">Sign in</a>.</p>
+				<fieldset class="at-account-fields">
+					<legend>Your details</legend>
+					<div class="at-rsvp-grid">
+						<label>Display name<input type="text" name="at_display_name" value="<?php echo esc_attr( $values['display_name'] ?? '' ); ?>" autocomplete="name" required></label>
+						<label>Email<input type="email" name="at_email" value="<?php echo esc_attr( $values['email'] ?? '' ); ?>" autocomplete="email" required></label>
+						<label>Password<input type="password" name="at_password" autocomplete="new-password" minlength="10" required></label>
+						<label>Confirm password<input type="password" name="at_password_confirm" autocomplete="new-password" minlength="10" required></label>
+					</div>
+				</fieldset>
+				<p class="at-form-actions"><button class="at-button" type="submit">Sign up</button></p>
+			</form>
+		<?php endif; ?>
+	</div>
+	<?php
+	return ob_get_clean();
+}
+add_shortcode( 'at_signup', 'at_gathering_signup_shortcode' );
+
+function at_gathering_signup() {
+	if ( ! isset( $_POST['at_signup_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['at_signup_nonce'] ) ), 'at_signup' ) ) {
+		wp_die( 'Sorry, we could not create that account.' );
+	}
+	$return = esc_url_raw( wp_unslash( $_POST['at_return_url'] ?? home_url( '/signup/' ) ) );
+	if ( is_user_logged_in() ) {
+		wp_safe_redirect( $return );
+		exit;
+	}
+
+	$name             = sanitize_text_field( wp_unslash( $_POST['at_display_name'] ?? '' ) );
+	$email            = sanitize_email( wp_unslash( $_POST['at_email'] ?? '' ) );
+	$password         = (string) wp_unslash( $_POST['at_password'] ?? '' );
+	$password_confirm = (string) wp_unslash( $_POST['at_password_confirm'] ?? '' );
+	$form_values      = array( 'display_name' => $name, 'email' => $email );
+	if ( ! $name || ! is_email( $email ) || strlen( $password ) < 10 || $password !== $password_confirm ) {
+		at_gathering_signup_redirect_error( $return, 'Please complete your account details. Passwords need at least 10 characters and must match.', $form_values );
+	}
+	if ( email_exists( $email ) ) {
+		at_gathering_signup_redirect_error( $return, 'There is already an account for that email. Please sign in instead.', $form_values );
+	}
+
+	$username = at_gathering_unique_login( $email );
+	$user_id  = wp_insert_user( array( 'user_login' => $username, 'user_pass' => $password, 'user_email' => $email, 'display_name' => $name, 'role' => 'subscriber' ) );
+	if ( is_wp_error( $user_id ) ) {
+		at_gathering_signup_redirect_error( $return, $user_id->get_error_message(), $form_values );
+	}
+	if ( function_exists( 'bbp_set_user_role' ) && function_exists( 'bbp_get_participant_role' ) ) {
+		bbp_set_user_role( $user_id, bbp_get_participant_role() );
+	}
+	wp_set_current_user( $user_id );
+	wp_set_auth_cookie( $user_id, true );
+	wp_safe_redirect( add_query_arg( 'at_signup', 'saved', $return ) );
+	exit;
+}
+add_action( 'admin_post_at_signup', 'at_gathering_signup' );
+add_action( 'admin_post_nopriv_at_signup', 'at_gathering_signup' );
+
 function at_gathering_confirmation_message( $user, $status, $guest_count, $guest_names, $foods, $dietary, $notes, $greeting_name = '' ) {
 	$details = at_gathering_event_details();
 	$food_text = $foods ? implode( ', ', $foods ) : 'Nothing chosen yet';
 	$greeting_name = $greeting_name ?: ( $user->display_name ?: $user->user_login );
+	$group_signup = at_gathering_rsvp_has_other_people( $guest_count, $guest_names )
+		? "\n\nPeople joining you can sign up separately for the forum and shared photos here:\n" . home_url( '/signup/' )
+		: '';
 
 	return sprintf(
-		"Hi %s,\n\nThanks for letting us know about Thanksgiving.\n\nAttendance: %s\nPeople: %d\nNames: %s\nFood: %s\nDietary notes: %s\nNote for the hosts: %s\n\n%s · %s\n%s\n\nYou can update your RSVP any time from the site. Your account also gives you access to the forum and shared photos.\n\nSee you there!",
+		"Hi %s,\n\nThanks for letting us know about Thanksgiving.\n\nAttendance: %s\nPeople: %d\nNames: %s\nFood: %s\nDietary notes: %s\nNote for the hosts: %s\n\n%s · %s\n%s\n\nYou can update your RSVP any time from the site. Your account also gives you access to the forum and shared photos.%s\n\nSee you there!",
 		$greeting_name,
 		at_gathering_status_label( $status ),
 		$guest_count,
@@ -470,7 +643,8 @@ function at_gathering_confirmation_message( $user, $status, $guest_count, $guest
 		$notes ?: 'None noted',
 		$details['date'],
 		$details['time'],
-		$details['address']
+		$details['address'],
+		$group_signup
 	);
 }
 
@@ -562,7 +736,7 @@ function at_gathering_save_rsvp() {
 
 	$message = at_gathering_confirmation_message( $user, $status, $guest_count, $guest_names, $foods, $data['dietary'], $data['notes'] );
 	$mail_ok = wp_mail( $user->user_email, 'Your Armstrong Thanksgiving RSVP', $message );
-	wp_safe_redirect( add_query_arg( array( 'at_rsvp' => 'saved', 'at_mail' => $mail_ok ? 'sent' : 'failed' ), $return ) );
+	wp_safe_redirect( add_query_arg( array( 'at_rsvp' => 'saved', 'at_mail' => $mail_ok ? 'sent' : 'failed' ), home_url( '/rsvp-confirmation/' ) ) );
 	exit;
 }
 add_action( 'admin_post_at_save_rsvp', 'at_gathering_save_rsvp' );

@@ -73,6 +73,8 @@ removePage('food');
 ensurePage('albums', 'Shared Albums', '<p>After dinner, come back to share your photos and see the day through everyone else’s eyes.</p>[wppa type="generic"]<p>[wppa type="upload" album="1"]</p>');
 const forumPageId = ensurePage('forum', 'The Gathering', '<p>Use this forum for hellos, small plans, and anything that does not belong on the RSVP.</p>[bbp-forum-index]');
 ensurePage('rsvp', 'RSVP', '[at_rsvp]');
+ensurePage('rsvp-confirmation', 'RSVP confirmation', '[at_rsvp_confirmation]');
+ensurePage('signup', 'Sign up', '[at_signup]');
 if (homeId) {
   wp(['option', 'update', 'show_on_front', 'page']);
   wp(['option', 'update', 'page_on_front', homeId]);
