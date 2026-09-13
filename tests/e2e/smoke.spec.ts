@@ -39,8 +39,11 @@ test('hero heading does not occlude the illustration at desktop width', async ({
   expect(headingBox!.x + headingBox!.width).toBeLessThanOrEqual(illustrationBox!.x);
 });
 
-test('front page keeps the navigation and content focused', async ({ page }) => {
+test('front page keeps the navigation and content focused', async ({ page, request }) => {
   await page.goto('/');
+  const publicResponse = await request.get('/');
+  expect(publicResponse.status()).toBe(200);
+  expect(await publicResponse.text()).not.toContain('Priestfield');
   await expect(page.getByRole('link', { name: 'Memories' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Food', exact: true })).toHaveCount(0);
   await expect(page.locator('.at-wordmark')).toBeHidden();
