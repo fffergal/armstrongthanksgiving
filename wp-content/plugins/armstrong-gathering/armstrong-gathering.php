@@ -11,7 +11,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'AT_GATHERING_VERSION', '0.4.1' );
+define( 'AT_GATHERING_VERSION', '0.5.2' );
 define( 'AT_GATHERING_FILE', __FILE__ );
 define( 'AT_GATHERING_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AT_GATHERING_URL', plugin_dir_url( __FILE__ ) );
@@ -23,15 +23,24 @@ function at_gathering_table() {
 
 function at_gathering_default_foods() {
 	return array(
-		'Stuffing',
-		'Mashed potatoes',
-		'Gravy',
+		'Stuffing — vegetarian',
+		'Stuffing — non-vegetarian',
+		'Mashed potato',
+		'Gravy — vegetarian',
+		'Gravy — non-vegetarian',
 		'Cranberry sauce',
 		'Green bean casserole',
-		'Sweet potatoes',
-		'Dinner rolls',
+		'Sweet potato casserole',
+		'Rolls',
+		'Carrots + beetroot',
 		'Pumpkin pie',
-		'Drinks',
+		'Pecan pie',
+		'Apple pie',
+		'Sweet potato pie',
+		'Nut roast',
+		'Ham hock',
+		'Cheese ball + crackers',
+		'7-layer jalapeño dip',
 	);
 }
 
@@ -122,12 +131,9 @@ function at_gathering_maybe_upgrade() {
 add_action( 'init', 'at_gathering_maybe_upgrade', 20 );
 
 function at_gathering_migrate_content() {
-	$foods = (array) get_option( 'at_gathering_foods', array() );
-	$foods = array_values( array_diff( $foods, array( 'Turkey or vegetarian centrepiece' ) ) );
-	if ( ! $foods ) {
-		$foods = at_gathering_default_foods();
-	}
-	update_option( 'at_gathering_foods', $foods );
+	// Replace the previous demo menu with the confirmed Thanksgiving potluck list.
+	// The turkey is supplied by the hosts and is intentionally not a guest option.
+	update_option( 'at_gathering_foods', at_gathering_default_foods() );
 	if ( false === get_option( 'at_gathering_invite_key', false ) ) {
 		update_option( 'at_gathering_invite_key', wp_generate_password( 32, false, false ) );
 	}
@@ -820,7 +826,7 @@ function at_gathering_send_sample_rsvp_email() {
 	if ( ! $recipient || ! in_array( 'administrator', (array) $recipient->roles, true ) ) {
 		wp_die( 'Choose an administrator as the sample recipient.' );
 	}
-	$message = at_gathering_confirmation_message( $recipient, 'yes', 2, 'Fergal and a guest', array( 'Stuffing', 'Gravy' ), 'None noted', 'Looking forward to it.', 'Fergal' );
+	$message = at_gathering_confirmation_message( $recipient, 'yes', 2, 'Fergal and a guest', array( 'Stuffing — non-vegetarian', 'Gravy — vegetarian' ), 'None noted', 'Looking forward to it.', 'Fergal' );
 	$sent = wp_mail( $recipient->user_email, 'Your Armstrong Thanksgiving RSVP', $message );
 	$url  = add_query_arg( array( 'page' => 'at-gathering', 'at_sample_mail' => $sent ? 'sent' : 'failed' ), admin_url( 'admin.php' ) );
 	wp_safe_redirect( $url );
