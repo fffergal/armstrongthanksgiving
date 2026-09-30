@@ -45,45 +45,19 @@ a:hover { color: var(--at-orange); }
 .at-nav a { display: inline-block; padding: .45rem .7rem; color: var(--at-brown); text-decoration: none; border-radius: 999px; }
 .at-nav a:hover, .at-nav a:focus-visible { background: var(--at-orange); color: #fff; }
 
-.at-main { min-height: 70vh; }
+.at-main { min-height: 70vh; margin-block-start: 0; }
 .at-shell { width: min(100% - 2rem, 76rem); margin: 0 auto; }
-.at-hero { position: relative; padding: clamp(3.5rem, 9vw, 8rem) 0 5rem; }
-.at-hero-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(16rem, .95fr); align-items: center; gap: clamp(2rem, 6vw, 6rem); }
-.at-hero-copy { min-width: 0; container-type: inline-size; }
 .at-kicker { margin: 0 0 1rem; color: var(--at-orange); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: .78rem; }
 .home .at-wordmark { display: none; }
 .home .at-header-inner { justify-content: flex-end; }
-/* Keep the unbroken word sized to its own grid track so it cannot paint into
- * the illustration track at wide desktop widths. */
-.at-hero h1 { max-inline-size: 100%; margin: 0; color: var(--at-orange); font-size: clamp(3.5rem, 16cqw, 9.5rem); line-height: .86; letter-spacing: -.045em; }
-.at-hero h1 > span, .at-hero h1 > em { display: inline-block; white-space: nowrap; }
-.at-hero h1 em { color: var(--at-coral); font-family: Georgia, serif; font-size: .32em; line-height: 1.5; letter-spacing: -.04em; font-style: normal; text-transform: lowercase; }
-.at-lead { max-width: 36rem; margin: 1.8rem 0 0; color: var(--at-brown); font-family: Georgia, serif; font-size: clamp(1.1rem, 2vw, 1.45rem); }
 .at-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.8rem; }
-.at-button { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: .65rem 1.15rem; border-radius: 999px; background: var(--at-coral); color: #fff; font-weight: 800; text-decoration: none; box-shadow: 0 6px 0 rgba(76, 37, 24, .12); }
-.at-button:hover, .at-button:focus-visible { background: var(--at-brown); color: #fff; transform: translateY(-1px); }
-.at-button.is-secondary { background: var(--at-olive); }
-.at-illustration { position: relative; min-height: 22rem; border-radius: 48% 52% 45% 55% / 42% 44% 56% 58%; background: var(--at-orange); box-shadow: var(--at-shadow); transform: rotate(3deg); }
-.at-illustration::before { content: ""; position: absolute; inset: 11% 15%; border: 1.4rem solid var(--at-mustard); border-radius: 55% 45% 58% 42%; transform: rotate(-11deg); }
-.at-illustration::after { content: "✦"; position: absolute; top: 18%; right: 18%; color: #fff; font-size: 3.5rem; transform: rotate(-12deg); }
-.at-date-card { position: absolute; left: 12%; bottom: 8%; padding: 1rem 1.4rem; border-radius: 1.6rem; background: var(--at-olive); color: #fff; font-family: Georgia, serif; font-size: clamp(1.7rem, 4vw, 2.8rem); line-height: .95; text-align: center; transform: rotate(-6deg); }
-.at-date-card small { display: block; margin-top: .5rem; font-family: inherit; font-size: .45em; letter-spacing: .04em; }
-
-.at-section { padding: 4rem 0; }
-.at-section.is-olive { background: var(--at-olive); color: #fff; }
-.at-section.is-olive a { color: #fff; }
-.at-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
-.at-section-heading h2 { margin: 0; color: var(--at-orange); font-size: clamp(2rem, 5vw, 4rem); line-height: .92; letter-spacing: -.07em; }
-.is-olive .at-section-heading h2 { color: #fff; }
-.at-section-heading p { max-width: 28rem; margin: 0; font-family: Georgia, serif; }
-.at-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
-.at-card { position: relative; min-height: 13rem; padding: 1.4rem; border: 1px solid rgba(76, 37, 24, .13); border-radius: 1.5rem; background: rgba(255,255,255,.42); box-shadow: 0 8px 25px rgba(76,37,24,.06); }
-.at-card:nth-child(2) { transform: translateY(1rem) rotate(1deg); background: #fff8ef; }
-.at-card:nth-child(3) { transform: rotate(-1deg); background: #f4dfbd; }
-.at-card h3 { margin: 0 0 .5rem; color: var(--at-brown); font-size: 1.45rem; }
-.at-card p, .at-card-link { color: var(--at-brown); }
-.at-section.is-olive .at-card-link { color: var(--at-brown); }
-.at-card .at-card-link { position: absolute; right: 1.3rem; bottom: 1.1rem; font-weight: 800; }
+a.at-button { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: .65rem 1.15rem; border-radius: 999px; background: var(--at-coral); color: #fff; font-weight: 800; text-decoration: none; box-shadow: 0 6px 0 rgba(76, 37, 24, .12); }
+a.at-button:hover, a.at-button:focus-visible { background: var(--at-brown); color: #fff; transform: translateY(-1px); }
+a.at-button.is-secondary { background: var(--at-olive); }
+.wp-block-button.at-button { display: inline-flex; }
+.wp-block-button.at-button .wp-block-button__link { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: .65rem 1.15rem; border-radius: 999px; background: var(--at-coral); color: #fff; font-weight: 800; text-decoration: none; box-shadow: 0 6px 0 rgba(76, 37, 24, .12); }
+.wp-block-button.at-button .wp-block-button__link:hover, .wp-block-button.at-button .wp-block-button__link:focus-visible { background: var(--at-brown); color: #fff; transform: translateY(-1px); }
+.wp-block-button.at-button.is-secondary .wp-block-button__link { background: var(--at-olive); }
 .at-quote { max-width: 45rem; margin: 0 auto; color: var(--at-brown); font-family: Georgia, serif; font-size: clamp(1.5rem, 3vw, 2.5rem); line-height: 1.12; text-align: center; }
 
 .at-page-header { padding: 4.5rem 0 2rem; }
@@ -101,6 +75,13 @@ a:hover { color: var(--at-orange); }
 .at-footer a { color: #fff; }
 .at-footer-links:empty { display: none; }
 .at-sign-out { text-underline-offset: .18em; }
+
+/* Named block styles are registered in functions.php and are reusable
+ * anywhere in the editor. Homepage-only decoration remains inline. */
+.is-style-display { color: var(--at-orange); }
+.is-style-kicker { margin: 0 0 1rem; color: var(--at-orange); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: .78rem; }
+.is-style-lead { max-width: 36rem; margin: 1.8rem 0 0; color: var(--at-brown); font-family: Georgia, serif; font-size: clamp(1.1rem, 2vw, 1.45rem); }
+.is-style-secondary .wp-block-button__link { background: var(--at-olive); }
 
 /* bbPress: let the classic forum structure borrow the flyer palette. */
 #bbpress-forums, .bbp-user-page { color: var(--at-ink); }
@@ -173,19 +154,6 @@ a:hover { color: var(--at-orange); }
 @media (max-width: 850px) {
   .at-header-inner, .at-footer-inner { align-items: flex-start; flex-direction: column; }
   .at-nav { justify-content: flex-start; }
-  .at-hero { padding-top: 3rem; }
-  .at-hero-grid { grid-template-columns: 1fr; }
-  .at-illustration { min-height: 16rem; max-width: 25rem; width: 90%; margin: 0 auto; }
-  .at-cards { grid-template-columns: 1fr; }
-  .at-card:nth-child(2) { transform: none; }
-  .at-section-heading { align-items: flex-start; flex-direction: column; }
-}
-
-@media (min-width: 851px) and (max-width: 1200px) {
-  .at-hero { padding: 4.5rem 0 3.5rem; }
-  .at-hero-grid { gap: 3rem; }
-  .at-hero h1 { font-size: clamp(4rem, 9vw, 7rem); }
-  .at-illustration { min-height: 18rem; }
 }
 
 :focus-visible { outline: 3px solid var(--at-mustard); outline-offset: 3px; }

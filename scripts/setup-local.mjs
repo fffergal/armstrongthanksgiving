@@ -1,9 +1,11 @@
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wrapper = path.join(root, 'scripts/wp-env.mjs');
+const homepageContent = readFileSync(path.join(root, 'content/pages/home.html'), 'utf8').trim();
 
 function wp(args, { allowFailure = false } = {}) {
   const result = spawnSync(process.execPath, [wrapper, 'run', 'cli', 'wp', ...args], {
@@ -68,7 +70,7 @@ if (wp(['user', 'get', 'guest', '--field=ID'], { allowFailure: true }).status !=
   wp(['user', 'create', 'guest', 'guest@example.test', '--role=subscriber', '--user_pass=password']);
 }
 
-const homeId = ensurePage('home', 'Home', '');
+const homeId = ensurePage('home', 'Home', homepageContent);
 removePage('food');
 ensurePage('albums', 'Shared Albums', '<p>After dinner, come back to share your photos and see the day through everyone else’s eyes.</p>[wppa type="generic"]<p>[wppa type="upload" album="1"]</p>');
 const forumPageId = ensurePage('forum', 'The Gathering', '<p>Use this forum for hellos, small plans, and anything that does not belong on the RSVP.</p>[bbp-forum-index]');

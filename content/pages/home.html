@@ -1,0 +1,163 @@
+<!-- wp:html -->
+<style>
+/* Page-specific layout stays beside the editable homepage content. */
+.at-hero { position: relative; padding: calc(clamp(3.5rem, 9vw, 8rem) + 1.5rem) 0 calc(5rem - 1.5rem); }
+.at-hero-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(16rem, .95fr); align-items: center; gap: clamp(2rem, 6vw, 6rem); }
+.at-hero-copy { min-width: 0; container-type: inline-size; }
+.at-hero > .at-hero-grid, .at-hero .at-illustration { margin-block-start: 0; }
+/* Keep the unbroken word sized to its own grid track so it cannot paint into
+ * the illustration track at wide desktop widths. */
+.at-hero h1 { max-inline-size: 100%; margin: 0; font-size: clamp(3.5rem, 16cqw, 9.5rem); line-height: .86; letter-spacing: -.045em; }
+.at-hero h1 > span, .at-hero h1 > em { display: inline-block; white-space: nowrap; }
+.at-hero h1 em { color: var(--at-coral); font-family: Georgia, serif; font-size: .32em; line-height: 1.5; letter-spacing: -.04em; font-style: normal; text-transform: lowercase; }
+.at-illustration { position: relative; min-height: 22rem; border-radius: 48% 52% 45% 55% / 42% 44% 56% 58%; background: var(--at-orange); box-shadow: var(--at-shadow); transform: rotate(3deg); }
+.at-illustration::before { content: ""; position: absolute; inset: 11% 15%; border: 1.4rem solid var(--at-mustard); border-radius: 55% 45% 58% 42%; transform: rotate(-11deg); }
+.at-illustration::after { content: "✦"; position: absolute; top: 18%; right: 18%; color: #fff; font-size: 3.5rem; transform: rotate(-12deg); }
+/* Gutenberg positions editable rich-text blocks relatively by default. */
+.editor-styles-wrapper .at-illustration > .block-editor-block-list__layout,
+.editor-styles-wrapper .at-illustration > .block-editor-block-list__layout > .block-editor-block-list__block {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+}
+.at-date-card { position: absolute; left: 12%; bottom: 8%; padding: 1rem 1.4rem; border-radius: 1.6rem; background: var(--at-olive); color: #fff; font-family: Georgia, serif; font-size: clamp(1.7rem, 4vw, 2.8rem); line-height: .95; text-align: center; transform: rotate(-6deg); }
+.at-date-card small { display: block; margin-top: .5rem; font-family: inherit; font-size: .45em; letter-spacing: .04em; }
+.editor-styles-wrapper .at-date-card {
+  position: absolute !important;
+  width: max-content !important;
+  max-width: calc(100% - 2rem);
+  margin: 0 !important;
+}
+.at-section { padding: 4rem 0; }
+.at-section.is-olive { background: var(--at-olive); color: #fff; }
+.at-section.is-olive a { color: #fff; }
+.at-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+.at-section-heading h2 { margin: 0; color: var(--at-orange); font-size: clamp(2rem, 5vw, 4rem); line-height: .92; letter-spacing: -.07em; }
+.is-olive .at-section-heading h2 { color: #fff; }
+.at-section-heading p { max-width: 28rem; margin: 0; font-family: Georgia, serif; }
+.at-cards { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 13rem; gap: 1rem; }
+.at-cards > .at-card { margin-block-start: 0; }
+.at-card { position: relative; min-height: 13rem; padding: 1.4rem; border: 1px solid rgba(76, 37, 24, .13); border-radius: 1.5rem; background: rgba(255,255,255,.42); box-shadow: 0 8px 25px rgba(76,37,24,.06); }
+.at-card:nth-child(2) { transform: translateY(1rem) rotate(1deg); background: #fff8ef; }
+.at-card:nth-child(3) { transform: rotate(-1deg); background: #f4dfbd; }
+.at-card h3 { margin: 0 0 .5rem; color: var(--at-brown); font-size: 1.45rem; }
+.at-card p, .at-card-link { color: var(--at-brown); }
+.at-section.is-olive .at-card-link, .at-section.is-olive .at-card-link a { color: var(--at-brown); }
+.at-card > .wp-block-paragraph:not(.at-card-link) { margin-block: 1em; }
+.at-card .at-card-link { position: absolute; right: 1.3rem; bottom: 1.1rem; margin: 0; font-weight: 800; }
+@media (max-width: 850px) {
+  .at-hero { padding-top: 3rem; }
+  .at-hero-grid { grid-template-columns: 1fr; }
+  .at-illustration { min-height: 16rem; max-width: 25rem; width: 90%; margin: 0 auto; }
+  .at-cards { grid-template-columns: 1fr; }
+  .at-card:nth-child(2) { transform: none; }
+  .at-section-heading { align-items: flex-start; flex-direction: column; }
+}
+@media (min-width: 851px) and (max-width: 1200px) {
+  .at-hero { padding: 4.5rem 0 3.5rem; }
+  .at-hero-grid { gap: 3rem; }
+  .at-hero h1 { font-size: clamp(4rem, 9vw, 7rem); }
+  .at-illustration { min-height: 18rem; }
+}
+</style>
+<!-- /wp:html -->
+<!-- wp:group {"tagName":"section","className":"at-hero at-shell","layout":{"type":"default"}} -->
+<section class="wp-block-group at-hero at-shell">
+	<!-- wp:group {"className":"at-hero-grid","layout":{"type":"default"}} -->
+	<div class="wp-block-group at-hero-grid">
+		<!-- wp:group {"className":"at-hero-copy","layout":{"type":"default"}} -->
+		<div class="wp-block-group at-hero-copy">
+			<!-- wp:paragraph {"className":"is-style-kicker"} -->
+			<p class="is-style-kicker">Come gather round</p>
+			<!-- /wp:paragraph -->
+			<!-- wp:heading {"level":1,"className":"is-style-display"} -->
+			<h1 class="wp-block-heading is-style-display"><span>Thanksgiving</span> <em>dinner</em></h1>
+			<!-- /wp:heading -->
+			<!-- wp:paragraph {"className":"is-style-lead"} -->
+			<p class="is-style-lead">RSVP, choose something for the table, and join the conversation — or sign up without an RSVP to use the forum and shared photos.</p>
+			<!-- /wp:paragraph -->
+			<!-- wp:buttons {"className":"at-actions","layout":{"type":"flex","flexWrap":"wrap"}} -->
+			<div class="wp-block-buttons at-actions">
+				<!-- wp:button {"url":"/rsvp/","className":"at-button"} -->
+				<div class="wp-block-button at-button"><a class="wp-block-button__link wp-element-button" href="/rsvp/">RSVP</a></div>
+				<!-- /wp:button -->
+				<!-- wp:button {"url":"/signup/","className":"at-button is-style-secondary"} -->
+				<div class="wp-block-button at-button is-style-secondary"><a class="wp-block-button__link wp-element-button" href="/signup/">Sign up without RSVP</a></div>
+				<!-- /wp:button -->
+			</div>
+			<!-- /wp:buttons -->
+		</div>
+		<!-- /wp:group -->
+		<!-- wp:group {"className":"at-illustration","layout":{"type":"default"}} -->
+		<div class="wp-block-group at-illustration">
+			<!-- wp:paragraph {"className":"at-date-card"} -->
+			<p class="at-date-card">Nov 21</p>
+			<!-- /wp:paragraph -->
+		</div>
+		<!-- /wp:group -->
+	</div>
+	<!-- /wp:group -->
+</section>
+<!-- /wp:group -->
+<!-- wp:group {"tagName":"section","className":"at-section is-olive","layout":{"type":"default"}} -->
+<section class="wp-block-group at-section is-olive">
+	<!-- wp:group {"className":"at-shell","layout":{"type":"default"}} -->
+	<div class="wp-block-group at-shell">
+		<!-- wp:group {"className":"at-section-heading","layout":{"type":"default"}} -->
+		<div class="wp-block-group at-section-heading">
+			<!-- wp:heading {"level":2} -->
+			<h2 class="wp-block-heading">Gather here</h2>
+			<!-- /wp:heading -->
+			<!-- wp:paragraph -->
+			<p>Join the conversation, keep your Thanksgiving plans up to date, and come back to share photos from the day.</p>
+			<!-- /wp:paragraph -->
+		</div>
+		<!-- /wp:group -->
+		<!-- wp:group {"className":"at-cards","layout":{"type":"default"}} -->
+		<div class="wp-block-group at-cards">
+			<!-- wp:group {"tagName":"article","className":"at-card","layout":{"type":"default"}} -->
+			<article class="wp-block-group at-card">
+				<!-- wp:heading {"level":3} -->
+				<h3 class="wp-block-heading">Photos</h3>
+				<!-- /wp:heading -->
+				<!-- wp:paragraph -->
+				<p>Come back after dinner to share your pictures and see what everyone else has added.</p>
+				<!-- /wp:paragraph -->
+				<!-- wp:paragraph {"className":"at-card-link"} -->
+				<p class="at-card-link"><a href="/albums/">Open photos →</a></p>
+				<!-- /wp:paragraph -->
+			</article>
+			<!-- /wp:group -->
+			<!-- wp:group {"tagName":"article","className":"at-card","layout":{"type":"default"}} -->
+			<article class="wp-block-group at-card">
+				<!-- wp:heading {"level":3} -->
+				<h3 class="wp-block-heading">Forum</h3>
+				<!-- /wp:heading -->
+				<!-- wp:paragraph -->
+				<p>Catch up, ask a question, or add to the conversation before and after dinner.</p>
+				<!-- /wp:paragraph -->
+				<!-- wp:paragraph {"className":"at-card-link"} -->
+				<p class="at-card-link"><a href="/forum/">Visit the forum →</a></p>
+				<!-- /wp:paragraph -->
+			</article>
+			<!-- /wp:group -->
+			<!-- wp:group {"tagName":"article","className":"at-card","layout":{"type":"default"}} -->
+			<article class="wp-block-group at-card">
+				<!-- wp:heading {"level":3} -->
+				<h3 class="wp-block-heading">RSVP</h3>
+				<!-- /wp:heading -->
+				<!-- wp:paragraph -->
+				<p>Let us know if you’re coming, along with any dietary needs and what you’d like to bring.</p>
+				<!-- /wp:paragraph -->
+				<!-- wp:paragraph {"className":"at-card-link"} -->
+				<p class="at-card-link"><a href="/rsvp/">Open RSVP →</a></p>
+				<!-- /wp:paragraph -->
+			</article>
+			<!-- /wp:group -->
+		</div>
+		<!-- /wp:group -->
+	</div>
+	<!-- /wp:group -->
+</section>
+<!-- /wp:group -->

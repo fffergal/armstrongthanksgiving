@@ -16,6 +16,46 @@ function armstrong_thanksgiving_enqueue_styles() {
 }
 add_action( 'wp_enqueue_scripts', 'armstrong_thanksgiving_enqueue_styles' );
 
+function armstrong_thanksgiving_editor_styles() {
+	add_theme_support( 'editor-styles' );
+	add_editor_style( get_stylesheet_uri() );
+}
+add_action( 'after_setup_theme', 'armstrong_thanksgiving_editor_styles' );
+
+function armstrong_thanksgiving_register_block_styles() {
+	$styles = array(
+		'core/heading'   => array(
+			array(
+				'name'  => 'display',
+				'label' => 'Display',
+			),
+		),
+		'core/paragraph' => array(
+			array(
+				'name'  => 'kicker',
+				'label' => 'Kicker',
+			),
+			array(
+				'name'  => 'lead',
+				'label' => 'Lead',
+			),
+		),
+		'core/button'    => array(
+			array(
+				'name'  => 'secondary',
+				'label' => 'Secondary',
+			),
+		),
+	);
+
+	foreach ( $styles as $block_name => $block_styles ) {
+		foreach ( $block_styles as $style ) {
+			register_block_style( $block_name, $style );
+		}
+	}
+}
+add_action( 'init', 'armstrong_thanksgiving_register_block_styles' );
+
 function armstrong_thanksgiving_theme_login_branding() {
 	?>
 	<style>
