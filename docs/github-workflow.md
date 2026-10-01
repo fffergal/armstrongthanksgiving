@@ -58,5 +58,5 @@ production change creates a new one. The PR receives the same CI and native
 Copilot approval gate as every other change. Once merged, the deployment workflow
 publishes the checked-in block document back to production. Because GitHub does
 not automatically fan out new workflow events from the repository's
-`GITHUB_TOKEN`, the sync workflow explicitly dispatches the two required checks
-against the updated branch.
+`GITHUB_TOKEN`, the sync workflow explicitly dispatches the required CI check
+against the updated branch; Copilot review is requested by the ruleset.
