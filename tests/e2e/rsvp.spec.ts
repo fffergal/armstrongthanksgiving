@@ -94,6 +94,86 @@ test('an RSVP saves and is still present after reload', async ({ page }) => {
   await expect(page.getByLabel('Stuffing — vegetarian')).toBeChecked();
 });
 
+test('a signed-in RSVP has no login prompt, emails its full payload, and repopulates every field when edited', async ({ page }) => {
+  await logIn(page);
+  await page.goto('/rsvp/');
+
+  await expect(page.getByRole('group', { name: 'Create your account' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Sign in first' })).toHaveCount(0);
+
+  await page.getByLabel('I’m coming').check();
+  await page.getByLabel('How many people are coming?').selectOption('3');
+  await page.getByLabel('Names').fill('Signed-in Friend, Alex, Sam');
+  await page.getByLabel('Dietary notes (optional)').fill('Vegetarian; no walnuts');
+  const existingFoods = page.locator('input[name="at_food[]"]:checked');
+  for (let i = await existingFoods.count() - 1; i >= 0; i--) await existingFoods.nth(i).uncheck();
+  await page.getByLabel('Gravy — vegetarian').check();
+  await page.getByLabel('Pumpkin pie').check();
+  await page.getByLabel('Something else?').fill('Mulled cider');
+  await page.getByLabel('Anything else for the hosts? (optional)').fill('Please put us near the window.');
+  await page.getByRole('button', { name: 'Update my RSVP' }).click();
+  await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
+
+  const firstMail = await page.request.get('/wp-admin/admin-ajax.php?action=at_gathering_last_test_mail');
+  const firstMailPayload = (await firstMail.json()).data;
+  expect(firstMailPayload.to).toBe('guest@example.test');
+  expect(firstMailPayload.subject).toBe('Your Armstrong Thanksgiving RSVP');
+  for (const value of [
+    'Attendance: Coming',
+    'People: 3',
+    'Names: Signed-in Friend, Alex, Sam',
+    'Food: Gravy — vegetarian, Pumpkin pie, Mulled cider',
+    'Dietary notes: Vegetarian; no walnuts',
+    'Note for the hosts: Please put us near the window.',
+  ]) expect(firstMailPayload.message).toContain(value);
+
+  await page.goto('/rsvp/');
+  await expect(page.getByLabel('I’m coming')).toBeChecked();
+  await expect(page.getByLabel('How many people are coming?')).toHaveValue('3');
+  await expect(page.getByLabel('Names')).toHaveValue('Signed-in Friend, Alex, Sam');
+  await expect(page.getByLabel('Dietary notes (optional)')).toHaveValue('Vegetarian; no walnuts');
+  await expect(page.getByLabel('Gravy — vegetarian')).toBeChecked();
+  await expect(page.getByLabel('Pumpkin pie')).toBeChecked();
+  await expect(page.getByLabel('Something else?')).toHaveValue('Mulled cider');
+  await expect(page.getByLabel('Anything else for the hosts? (optional)')).toHaveValue('Please put us near the window.');
+
+  await page.getByLabel('Maybe').check();
+  await page.getByLabel('How many people are coming?').selectOption('1');
+  await page.getByLabel('Names').fill('Signed-in Friend');
+  await page.getByLabel('Dietary notes (optional)').fill('No walnuts');
+  await page.getByLabel('Gravy — vegetarian').uncheck();
+  await page.getByLabel('Pumpkin pie').uncheck();
+  await page.getByLabel('Cranberry sauce').check();
+  await page.getByLabel('Something else?').fill('Sparkling cider');
+  await page.getByLabel('Anything else for the hosts? (optional)').fill('Updated note for the hosts.');
+  await page.getByRole('button', { name: 'Update my RSVP' }).click();
+  await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
+
+  const editedMail = await page.request.get('/wp-admin/admin-ajax.php?action=at_gathering_last_test_mail');
+  const editedMailPayload = (await editedMail.json()).data;
+  for (const value of [
+    'Attendance: Maybe',
+    'People: 1',
+    'Names: Signed-in Friend',
+    'Food: Cranberry sauce, Sparkling cider',
+    'Dietary notes: No walnuts',
+    'Note for the hosts: Updated note for the hosts.',
+  ]) expect(editedMailPayload.message).toContain(value);
+  expect(editedMailPayload.message).not.toContain('Signed-in Friend, Alex, Sam');
+  expect(editedMailPayload.message).not.toContain('Mulled cider');
+
+  await page.goto('/rsvp/');
+  await expect(page.getByLabel('Maybe')).toBeChecked();
+  await expect(page.getByLabel('How many people are coming?')).toHaveValue('1');
+  await expect(page.getByLabel('Names')).toHaveValue('Signed-in Friend');
+  await expect(page.getByLabel('Dietary notes (optional)')).toHaveValue('No walnuts');
+  await expect(page.getByLabel('Cranberry sauce')).toBeChecked();
+  await expect(page.getByLabel('Gravy — vegetarian')).not.toBeChecked();
+  await expect(page.getByLabel('Pumpkin pie')).not.toBeChecked();
+  await expect(page.getByLabel('Something else?')).toHaveValue('Sparkling cider');
+  await expect(page.getByLabel('Anything else for the hosts? (optional)')).toHaveValue('Updated note for the hosts.');
+});
+
 test('a standalone signup creates a member without an RSVP', async ({ page }, testInfo) => {
   const unique = `${testInfo.project.name.replace(/\W/g, '')}${Date.now()}`.toLowerCase();
   await page.goto('/signup/');
@@ -205,8 +285,17 @@ test('server-side RSVP validation does not leave an orphan account', async ({ pa
   await expect(page.getByRole('alert')).toContainText('Please add the names');
 
   await page.goto('/wp-login.php');
-  await page.locator('#user_login').fill(unique.split('@')[0]);
-  await page.locator('#user_pass').fill('cranberry-sauce-2026');
+  await page.evaluate(({ username, password }) => {
+    const usernameInput = document.querySelector<HTMLInputElement>('#user_login');
+    const passwordInput = document.querySelector<HTMLInputElement>('#user_pass');
+    if (!usernameInput || !passwordInput) throw new Error('WordPress login fields not found');
+    usernameInput.value = username;
+    passwordInput.value = password;
+    for (const input of [usernameInput, passwordInput]) {
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }, { username: unique, password: 'cranberry-sauce-2026' });
   await page.locator('#wp-submit').click();
   await expect(page.locator('#login_error')).toBeVisible();
 });

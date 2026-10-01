@@ -190,6 +190,10 @@ wp ${activation} is-installed ${quoteShell(component.slug)}
 if [ "$active_before" = yes ] || [ ${activate ? 'yes' : 'no'} = yes ]; then
   wp ${activation} is-active ${quoteShell(component.slug)}
 fi
+# bbPress counts the top-level reply as one depth level, so 3 is needed for
+# two visible nested reply levels.
+wp option update _bbp_allow_threaded_replies 1
+wp option update _bbp_thread_replies_depth 3
 wp cache flush
 wp super-cache flush
 printf 'Deployed ${component.slug}; database backup: %s; component backup: %s\\n' "$database_backup" "$component_backup"

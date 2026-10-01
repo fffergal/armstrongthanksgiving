@@ -60,6 +60,10 @@ wp(['option', 'update', 'blogname', 'Armstrong Thanksgiving']);
 wp(['option', 'update', 'users_can_register', '0']);
 wp(['option', 'update', '_bbp_root_slug', 'community']);
 wp(['option', 'update', '_bbp_topic_slug', 'topic']);
+wp(['option', 'update', '_bbp_allow_threaded_replies', '1']);
+// bbPress counts the top-level reply as one depth level, so 3 is needed for
+// two visible nested reply levels.
+wp(['option', 'update', '_bbp_thread_replies_depth', '3']);
 wp(['rewrite', 'structure', '/%postname%/']);
 wp([
   'eval',

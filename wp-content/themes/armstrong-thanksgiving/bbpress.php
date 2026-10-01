@@ -27,7 +27,21 @@ echo do_blocks('<!-- wp:template-part {"slug":"header"} /-->');
   </header>
   <div class="at-content-card">
     <?php
-    if (function_exists('bbp_is_single_topic') && bbp_is_single_topic()) {
+    if (function_exists('bbp_is_topic_edit') && bbp_is_topic_edit()) {
+        global $post;
+        $topic_id = absint(get_queried_object_id());
+        $previous_post = $post;
+        $post = get_post($topic_id);
+        bbp_get_template_part('form', 'topic');
+        $post = $previous_post;
+    } elseif (function_exists('bbp_is_reply_edit') && bbp_is_reply_edit()) {
+        global $post;
+        $reply_id = absint(get_queried_object_id());
+        $previous_post = $post;
+        $post = get_post($reply_id);
+        bbp_get_template_part('form', 'reply');
+        $post = $previous_post;
+    } elseif (function_exists('bbp_is_single_topic') && bbp_is_single_topic()) {
         echo do_shortcode('[bbp-single-topic id="' . absint(get_queried_object_id()) . '"]');
     } else {
         the_content();

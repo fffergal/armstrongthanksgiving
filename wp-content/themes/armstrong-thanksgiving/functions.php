@@ -56,6 +56,25 @@ function armstrong_thanksgiving_register_block_styles() {
 }
 add_action( 'init', 'armstrong_thanksgiving_register_block_styles' );
 
+/**
+ * Give replies to another reply a visual hook for the forum stylesheet.
+ *
+ * bbPress stores this relationship in post meta but does not include it in
+ * the rendered reply classes by default.
+ *
+ * @param array $classes  Classes generated for the reply.
+ * @param int   $reply_id Reply ID.
+ * @return array
+ */
+function armstrong_thanksgiving_reply_classes( $classes, $reply_id ) {
+	if ( function_exists( 'bbp_get_reply_to' ) && bbp_get_reply_to( $reply_id ) ) {
+		$classes[] = 'bbp-direct-reply';
+	}
+
+	return $classes;
+}
+add_filter( 'bbp_get_reply_class', 'armstrong_thanksgiving_reply_classes', 10, 2 );
+
 function armstrong_thanksgiving_theme_login_branding() {
 	?>
 	<style>
