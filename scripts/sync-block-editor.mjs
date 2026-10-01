@@ -178,7 +178,7 @@ wp super-cache flush`)], {
       quiet: true,
     });
   } finally {
-    run('ssh', [...sshArgs, `rm -f ${quoteShell(remoteContentPath)}`], { quiet: true });
+    run('ssh', [...sshArgs, `rm -f ${quoteShell(remoteContentPath)} ${quoteShell(remoteBaselinePath)}`], { quiet: true });
   }
   console.log(`Published the committed Home page content${baselineSha ? ' after confirming production still matched the accepted baseline under a database row lock' : ''} and flushed the WordPress object and page caches. Run \`npm run verify:production\` after the deployment workflow completes.`);
 }
