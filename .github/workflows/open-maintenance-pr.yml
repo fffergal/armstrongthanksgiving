@@ -24,6 +24,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+  actions: write
   contents: write
   pull-requests: write
 
@@ -90,7 +91,7 @@ jobs:
           body="$(printf '%s\n\n%s\n\n%s' \
             'This PR was opened by the **Open maintenance PR** workflow.' \
             "It proposes the current contents of \`$source_branch\` through a bot-authored PR so a human can review and approve the change." \
-            'CI runs from the trusted workflow definition on main against this PR. The \`Protect main\` ruleset still requires current CI, an up-to-date branch, resolved conversations, and the configured review approval before merge.')"
+            'The workflow dispatches trusted CI from main, which reports the required CI / test check on this PR commit. The \`Protect main\` ruleset still requires current CI, an up-to-date branch, resolved conversations, and the configured review approval before merge.')"
           pr_number="$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --head "$head_branch" --state open --json number --jq '.[0].number // empty')"
 
           if [ -n "$pr_number" ]; then
@@ -103,8 +104,26 @@ jobs:
           pr_url="$(gh pr view "$pr_number" --json url --jq .url)"
           echo "number=$pr_number" >> "$GITHUB_OUTPUT"
           echo "head_branch=$head_branch" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "url=$pr_url" >> "$GITHUB_OUTPUT"
           echo "Opened $pr_url"
+
+      - name: Dispatch trusted CI for the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if gh workflow run ci.yml --ref main -f "pr_number=$PR_NUMBER" -f "head_sha=$HEAD_SHA"; then
+              exit 0
+            fi
+            echo "Trusted CI dispatch attempt $attempt failed; retrying."
+            sleep 10
+          done
+          echo 'Could not dispatch trusted CI for the maintenance PR.' >&2
+          exit 1
 
       - name: Summarize pull request
         env:
