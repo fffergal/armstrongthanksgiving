@@ -51,11 +51,15 @@ variables if the hosting account changes.
 
 ## Syncing block-editor edits
 
-Run **Actions → Sync block editor content → Run workflow**. The workflow reads
-the published `Home` page from production, compares it with `main`, and opens a
-normal PR when it finds a difference. The PR receives the same tests and
-Copilot approval gate as every other change. Once merged, the deployment
-workflow publishes the checked-in block document back to production. Because
-GitHub does not automatically fan out new workflow events from the repository's
-`GITHUB_TOKEN`, the sync workflow explicitly dispatches the two required
-checks against the created branch.
+The **Sync block editor content** workflow runs daily at 03:17 UTC and is also
+available through **Actions → Sync block editor content → Run workflow**. It
+reads the published `Home` page from production, compares it with the current
+sync branch, and updates one reusable `automation/sync-block-editor` PR when it
+finds a difference. If that PR has not been merged yet, later runs add a new
+commit to it instead of opening duplicates. If the PR is merged, the next
+production change creates a new one. The PR receives the same tests and Copilot
+approval gate as every other change. Once merged, the deployment workflow
+publishes the checked-in block document back to production. Because GitHub does
+not automatically fan out new workflow events from the repository's
+`GITHUB_TOKEN`, the sync workflow explicitly dispatches the two required checks
+against the updated branch.

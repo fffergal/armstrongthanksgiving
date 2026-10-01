@@ -1,7 +1,13 @@
 name: Sync block editor content
 
 on:
+  schedule:
+    - cron: '17 3 * * *'
   workflow_dispatch:
+
+concurrency:
+  group: sync-block-editor
+  cancel-in-progress: false
 
 permissions:
   actions: write
@@ -38,11 +44,29 @@ jobs:
           printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 644 "$HOME/.ssh/known_hosts"
 
+      - name: Select the reusable sync branch
+        id: branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch='automation/sync-block-editor'
+          pr_number="$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --head "$branch" --state open --json number --jq '.[0].number // empty')"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
+
+          if git fetch origin "$branch"; then
+            git switch --create "$branch" --track "origin/$branch"
+          else
+            git switch --create "$branch"
+          fi
+
       - name: Pull the published Home page
         run: npm run sync:block-editor -- pull
 
-      - name: Create a sync branch when content changed
+      - name: Update the sync branch when content changed
         id: diff
+        env:
+          BRANCH: ${{ steps.branch.outputs.branch }}
         run: |
           if git diff --quiet -- content/pages/home.html; then
             echo 'changed=false' >> "$GITHUB_OUTPUT"
@@ -50,27 +74,30 @@ jobs:
             exit 0
           fi
           echo 'changed=true' >> "$GITHUB_OUTPUT"
-          branch="automation/sync-block-editor-${GITHUB_RUN_ID}"
-          git switch -c "$branch"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add content/pages/home.html
           git commit -m 'Sync Home page from block editor'
-          git push --set-upstream origin "$branch"
-          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          git push --set-upstream origin "$BRANCH"
 
       - name: Open pull request
         if: steps.diff.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          BRANCH: ${{ steps.diff.outputs.branch }}
+          BRANCH: ${{ steps.branch.outputs.branch }}
+          EXISTING_PR_NUMBER: ${{ steps.branch.outputs.pr_number }}
         run: |
-          pr_url="$(gh pr create \
-            --base main \
-            --head "$BRANCH" \
-            --title 'Sync Home page from block editor' \
-            --body $'This PR was created by the **Sync block editor content** workflow.\n\nIt imports the published WordPress Home page into `content/pages/home.html`. CI and the normal Copilot approval gate still apply.')"
-          pr_number="$(gh pr view "$pr_url" --json number --jq .number)"
+          pr_number="$EXISTING_PR_NUMBER"
+          if [ -z "$pr_number" ]; then
+            pr_url="$(gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title 'Sync Home page from block editor' \
+              --body $'This PR was created by the **Sync block editor content** workflow.\n\nIt imports the published WordPress Home page into `content/pages/home.html`. CI and the normal Copilot approval gate still apply.')"
+            pr_number="$(gh pr view "$pr_url" --json number --jq .number)"
+          else
+            echo "Updating existing sync PR #$pr_number."
+          fi
           head_sha="$(git rev-parse HEAD)"
           # GITHUB_TOKEN-created pushes/PRs do not reliably emit a new
           # pull_request workflow run. Dispatch both required checks against
