@@ -14,6 +14,14 @@ const configuredBaseURL = process.env.BASE_URL?.trim();
 const baseURL = process.env.USE_WORKTREE_RUNTIME === '0'
   ? configuredBaseURL || 'http://localhost:8888'
   : (runtime.url || (configuredBaseURL && configuredBaseURL !== 'http://localhost:8888' ? configuredBaseURL : 'http://localhost:8888'));
+const chromiumLaunchOptions = {
+  launchOptions: {
+    // The login page is intentionally exercised with known fixture
+    // credentials. Prevent Chromium's password manager from carrying a
+    // saved value between projects and overwriting the test fields.
+    args: ['--disable-save-password-bubble', '--disable-features=PasswordManagerOnboarding,AutofillServerCommunication']
+  }
+};
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -30,23 +38,17 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     actionTimeout: 10_000,
-    navigationTimeout: 30_000,
-    launchOptions: {
-      // The login page is intentionally exercised with known fixture
-      // credentials. Prevent Chromium's password manager from carrying a
-      // saved value between projects and overwriting the test fields.
-      args: ['--disable-save-password-bubble', '--disable-features=PasswordManagerOnboarding,AutofillServerCommunication']
-    }
+    navigationTimeout: 30_000
   },
   projects: [
-    { name: 'desktop-chromium', testMatch: /smoke\.spec\.ts/, use: { ...devices['Desktop Chrome'] } },
+    { name: 'desktop-chromium', testMatch: /smoke\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
     { name: 'mobile-safari', testMatch: /smoke\.spec\.ts/, use: { ...devices['iPhone 13'] } },
-    { name: 'login', testMatch: /login\.spec\.ts/, use: { ...devices['Desktop Chrome'] } },
-    { name: 'accessibility', testMatch: /a11y\.spec\.ts/, use: { ...devices['Desktop Chrome'] } },
-    { name: 'visual', testMatch: /visual\.spec\.ts/, use: { ...devices['Desktop Chrome'] } },
-    { name: 'member', testMatch: /member\.spec\.ts/, use: { ...devices['Desktop Chrome'] } },
-    { name: 'forum', testMatch: /forum\.spec\.ts/, use: { ...devices['Desktop Chrome'] } },
-    { name: 'rsvp', testMatch: /rsvp\.spec\.ts/, use: { ...devices['Desktop Chrome'] } },
+    { name: 'login', testMatch: /login\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
+    { name: 'accessibility', testMatch: /a11y\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
+    { name: 'visual', testMatch: /visual\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
+    { name: 'member', testMatch: /member\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
+    { name: 'forum', testMatch: /forum\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
+    { name: 'rsvp', testMatch: /rsvp\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
     { name: 'rsvp-mobile', testMatch: /rsvp\.spec\.ts/, use: { ...devices['iPhone 13'] } }
   ]
 });

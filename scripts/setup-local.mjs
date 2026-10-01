@@ -50,7 +50,10 @@ function removePage(slug) {
   if (id) wp(['post', 'delete', id, '--force']);
 }
 
-ensureCliPackage('wp-cli/wp-super-cache-cli');
+// The GitHub Actions CLI image does not include git, which the package's VCS
+// install needs. Browser tests only need the plugin itself; production
+// deployment checks install and verify the WP-CLI package on the server.
+if (!process.env.CI) ensureCliPackage('wp-cli/wp-super-cache-cli');
 ensurePlugin('wp-super-cache');
 wp(['theme', 'activate', 'armstrong-thanksgiving']);
 wp(['plugin', 'activate', 'bbpress.latest-stable', 'wp-photo-album-plus.latest-stable', 'jonradio-private-site.latest-stable']);

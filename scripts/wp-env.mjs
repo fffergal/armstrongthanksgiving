@@ -63,7 +63,11 @@ for (const slug of pluginSlugs) {
   if (found) cachedPlugins.push({ slug, source: found });
 }
 config.themes = [];
-config.plugins = [];
+// Cached plugin archives make local worktrees deterministic, but a fresh CI
+// runner has no ~/.wp-env cache yet. Let wp-env install the community plugins
+// on that first run; subsequent starts use the cached-copy path below.
+const pluginsAreCached = cachedPlugins.length === pluginSlugs.length;
+config.plugins = pluginsAreCached ? [] : remotePlugins;
 config.mappings = {};
 await fs.writeFile(stagedConfig, `${JSON.stringify(config, null, 2)}\n`);
 
@@ -115,9 +119,6 @@ function environmentStatus() {
 }
 
 async function copyProjectIntoContainer() {
-  if (cachedPlugins.length !== pluginSlugs.length) {
-    throw new Error('The wp-env plugin cache is incomplete; run `npm run wp:start` once with network access to refill it.');
-  }
   const projectDir = environmentStatus().installPath;
   if (!projectDir) throw new Error('Could not locate the generated wp-env project.');
   const composeFile = path.join(projectDir, 'docker-compose.yml');
@@ -128,7 +129,9 @@ async function copyProjectIntoContainer() {
     { source: stagedTheme, target: '/var/www/html/wp-content/themes/armstrong-thanksgiving' },
     { source: stagedGatheringPlugin, target: '/var/www/html/wp-content/plugins/armstrong-gathering' },
     { source: stagedMuPlugins, target: '/var/www/html/wp-content/mu-plugins' },
-    ...cachedPlugins.map(({ slug, source }) => ({ source, target: `/var/www/html/wp-content/plugins/${slug}` }))
+    ...(pluginsAreCached
+      ? cachedPlugins.map(({ slug, source }) => ({ source, target: `/var/www/html/wp-content/plugins/${slug}` }))
+      : [])
   ];
   for (const { source, target } of targets) {
     run('docker', ['exec', container, 'rm', '-rf', target]);

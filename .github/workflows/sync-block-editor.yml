@@ -1,0 +1,179 @@
+name: Sync block editor content
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: sync-block-editor
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    name: Pull production Home page and open PR
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Configure production SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_KNOWN_HOSTS"
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 644 "$HOME/.ssh/known_hosts"
+
+      - name: Select the reusable sync branch
+        id: branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          branch='automation/sync-block-editor'
+          pr_number="$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --head "$branch" --state open --json number --jq '.[0].number // empty')"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
+
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch"
+            remote_branch_exists=true
+          else
+            remote_branch_exists=false
+          fi
+
+          if [ -n "$pr_number" ]; then
+            git switch --create "$branch" --track "origin/$branch"
+            branch_head_before="$(git rev-parse HEAD)"
+            if ! git merge --no-edit main; then
+              mapfile -t conflicted_files < <(git diff --name-only --diff-filter=U)
+              if [ "${#conflicted_files[@]}" -eq 1 ] && [ "${conflicted_files[0]}" = content/pages/home.html ]; then
+                echo 'The managed Home page conflicts with main; using main temporarily before pulling production content.'
+                git checkout --theirs -- content/pages/home.html
+                git add content/pages/home.html
+                git commit --no-edit
+              else
+                echo 'The sync branch has an unexpected merge conflict.' >&2
+                printf 'Conflicted files:\n%s\n' "${conflicted_files[*]}" >&2
+                git merge --abort
+                exit 1
+              fi
+            fi
+            if [ "$(git rev-parse HEAD)" != "$branch_head_before" ]; then
+              branch_updated=true
+            else
+              branch_updated=false
+            fi
+            echo 'reset_remote=false' >> "$GITHUB_OUTPUT"
+          elif [ "$remote_branch_exists" = true ]; then
+            git switch --create "$branch"
+            branch_updated=false
+            echo 'reset_remote=true' >> "$GITHUB_OUTPUT"
+          else
+            git switch --create "$branch"
+            branch_updated=false
+            echo 'reset_remote=false' >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "branch_updated=$branch_updated" >> "$GITHUB_OUTPUT"
+          git switch main
+
+      - name: Pull the published Home page
+        run: npm run sync:block-editor -- pull
+
+      - name: Preserve the trusted production content
+        run: |
+          cp content/pages/home.html "$RUNNER_TEMP/home.html"
+          git restore --worktree -- content/pages/home.html
+
+      - name: Update the sync branch when content changed
+        id: diff
+        env:
+          BRANCH: ${{ steps.branch.outputs.branch }}
+          BRANCH_UPDATED: ${{ steps.branch.outputs.branch_updated }}
+          RESET_REMOTE: ${{ steps.branch.outputs.reset_remote }}
+        run: |
+          git switch "$BRANCH"
+          cp "$RUNNER_TEMP/home.html" content/pages/home.html
+          changed=false
+          if git diff --quiet -- content/pages/home.html; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            echo 'Production Home page already matches the sync branch.'
+          else
+            changed=true
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+            git add content/pages/home.html
+            git commit -m 'Sync Home page from block editor'
+          fi
+
+          if [ "$BRANCH_UPDATED" = true ] || [ "$changed" = true ]; then
+            if [ "$RESET_REMOTE" = true ]; then
+              git push --force-with-lease --set-upstream origin "$BRANCH"
+            else
+              git push --set-upstream origin "$BRANCH"
+            fi
+          fi
+
+      - name: Open pull request
+        id: pr
+        if: steps.diff.outputs.changed == 'true' || steps.branch.outputs.branch_updated == 'true' || steps.branch.outputs.pr_number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.branch.outputs.branch }}
+          EXISTING_PR_NUMBER: ${{ steps.branch.outputs.pr_number }}
+        run: |
+          pr_number="$EXISTING_PR_NUMBER"
+          if [ -z "$pr_number" ]; then
+            pr_url="$(gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title 'Sync Home page from block editor' \
+              --body $'This PR was created by the **Sync block editor content** workflow.\n\nIt imports the published WordPress Home page into `content/pages/home.html`. Trusted CI is dispatched from `main` and reports the required `CI / test` check on this PR commit; the `Protect main` ruleset requests native Copilot review and requires its approval.')"
+            pr_number="$(gh pr view "$pr_url" --json number --jq .number)"
+          else
+            echo "Updating existing sync PR #$pr_number."
+          fi
+
+          echo "number=$pr_number" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch trusted CI for the sync PR
+        if: steps.diff.outputs.changed == 'true' || steps.branch.outputs.branch_updated == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if gh workflow run ci.yml --ref main -f "pr_number=$PR_NUMBER" -f "head_sha=$HEAD_SHA"; then
+              exit 0
+            fi
+            echo "Trusted CI dispatch attempt $attempt failed; retrying."
+            sleep 10
+          done
+          echo 'Could not dispatch trusted CI for the sync PR.' >&2
+          exit 1
