@@ -8,11 +8,11 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: Optional pull request number to test
+        description: Pull request number to test
         required: false
         type: string
       head_sha:
-        description: Pull request head SHA for the required check
+        description: Expected current pull request head SHA
         required: false
         type: string
 
@@ -21,28 +21,60 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  checks: write
   contents: read
 
 jobs:
-  test:
-    name: Run trusted CI
+  prepare_check:
+    name: Prepare trusted check
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 5
+    permissions:
+      checks: write
+      pull-requests: read
+    outputs:
+      check_id: ${{ steps.context.outputs.check_id }}
+      merge_ref: ${{ steps.context.outputs.merge_ref }}
+      head_sha: ${{ steps.context.outputs.head_sha }}
     steps:
-      - name: Start required pull-request check
-        id: required_check
-        if: github.event_name == 'pull_request_target' || (github.event_name == 'workflow_dispatch' && inputs.pr_number != '' && inputs.head_sha != '')
+      - name: Verify pull request and create check
+        id: context
         uses: actions/github-script@v7
         env:
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || inputs.head_sha }}
+          INPUT_HEAD_SHA: ${{ inputs.head_sha }}
+          INPUT_PR_NUMBER: ${{ inputs.pr_number }}
         with:
           script: |
-            const { data } = await github.rest.checks.create({
+            const requestedNumber = Number(process.env.INPUT_PR_NUMBER || 0);
+            const prNumber = context.payload.pull_request?.number || requestedNumber;
+
+            if (!prNumber) {
+              core.setOutput('merge_ref', '');
+              return;
+            }
+
+            const { data: pullRequest } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+
+            if (pullRequest.base.ref !== 'main' || pullRequest.state !== 'open') {
+              core.setFailed('The requested pull request must be open and target main.');
+              return;
+            }
+
+            if (context.eventName === 'workflow_dispatch' && pullRequest.head.sha !== process.env.INPUT_HEAD_SHA) {
+              core.setFailed('The requested pull request head changed before trusted CI started.');
+              return;
+            }
+
+            const headSha = pullRequest.head.sha;
+            const mergeRef = `refs/pull/${prNumber}/merge`;
+            const { data: check } = await github.rest.checks.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               name: 'CI / test',
-              head_sha: process.env.PR_HEAD_SHA,
+              head_sha: headSha,
               status: 'in_progress',
               started_at: new Date().toISOString(),
               details_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
@@ -51,14 +83,26 @@ jobs:
                 summary: 'Testing the pull request merge ref with the workflow definition from main.',
               },
             });
-            core.setOutput('check_id', data.id);
 
+            core.setOutput('check_id', check.id);
+            core.setOutput('merge_ref', mergeRef);
+            core.setOutput('head_sha', headSha);
+
+  test:
+    name: Run trusted CI
+    needs: prepare_check
+    if: needs.prepare_check.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
       - name: Check out source
         uses: actions/checkout@v5
         with:
-          # The workflow comes from trusted main; only the source under test
-          # comes from the pull request's merge ref.
-          ref: ${{ github.event.pull_request.number && format('refs/pull/{0}/merge', github.event.pull_request.number) || inputs.pr_number && format('refs/pull/{0}/merge', inputs.pr_number) || github.sha }}
+          # This workflow comes from trusted main; only the source under test
+          # comes from the verified pull request merge ref.
+          ref: ${{ needs.prepare_check.outputs.merge_ref || github.sha }}
           persist-credentials: false
 
       - name: Set up Node.js
@@ -96,19 +140,28 @@ jobs:
         if: always()
         run: npm run wp:cleanup
 
+  complete_check:
+    name: Complete required check
+    needs: [prepare_check, test]
+    if: always() && needs.prepare_check.outputs.check_id != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      checks: write
+    steps:
       - name: Complete required pull-request check
-        if: always() && steps.required_check.outputs.check_id != ''
         uses: actions/github-script@v7
         env:
-          CHECK_ID: ${{ steps.required_check.outputs.check_id }}
-          JOB_STATUS: ${{ job.status }}
+          CHECK_ID: ${{ needs.prepare_check.outputs.check_id }}
+          TEST_RESULT: ${{ needs.test.result }}
         with:
           script: |
             const conclusion = {
               success: 'success',
               failure: 'failure',
               cancelled: 'cancelled',
-            }[process.env.JOB_STATUS] || 'failure';
+            }[process.env.TEST_RESULT] || 'failure';
+
             await github.rest.checks.update({
               owner: context.repo.owner,
               repo: context.repo.repo,

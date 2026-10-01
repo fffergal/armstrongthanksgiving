@@ -10,11 +10,10 @@ requests into `main`:
    request's merge ref. Its reports are retained as a workflow artifact. The
    workflow definition comes from `main`, while the source under test comes
    from the pull request, so a PR cannot replace the required check by editing
-   its own CI YAML. The runner has only `contents: read` plus the narrow
-   ability to create its own check run, does not use production secrets, and
-   disables checkout credentials. It explicitly reports `CI / test` against
-   the PR head SHA, including when a token-created automation PR cannot start
-   a normal pull-request workflow.
+   its own CI YAML. The test runner has only `contents: read`, does not use
+   production secrets, and disables checkout credentials. Separate trusted
+   jobs create and complete `CI / test` with `checks: write`, including when a
+   token-created automation PR cannot start a normal pull-request workflow.
 4. The repository ruleset automatically requests Copilot review on new pull
    requests and new pushes. Copilot's native approval counts as the required
    pull-request approval when repository Copilot approval settings are enabled.
@@ -74,24 +73,19 @@ required checks and approvals. The legacy `Copilot approval` Actions check was
 removed when that ruleset was enabled; native Copilot review plus its approval
 setting now supplies the review requirement.
 
-## Opening a bot-authored maintenance PR
+## When Copilot cannot approve a change
 
-Sometimes Copilot can review the diff but cannot approve a PR because the
-change depends on repository-level settings that are not visible in the
-checkout: rulesets, required checks, environment approvals, deployment
-secrets, or other GitHub configuration. If the PR was opened by the same human
-who prepared the change, that human cannot approve their own PR either. A
-comment saying that the change looks good does not satisfy GitHub's approval
-requirement.
+Copilot may be unable to approve a change whose correctness depends on
+repository-level settings that are not visible in the checkout: rulesets,
+required checks, environment approvals, deployment secrets, or other GitHub
+configuration. A comment saying that the change looks good does not satisfy
+GitHub's approval requirement, and copying an arbitrary human-authored branch
+into a bot-authored PR would undermine the independent-review gate.
 
-For that case, use **Actions → Open maintenance PR → Run workflow**. Enter the
-existing source branch and optionally a title. The workflow copies that branch
-to a distinct `automation/maintenance/<source-branch>` branch, opens or
-updates one PR as `github-actions[bot]`, dispatches trusted CI with the PR
-number and head SHA, and prints the PR link in the workflow summary. The bot
-identity only separates PR authorship from the human reviewer; it does not
-assert that the change is
-trusted or grant a bypass. Review the diff and the relevant GitHub settings,
-then approve the PR normally. The same ruleset still enforces current CI, an
-up-to-date branch, resolved conversations, and the configured review approval
-before merge.
+Keep those changes in a normal human-authored PR and have an independent
+reviewer approve them. The initial workflow setup PR is the one-time bootstrap
+exception: after checking the diff and the relevant settings, an administrator
+can temporarily add themselves as a ruleset bypass, squash-merge that PR, and
+remove the bypass immediately. The block-editor sync PR is different: it is
+bot-authored from content read from the published site, not from an arbitrary
+coding branch, and still goes through the normal checks and Copilot approval.
