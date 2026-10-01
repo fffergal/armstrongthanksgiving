@@ -19,7 +19,10 @@ requests into `main`:
    pull-request approval when repository Copilot approval settings are enabled.
 5. After the checks and approval are complete, squash-merge the pull request.
 6. A push to `main` deploys changed theme, plugin, and block-editor content in
-   sequence, then checks the public site.
+   sequence, then checks the public site. Before publishing a changed Home
+   page, deployment checks that production still matches the previously
+   committed page (or already matches the incoming page); it stops if newer
+   editor changes would be overwritten.
 
 ## One-time repository settings
 

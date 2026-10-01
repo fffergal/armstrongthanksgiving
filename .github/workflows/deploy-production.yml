@@ -59,6 +59,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -88,7 +90,11 @@ jobs:
 
       - name: Publish block-editor content
         if: needs.changed-components.outputs.content == 'true'
-        run: npm run sync:block-editor -- push --confirm
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          npm run sync:block-editor -- check --baseline-sha "$BEFORE_SHA"
+          npm run sync:block-editor -- push --confirm
 
       - name: Verify public site
         run: npm run verify:production
