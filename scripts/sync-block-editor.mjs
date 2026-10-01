@@ -110,7 +110,7 @@ fi`;
 
 async function pull() {
   const content = run('ssh', [...sshArgs, remoteScript(`${homePageLookup()}
-wp post get "$home_id" --field=post_content --format=plaintext`)], { quiet: true });
+wp post get "$home_id" --field=post_content`)], { quiet: true });
   await fs.writeFile(contentPath, `${content.trimEnd()}\n`);
   console.log(`Pulled production Home page into ${path.relative(root, contentPath)}.`);
 }
