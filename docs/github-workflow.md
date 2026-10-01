@@ -54,13 +54,14 @@ variables if the hosting account changes.
 
 ## Syncing block-editor edits
 
-The **Sync block editor content** workflow runs daily at 03:17 UTC and is also
-available through **Actions → Sync block editor content → Run workflow**. It
-reads the published `Home` page from production, compares it with the current
-sync branch, and updates one reusable `automation/sync-block-editor` PR when it
-finds a difference. If that PR has not been merged yet, later runs merge the
-latest `main` into it and add a new content commit instead of opening
-duplicates. If the PR is merged, the next production change creates a new one.
+The **Sync block editor content** workflow runs daily at 03:17 UTC, after each
+successful production workflow, and is also available through **Actions → Sync
+block editor content → Run workflow**. It reads the published `Home` page from
+production, compares it with the current sync branch, and updates one reusable
+`automation/sync-block-editor` PR when it finds a difference. If that PR has
+not been merged yet, later runs merge the latest `main` into it and add a new
+content commit instead of opening duplicates. If the PR is merged, the next
+production change creates a new one.
 The PR receives the same CI and native Copilot approval gate as every other
 change. Once merged, the deployment workflow publishes the checked-in block
 document back to production. Since the sync workflow writes with
