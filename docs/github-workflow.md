@@ -68,11 +68,6 @@ document back to production. Since the sync workflow writes with
 with the PR number and head SHA; that workflow reports the required
 `CI / test` check on the PR commit. Copilot review is requested by the ruleset.
 
-The repository's active `Protect main` ruleset is the source of truth for
-required checks and approvals. The legacy `Copilot approval` Actions check was
-removed when that ruleset was enabled; native Copilot review plus its approval
-setting now supplies the review requirement.
-
 ## When Copilot cannot approve a change
 
 Copilot may be unable to approve a change whose correctness depends on
