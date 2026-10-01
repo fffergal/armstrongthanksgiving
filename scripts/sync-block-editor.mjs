@@ -9,7 +9,6 @@ import { spawnSync } from 'node:child_process';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const contentPath = path.join(root, 'content/pages/home.html');
 const productionURL = 'https://www.armstrongthanksgiving.com';
-const pageSlug = 'home';
 const args = process.argv.slice(2);
 const direction = args.shift();
 const confirm = args.includes('--confirm');
@@ -91,9 +90,20 @@ ${body}
 }
 
 function homePageLookup() {
-  return `home_id="$(wp post list --post_type=page --name=${quoteShell(pageSlug)} --field=ID --format=ids | awk '{print $1}')"
-if [ -z "$home_id" ]; then
-  printf 'Could not find the published Home page.\\n' >&2
+  return `front_type="$(wp option get show_on_front)"
+if [ "$front_type" != page ]; then
+  printf 'The production front page is not configured as a page.\\n' >&2
+  exit 1
+fi
+home_id="$(wp option get page_on_front)"
+if [ -z "$home_id" ] || [ "$home_id" = 0 ]; then
+  printf 'Could not find the configured production front page.\\n' >&2
+  exit 1
+fi
+home_post_type="$(wp post get "$home_id" --field=post_type)"
+home_status="$(wp post get "$home_id" --field=post_status)"
+if [ "$home_post_type" != page ] || [ "$home_status" != publish ]; then
+  printf 'The configured production front page is not a published page.\\n' >&2
   exit 1
 fi`;
 }
