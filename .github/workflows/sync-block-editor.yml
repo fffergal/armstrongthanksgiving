@@ -10,8 +10,6 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  actions: write
-  checks: read
   contents: write
   pull-requests: write
 
@@ -151,37 +149,8 @@ jobs:
               --base main \
               --head "$BRANCH" \
               --title 'Sync Home page from block editor' \
-              --body $'This PR was created by the **Sync block editor content** workflow.\n\nIt imports the published WordPress Home page into `content/pages/home.html`. The workflow dispatches CI for token-created branch pushes; the `Protect main` ruleset requests native Copilot review and requires its approval.')"
+              --body $'This PR was created by the **Sync block editor content** workflow.\n\nIt imports the published WordPress Home page into `content/pages/home.html`. CI runs from the trusted workflow definition on `main`; the `Protect main` ruleset requests native Copilot review and requires its approval.')"
             pr_number="$(gh pr view "$pr_url" --json number --jq .number)"
           else
             echo "Updating existing sync PR #$pr_number."
           fi
-
-      - name: Dispatch CI for the sync PR
-        if: steps.diff.outputs.changed == 'true' || steps.branch.outputs.branch_updated == 'true' || steps.branch.outputs.pr_number != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BRANCH: ${{ steps.branch.outputs.branch }}
-          PR_NUMBER: ${{ steps.branch.outputs.pr_number }}
-          BRANCH_UPDATED: ${{ steps.branch.outputs.branch_updated }}
-          CONTENT_CHANGED: ${{ steps.diff.outputs.changed }}
-        run: |
-          if [ "$BRANCH_UPDATED" = true ] || [ "$CONTENT_CHANGED" = true ]; then
-            echo 'The sync branch changed in this run; dispatching CI for its new head.'
-          elif [ -n "$PR_NUMBER" ]; then
-            ci_bucket="$(gh pr checks "$PR_NUMBER" --required --json name,bucket --jq '[.[] | select(.name == "CI / test")] | .[0].bucket // empty' 2>/dev/null || true)"
-            if [ "$ci_bucket" = pass ]; then
-              echo 'CI already passes for the current sync PR head.'
-              exit 0
-            fi
-          fi
-
-          for attempt in 1 2 3; do
-            if gh workflow run ci.yml --ref "$BRANCH" -f "ref=$BRANCH"; then
-              exit 0
-            fi
-            echo "CI dispatch attempt $attempt failed; retrying."
-            sleep 10
-          done
-          echo 'Could not dispatch CI for the sync PR.' >&2
-          exit 1

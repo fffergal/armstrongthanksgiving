@@ -5,9 +5,15 @@ requests into `main`:
 
 1. Make a feature in its own worktree and push the branch.
 2. Open a pull request into `main`.
-3. The `CI / test` check starts WordPress, seeds the fixture data, runs the
-   complete Playwright suite, and runs the Lighthouse budgets. Its reports are
-   retained as a workflow artifact.
+3. The trusted `CI / test` workflow starts WordPress, seeds the fixture data,
+   runs the complete Playwright suite, and runs the Lighthouse budgets against
+   the pull request's merge ref. Its reports are retained as a workflow
+   artifact. The workflow definition comes from `main`, while the source under
+   test comes from the pull request, so a PR cannot replace the required check
+   by editing its own CI YAML. The job has only `contents: read`, does not use
+   production secrets, and disables checkout credentials. This is deliberately
+   a narrow use of `pull_request_target`: the workflow must not gain
+   production secrets or write permissions while it runs branch code.
 4. The repository ruleset automatically requests Copilot review on new pull
    requests and new pushes. Copilot's native approval counts as the required
    pull-request approval when repository Copilot approval settings are enabled.
@@ -57,9 +63,8 @@ latest `main` into it and add a new content commit instead of opening
 duplicates. If the PR is merged, the next production change creates a new one.
 The PR receives the same CI and native Copilot approval gate as every other
 change. Once merged, the deployment workflow publishes the checked-in block
-document back to production. Because GitHub does not automatically fan out new
-workflow events from the repository's `GITHUB_TOKEN`, the sync workflow
-explicitly dispatches the required CI check against the updated branch;
+document back to production. CI is triggered by the trusted
+`pull_request_target` workflow rather than by a manually dispatched run;
 Copilot review is requested by the ruleset.
 
 The repository's active `Protect main` ruleset is the source of truth for
@@ -80,8 +85,8 @@ requirement.
 For that case, use **Actions → Open maintenance PR → Run workflow**. Enter the
 existing source branch and optionally a title. The workflow copies that branch
 to a distinct `automation/maintenance/<source-branch>` branch, opens or
-updates one PR as `github-actions[bot]`, explicitly dispatches CI, and prints
-the PR link in the workflow summary. The bot identity only separates PR
+updates one PR as `github-actions[bot]`, and prints the PR link in the workflow
+summary. The bot identity only separates PR
 authorship from the human reviewer; it does not assert that the change is
 trusted or grant a bypass. Review the diff and the relevant GitHub settings,
 then approve the PR normally. The same ruleset still enforces current CI, an
