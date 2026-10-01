@@ -69,11 +69,21 @@ setting now supplies the review requirement.
 
 ## Opening a bot-authored maintenance PR
 
-For a change that was prepared by an automation or coding agent, use
-**Actions → Open maintenance PR → Run workflow**. Enter the existing source
-branch and optionally a title. The workflow copies that branch to a protected
-`automation/maintenance/*` branch, opens or updates one PR as
-`github-actions[bot]`, explicitly dispatches CI, and prints the PR link in the
-workflow summary. Review and approve that PR normally; the ruleset still
-enforces the same checks and merge requirements, so this does not grant a
-bypass permission to the automation.
+Sometimes Copilot can review the diff but cannot approve a PR because the
+change depends on repository-level settings that are not visible in the
+checkout: rulesets, required checks, environment approvals, deployment
+secrets, or other GitHub configuration. If the PR was opened by the same human
+who prepared the change, that human cannot approve their own PR either. A
+comment saying that the change looks good does not satisfy GitHub's approval
+requirement.
+
+For that case, use **Actions → Open maintenance PR → Run workflow**. Enter the
+existing source branch and optionally a title. The workflow copies that branch
+to a distinct `automation/maintenance/<source-branch>` branch, opens or
+updates one PR as `github-actions[bot]`, explicitly dispatches CI, and prints
+the PR link in the workflow summary. The bot identity only separates PR
+authorship from the human reviewer; it does not assert that the change is
+trusted or grant a bypass. Review the diff and the relevant GitHub settings,
+then approve the PR normally. The same ruleset still enforces current CI, an
+up-to-date branch, resolved conversations, and the configured review approval
+before merge.

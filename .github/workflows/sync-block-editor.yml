@@ -69,7 +69,20 @@ jobs:
           if [ -n "$pr_number" ]; then
             git switch --create "$branch" --track "origin/$branch"
             branch_head_before="$(git rev-parse HEAD)"
-            git merge --no-edit main
+            if ! git merge --no-edit main; then
+              mapfile -t conflicted_files < <(git diff --name-only --diff-filter=U)
+              if [ "${#conflicted_files[@]}" -eq 1 ] && [ "${conflicted_files[0]}" = content/pages/home.html ]; then
+                echo 'The managed Home page conflicts with main; using main temporarily before pulling production content.'
+                git checkout --theirs -- content/pages/home.html
+                git add content/pages/home.html
+                git commit --no-edit
+              else
+                echo 'The sync branch has an unexpected merge conflict.' >&2
+                printf 'Conflicted files:\n%s\n' "${conflicted_files[*]}" >&2
+                git merge --abort
+                exit 1
+              fi
+            fi
             if [ "$(git rev-parse HEAD)" != "$branch_head_before" ]; then
               branch_updated=true
             else

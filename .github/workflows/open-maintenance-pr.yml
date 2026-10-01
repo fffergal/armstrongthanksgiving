@@ -59,8 +59,7 @@ jobs:
           if [ -n "$REQUESTED_HEAD_BRANCH" ]; then
             head_branch="${REQUESTED_HEAD_BRANCH#refs/heads/}"
           else
-            safe_source_branch="$(printf '%s' "$source_branch" | tr '/_' '-')"
-            head_branch="automation/maintenance/$safe_source_branch"
+            head_branch="automation/maintenance/$source_branch"
           fi
 
           case "$head_branch" in
@@ -70,6 +69,7 @@ jobs:
               exit 1
               ;;
           esac
+          git check-ref-format --branch "$head_branch"
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'

@@ -91,9 +91,11 @@ The GitHub workflow for multiple concurrent worktrees is documented in
 complete browser and Lighthouse suite, automatically request Copilot review,
 and require a current Copilot approval before merge. Squash merges to `main` deploy the
 changed theme, plugin, and block-editor content. The **Sync block editor
-content** workflow can pull the published Home page into a PR. The
-**Open maintenance PR** workflow can turn an existing automation or agent
-branch into a bot-authored PR for human review.
+content** workflow can pull the published Home page into a PR. When Copilot
+cannot approve a change because it depends on repository settings that are not
+visible in the diff, the **Open maintenance PR** workflow can turn an existing
+automation or agent branch into a bot-authored PR for a human to review and
+approve without granting a bypass.
 
 Production deployment uses the server's SSH-accessible WP-CLI. From a clean,
 committed source state, preview or deploy the relevant component with:
