@@ -101,7 +101,7 @@ jobs:
           changed=false
           if git diff --quiet -- content/pages/home.html; then
             echo 'changed=false' >> "$GITHUB_OUTPUT"
-            echo 'Production Home page already matches main.'
+            echo 'Production Home page already matches the sync branch.'
           else
             changed=true
             echo 'changed=true' >> "$GITHUB_OUTPUT"
