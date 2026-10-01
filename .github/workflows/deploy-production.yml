@@ -1,0 +1,87 @@
+name: Deploy production
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  changed-components:
+    name: Detect deployable changes
+    runs-on: ubuntu-latest
+    outputs:
+      theme: ${{ steps.changes.outputs.theme }}
+      plugin: ${{ steps.changes.outputs.plugin }}
+      content: ${{ steps.changes.outputs.content }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed components
+        id: changes
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: |
+          changed_files="$(git diff --name-only "$BEFORE_SHA" "$AFTER_SHA")"
+          has_path() {
+            printf '%s\n' "$changed_files" | grep -Fqx "$1"
+          }
+          has_prefix() {
+            printf '%s\n' "$changed_files" | grep -Fq "$1"
+          }
+          if has_prefix 'wp-content/themes/armstrong-thanksgiving/'; then echo 'theme=true' >> "$GITHUB_OUTPUT"; else echo 'theme=false' >> "$GITHUB_OUTPUT"; fi
+          if has_prefix 'wp-content/plugins/armstrong-gathering/'; then echo 'plugin=true' >> "$GITHUB_OUTPUT"; else echo 'plugin=false' >> "$GITHUB_OUTPUT"; fi
+          if has_path 'content/pages/home.html'; then echo 'content=true' >> "$GITHUB_OUTPUT"; else echo 'content=false' >> "$GITHUB_OUTPUT"; fi
+
+  deploy:
+    name: Deploy production
+    needs: changed-components
+    if: needs.changed-components.outputs.theme == 'true' || needs.changed-components.outputs.plugin == 'true' || needs.changed-components.outputs.content == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Configure production SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_KNOWN_HOSTS"
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 644 "$HOME/.ssh/known_hosts"
+
+      - name: Deploy theme
+        if: needs.changed-components.outputs.theme == 'true'
+        run: npm run deploy:production -- theme --confirm --activate
+
+      - name: Deploy gathering plugin
+        if: needs.changed-components.outputs.plugin == 'true'
+        run: npm run deploy:production -- plugin --confirm
+
+      - name: Publish block-editor content
+        if: needs.changed-components.outputs.content == 'true'
+        run: npm run sync:block-editor -- push --confirm
+
+      - name: Verify public site
+        run: npm run verify:production

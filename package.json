@@ -16,6 +16,7 @@
     "wp:logs": "node scripts/wp-env.mjs logs",
     "wp:setup": "node scripts/setup-local.mjs",
     "deploy:production": "node scripts/deploy-production.mjs",
+    "sync:block-editor": "node scripts/sync-block-editor.mjs",
     "verify:production": "node scripts/verify-production.mjs",
     "env:setup": "node scripts/worktree-setup.mjs",
     "env:teardown": "node scripts/wp-env.mjs cleanup",

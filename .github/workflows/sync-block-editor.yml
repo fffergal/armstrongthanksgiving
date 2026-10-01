@@ -1,0 +1,79 @@
+name: Sync block editor content
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    name: Pull production Home page and open PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Configure production SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_KNOWN_HOSTS"
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 644 "$HOME/.ssh/known_hosts"
+
+      - name: Pull the published Home page
+        run: npm run sync:block-editor -- pull
+
+      - name: Create a sync branch when content changed
+        id: diff
+        run: |
+          if git diff --quiet -- content/pages/home.html; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            echo 'Production Home page already matches main.'
+            exit 0
+          fi
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+          branch="automation/sync-block-editor-${GITHUB_RUN_ID}"
+          git switch -c "$branch"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add content/pages/home.html
+          git commit -m 'Sync Home page from block editor'
+          git push --set-upstream origin "$branch"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
+      - name: Open pull request
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.diff.outputs.branch }}
+        run: |
+          pr_url="$(gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title 'Sync Home page from block editor' \
+            --body $'This PR was created by the **Sync block editor content** workflow.\n\nIt imports the published WordPress Home page into `content/pages/home.html`. CI and the normal Copilot approval gate still apply.')"
+          pr_number="$(gh pr view "$pr_url" --json number --jq .number)"
+          head_sha="$(git rev-parse HEAD)"
+          # GITHUB_TOKEN-created pushes/PRs do not reliably emit a new
+          # pull_request workflow run. Dispatch both required checks against
+          # the sync branch so branch protection sees them on this commit.
+          gh workflow run ci.yml --ref "$BRANCH" -f "ref=$BRANCH"
+          gh workflow run copilot-review.yml --ref "$BRANCH" -f "pr_number=$pr_number" -f "head_sha=$head_sha"

@@ -86,6 +86,13 @@ invite flow, deliverability follow-up, and the evidence needed to confirm a real
 
 ## Production updates
 
+The GitHub workflow for multiple concurrent worktrees is documented in
+[GitHub workflow](docs/github-workflow.md). Pull requests into `main` run the
+complete browser and Lighthouse suite, request Copilot review, and require a
+current Copilot approval before merge. Squash merges to `main` deploy the
+changed theme, plugin, and block-editor content. The **Sync block editor
+content** workflow can pull the published Home page into a PR.
+
 Production deployment uses the server's SSH-accessible WP-CLI. From a clean,
 committed source state, preview or deploy the relevant component with:
 

@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or commit to test
+        required: true
+        type: string
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ inputs.ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: CI / test
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Start WordPress
+        run: npm run wp:start
+
+      - name: Seed WordPress fixtures
+        run: npm run wp:setup
+
+      - name: Run browser and Lighthouse tests
+        run: npm run test:all
+
+      - name: Upload browser reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ci-reports-${{ github.run_id }}
+          if-no-files-found: ignore
+          path: |
+            playwright-report/
+            test-results/
+            lighthouse-results/
+
+      - name: Stop WordPress
+        if: always()
+        run: npm run wp:cleanup
