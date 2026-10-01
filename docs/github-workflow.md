@@ -66,3 +66,14 @@ The repository's active `Protect main` ruleset is the source of truth for
 required checks and approvals. The legacy `Copilot approval` Actions check was
 removed when that ruleset was enabled; native Copilot review plus its approval
 setting now supplies the review requirement.
+
+## Opening a bot-authored maintenance PR
+
+For a change that was prepared by an automation or coding agent, use
+**Actions → Open maintenance PR → Run workflow**. Enter the existing source
+branch and optionally a title. The workflow copies that branch to a protected
+`automation/maintenance/*` branch, opens or updates one PR as
+`github-actions[bot]`, explicitly dispatches CI, and prints the PR link in the
+workflow summary. Review and approve that PR normally; the ruleset still
+enforces the same checks and merge requirements, so this does not grant a
+bypass permission to the automation.

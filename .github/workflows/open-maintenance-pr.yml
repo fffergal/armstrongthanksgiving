@@ -1,0 +1,127 @@
+name: Open maintenance PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_branch:
+        description: Existing branch whose current contents should be proposed to main
+        required: true
+        default: automation/sync-block-editor
+        type: string
+      head_branch:
+        description: Optional bot-owned branch for the PR; leave blank to derive one
+        required: false
+        default: ''
+        type: string
+      title:
+        description: Optional pull-request title
+        required: false
+        default: ''
+        type: string
+
+concurrency:
+  group: open-maintenance-pr
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  checks: read
+  contents: write
+  pull-requests: write
+
+jobs:
+  open-pr:
+    name: Open bot-authored maintenance PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Create or update the bot branch and pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_BRANCH: ${{ inputs.source_branch }}
+          REQUESTED_HEAD_BRANCH: ${{ inputs.head_branch }}
+          REQUESTED_TITLE: ${{ inputs.title }}
+        run: |
+          set -euo pipefail
+
+          source_branch="${SOURCE_BRANCH#refs/heads/}"
+          test -n "$source_branch"
+          test "$source_branch" != main
+          git fetch origin "refs/heads/$source_branch:refs/remotes/origin/$source_branch"
+
+          if [ -n "$REQUESTED_HEAD_BRANCH" ]; then
+            head_branch="${REQUESTED_HEAD_BRANCH#refs/heads/}"
+          else
+            safe_source_branch="$(printf '%s' "$source_branch" | tr '/_' '-')"
+            head_branch="automation/maintenance/$safe_source_branch"
+          fi
+
+          case "$head_branch" in
+            automation/maintenance/*) ;;
+            *)
+              echo 'head_branch must use the automation/maintenance/ prefix.' >&2
+              exit 1
+              ;;
+          esac
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          if git ls-remote --exit-code --heads origin "$head_branch" >/dev/null 2>&1; then
+            git fetch origin "refs/heads/$head_branch:refs/remotes/origin/$head_branch"
+            git switch --create "$head_branch" --track "origin/$head_branch"
+            git reset --hard "origin/$source_branch"
+            git push --force-with-lease origin "$head_branch"
+          else
+            git switch --create "$head_branch" --track "origin/$source_branch"
+            git push --set-upstream origin "$head_branch"
+          fi
+
+          title="$REQUESTED_TITLE"
+          if [ -z "$title" ]; then
+            title="Maintenance update from $source_branch"
+          fi
+
+          body="This PR was opened by the **Open maintenance PR** workflow.\n\nIt proposes the current contents of \`$source_branch\` through a bot-authored PR so a human can review and approve the change.\n\nCI is dispatched explicitly for the bot-created branch push. The \`Protect main\` ruleset still requires current CI, an up-to-date branch, resolved conversations, and the configured review approval before merge."
+          pr_number="$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --head "$head_branch" --state open --json number --jq '.[0].number // empty')"
+
+          if [ -n "$pr_number" ]; then
+            gh pr edit "$pr_number" --title "$title" --body "$body"
+          else
+            pr_url="$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$head_branch" --title "$title" --body "$body")"
+            pr_number="$(gh pr view "$pr_url" --json number --jq .number)"
+          fi
+
+          pr_url="$(gh pr view "$pr_number" --json url --jq .url)"
+          echo "number=$pr_number" >> "$GITHUB_OUTPUT"
+          echo "head_branch=$head_branch" >> "$GITHUB_OUTPUT"
+          echo "url=$pr_url" >> "$GITHUB_OUTPUT"
+          echo "Opened $pr_url"
+
+      - name: Dispatch CI for the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ steps.pr.outputs.head_branch }}
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if gh workflow run ci.yml --ref "$HEAD_BRANCH" -f "ref=$HEAD_BRANCH"; then
+              exit 0
+            fi
+            echo "CI dispatch attempt $attempt failed; retrying."
+            sleep 10
+          done
+          echo 'Could not dispatch CI for the maintenance PR.' >&2
+          exit 1
+
+      - name: Summarize pull request
+        env:
+          PR_URL: ${{ steps.pr.outputs.url }}
+        run: echo "Review the bot-authored pull request at $PR_URL"
