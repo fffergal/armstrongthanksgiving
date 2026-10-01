@@ -11,12 +11,17 @@ const contentPath = path.join(root, 'content/pages/home.html');
 const productionURL = 'https://www.armstrongthanksgiving.com';
 const args = process.argv.slice(2);
 const direction = args.shift();
-const confirm = args.includes('--confirm');
-const baselineShaIndex = args.indexOf('--baseline-sha');
-const baselineSha = baselineShaIndex >= 0 ? args[baselineShaIndex + 1] : undefined;
 const help = direction === '--help' || direction === '-h' || args.includes('--help') || args.includes('-h');
-const unknownArgs = args.filter((arg, index) => !['--confirm', '--help', '-h', '--baseline-sha'].includes(arg)
-  && !(index === baselineShaIndex + 1 && baselineShaIndex >= 0));
+let confirm = false;
+let baselineSha;
+const unknownArgs = [];
+for (let index = 0; index < args.length; index += 1) {
+  if (args[index] === '--confirm') confirm = true;
+  else if (args[index] === '--baseline-sha' && args[index + 1]) {
+    baselineSha = args[index + 1];
+    index += 1;
+  } else unknownArgs.push(args[index]);
+}
 
 const sshHost = process.env.PROD_SSH_HOST ?? 'armstrongthanksgiving.com';
 const sshUser = process.env.PROD_SSH_USER ?? 'dh_mbpyvr';
@@ -24,18 +29,18 @@ const wpPath = process.env.PROD_WP_PATH ?? '/home/dh_mbpyvr/armstrongthanksgivin
 const sshTarget = `${sshUser}@${sshHost}`;
 const releaseId = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
 const remoteContentPath = `/tmp/armstrong-home-${releaseId}.html`;
+const remoteBaselinePath = `/tmp/armstrong-home-baseline-${releaseId}.html`;
 
 function usage() {
   console.log(`Usage:
   npm run sync:block-editor -- pull
-  npm run sync:block-editor -- check --baseline-sha <main-before-sha>
-  npm run sync:block-editor -- push --confirm
+  npm run sync:block-editor -- push --confirm [--baseline-sha <main-before-sha>]
 
 pull reads the published Home page from production into content/pages/home.html.
-check refuses a deployment if production differs from both the previous and
-incoming committed Home page, protecting unpublished editor changes.
 push updates the published Home page from the committed local content file.
-The push command requires --confirm because it changes production.
+The push command requires --confirm because it changes production. When a
+baseline SHA is provided, it updates only if production still matches that
+baseline or the incoming content, checked under a database row lock.
 `);
 }
 
@@ -44,17 +49,21 @@ if (help) {
   process.exit(0);
 }
 
-if (!['pull', 'check', 'push'].includes(direction)) {
+if (!['pull', 'push'].includes(direction)) {
   usage();
-  throw new Error('Choose exactly one direction: pull, check, or push.');
+  throw new Error('Choose exactly one direction: pull or push.');
 }
 if (unknownArgs.length) {
   usage();
   throw new Error(`Unknown option(s): ${unknownArgs.join(', ')}`);
 }
-if (direction === 'check' && (!baselineSha || !/^[0-9a-f]{40}$/i.test(baselineSha))) {
+if (baselineSha && direction !== 'push') {
   usage();
-  throw new Error('The check command requires a valid --baseline-sha commit.');
+  throw new Error('--baseline-sha is only supported by the push command.');
+}
+if (baselineSha && !/^[0-9a-f]{40}$/i.test(baselineSha)) {
+  usage();
+  throw new Error('--baseline-sha must be a valid commit SHA.');
 }
 if (direction === 'push' && !confirm) {
   usage();
@@ -125,35 +134,45 @@ wp post get "$home_id" --field=post_content`)], { quiet: true });
   console.log(`Pulled production Home page into ${path.relative(root, contentPath)}.`);
 }
 
-async function check() {
-  const baseline = run('git', ['show', `${baselineSha}:content/pages/home.html`], { quiet: true });
-  const incoming = await fs.readFile(contentPath, 'utf8');
-  const production = run('ssh', [...sshArgs, remoteScript(`${homePageLookup()}
-wp post get "$home_id" --field=post_content`)], { quiet: true });
-  const normalize = content => content.trimEnd();
-
-  if (normalize(production) === normalize(incoming)) {
-    console.log('Production Home page already matches the incoming committed content.');
-    return;
-  }
-
-  if (normalize(production) !== normalize(baseline)) {
-    throw new Error('Production Home page has unpublished editor changes. Refusing to overwrite it; sync and reconcile those changes before deploying new Home page content.');
-  }
-
-  console.log('Production Home page matches the previous committed content; safe to publish the incoming page.');
-}
-
 async function push() {
   const changes = run('git', ['status', '--porcelain', '--untracked-files=all', '--', 'content/pages/home.html'], { quiet: true });
   if (changes) throw new Error(`The block-editor content has uncommitted changes:\n${changes}`);
   const content = await fs.readFile(contentPath, 'utf8');
   if (!content.trim()) throw new Error(`${contentPath} is empty.`);
+  const baseline = baselineSha
+    ? run('git', ['show', `${baselineSha}:content/pages/home.html`], { quiet: true })
+    : undefined;
 
-  run('ssh', [...sshArgs, `umask 077; cat > ${quoteShell(remoteContentPath)}`], { input: content, quiet: true });
   try {
+    run('ssh', [...sshArgs, `umask 077; cat > ${quoteShell(remoteContentPath)}`], { input: content, quiet: true });
+    if (baseline !== undefined) {
+      run('ssh', [...sshArgs, `umask 077; cat > ${quoteShell(remoteBaselinePath)}`], { input: baseline, quiet: true });
+    }
+    const baselineCheck = baseline !== undefined
+      ? `\$baseline = file_get_contents(${JSON.stringify(remoteBaselinePath)}); if (rtrim(\$current) !== rtrim(\$baseline) && rtrim(\$current) !== rtrim(\$content)) { throw new RuntimeException("Production Home page has unpublished editor changes. Refusing to overwrite it; sync and reconcile those changes before deploying new Home page content."); }`
+      : '';
+    const php = [
+      `\$home_id = (int) getenv("AT_HOME_ID")`,
+      `\$content = file_get_contents(${JSON.stringify(remoteContentPath)})`,
+      `if (!\$content) { throw new RuntimeException("Empty block-editor content"); }`,
+      `global \$wpdb`,
+      `try { if (\$wpdb->query("START TRANSACTION") === false) { throw new RuntimeException("Could not start the production content transaction."); }`,
+      `\$engine = \$wpdb->get_var(\$wpdb->prepare("SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s", \$wpdb->posts)); if (strtoupper((string) \$engine) !== "INNODB") { throw new RuntimeException("The production posts table does not support a safe conditional publish."); }`,
+      `\$row = \$wpdb->get_row(\$wpdb->prepare("SELECT post_content FROM {\$wpdb->posts} WHERE ID = %d FOR UPDATE", \$home_id));`,
+      `if (!\$row) { throw new RuntimeException("The configured front page no longer exists."); }`,
+      `\$current = \$row->post_content`,
+      baselineCheck,
+      `\$result = wp_update_post(["ID" => \$home_id, "post_content" => wp_slash(\$content), "post_status" => "publish"], true)`,
+      `if (is_wp_error(\$result)) { throw new RuntimeException(\$result->get_error_message()); } if (\$result === false || (\$result === 0 && \$current !== \$content)) { throw new RuntimeException("WordPress did not update the production Home page."); }`,
+      `\$stored = \$wpdb->get_var(\$wpdb->prepare("SELECT post_content FROM {\$wpdb->posts} WHERE ID = %d", \$home_id)); if (\$stored !== \$content) { throw new RuntimeException("The saved production Home page does not match the incoming content."); }`,
+      `if (\$wpdb->query("COMMIT") === false) { throw new RuntimeException("Could not commit the production content update."); } } catch (Throwable \$error) { \$wpdb->query("ROLLBACK"); clean_post_cache(\$home_id); wp_cache_flush(); fwrite(STDERR, \$error->getMessage() . "\\n"); exit(1); }`,
+    ].join('; ');
     run('ssh', [...sshArgs, remoteScript(`${homePageLookup()}
-AT_HOME_ID="$home_id" wp eval '[$home_id, $content] = [(int) getenv("AT_HOME_ID"), file_get_contents(${JSON.stringify(remoteContentPath)})]; if (!$content) { fwrite(STDERR, "Empty block-editor content\\n"); exit(1); } wp_update_post(["ID" => $home_id, "post_content" => $content, "post_status" => "publish"]);'
+if ! AT_HOME_ID="$home_id" wp eval ${quoteShell(php)}; then
+  wp cache flush
+  wp super-cache flush
+  exit 1
+fi
 wp cache flush
 wp super-cache flush`)], {
       quiet: true,
@@ -161,9 +180,8 @@ wp super-cache flush`)], {
   } finally {
     run('ssh', [...sshArgs, `rm -f ${quoteShell(remoteContentPath)}`], { quiet: true });
   }
-  console.log('Published the committed Home page content and flushed the WordPress object and page caches. Run `npm run verify:production` after the deployment workflow completes.');
+  console.log(`Published the committed Home page content${baselineSha ? ' after confirming production still matched the accepted baseline under a database row lock' : ''} and flushed the WordPress object and page caches. Run \`npm run verify:production\` after the deployment workflow completes.`);
 }
 
 if (direction === 'pull') await pull();
-else if (direction === 'check') await check();
 else await push();

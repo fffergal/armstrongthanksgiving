@@ -93,8 +93,7 @@ jobs:
         env:
           BEFORE_SHA: ${{ github.event.before }}
         run: |
-          npm run sync:block-editor -- check --baseline-sha "$BEFORE_SHA"
-          npm run sync:block-editor -- push --confirm
+          npm run sync:block-editor -- push --confirm --baseline-sha "$BEFORE_SHA"
 
       - name: Verify public site
         run: npm run verify:production

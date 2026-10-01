@@ -6,8 +6,9 @@ requests into `main`:
 1. Make a feature in its own worktree and push the branch.
 2. Open a pull request into `main`.
 3. The trusted CI workflow starts WordPress, seeds the fixture data, runs the
-   complete Playwright suite, and runs the Lighthouse budgets against the pull
-   request's merge ref. Its reports are retained as a workflow artifact. The
+   complete Playwright suite, and runs the Lighthouse budgets against the
+   immutable merge commit captured with the PR head used for the required
+   check. Its reports are retained as a workflow artifact. The
    workflow definition comes from `main`, while the source under test comes
    from the pull request, so a PR cannot replace the required check by editing
    its own CI YAML. The test runner has only `contents: read`, does not use
@@ -19,10 +20,12 @@ requests into `main`:
    pull-request approval when repository Copilot approval settings are enabled.
 5. After the checks and approval are complete, squash-merge the pull request.
 6. A push to `main` deploys changed theme, plugin, and block-editor content in
-   sequence, then checks the public site. Before publishing a changed Home
-   page, deployment checks that production still matches the previously
-   committed page (or already matches the incoming page); it stops if newer
-   editor changes would be overwritten.
+   sequence, then checks the public site. When publishing a changed Home page,
+   deployment compares production against the previous committed page (or the
+   incoming page) inside the same database transaction as the update, holding
+   a row lock throughout. It stops if newer editor changes would be
+   overwritten. Theme/plugin-only deploys do not touch or depend on page
+   content.
 
 ## One-time repository settings
 

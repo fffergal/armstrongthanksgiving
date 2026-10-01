@@ -33,7 +33,7 @@ jobs:
       pull-requests: read
     outputs:
       check_id: ${{ steps.context.outputs.check_id }}
-      merge_ref: ${{ steps.context.outputs.merge_ref }}
+      test_sha: ${{ steps.context.outputs.test_sha }}
       head_sha: ${{ steps.context.outputs.head_sha }}
     steps:
       - name: Verify pull request and create check
@@ -48,7 +48,7 @@ jobs:
             const prNumber = context.payload.pull_request?.number || requestedNumber;
 
             if (!prNumber) {
-              core.setOutput('merge_ref', '');
+              core.setOutput('test_sha', '');
               return;
             }
 
@@ -69,7 +69,24 @@ jobs:
             }
 
             const headSha = pullRequest.head.sha;
-            const mergeRef = `refs/pull/${prNumber}/merge`;
+            const testSha = pullRequest.merge_commit_sha;
+            if (!testSha) {
+              core.setFailed('GitHub has not produced a merge commit for this pull request yet.');
+              return;
+            }
+            const { data: mergeCommit } = await github.rest.repos.getCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: testSha,
+            });
+            const parents = mergeCommit.parents.map(parent => parent.sha);
+            if (mergeCommit.sha !== testSha
+              || parents.length !== 2
+              || parents[0] !== pullRequest.base.sha
+              || parents[1] !== headSha) {
+              core.setFailed('The pull-request merge commit does not match the captured base and head SHAs.');
+              return;
+            }
             const { data: check } = await github.rest.checks.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -80,12 +97,12 @@ jobs:
               details_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
               output: {
                 title: 'Trusted CI is running',
-                summary: 'Testing the pull request merge ref with the workflow definition from main.',
+                summary: 'Testing the immutable pull-request merge commit with the workflow definition from main.',
               },
             });
 
             core.setOutput('check_id', check.id);
-            core.setOutput('merge_ref', mergeRef);
+            core.setOutput('test_sha', testSha);
             core.setOutput('head_sha', headSha);
 
   test:
@@ -101,8 +118,8 @@ jobs:
         uses: actions/checkout@v5
         with:
           # This workflow comes from trusted main; only the source under test
-          # comes from the verified pull request merge ref.
-          ref: ${{ needs.prepare_check.outputs.merge_ref || github.sha }}
+          # comes from the verified immutable pull-request merge commit.
+          ref: ${{ needs.prepare_check.outputs.test_sha || github.sha }}
           persist-credentials: false
 
       - name: Set up Node.js
