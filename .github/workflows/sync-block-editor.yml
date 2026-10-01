@@ -1,12 +1,14 @@
 name: Sync block editor content
 
 on:
-  push:
-    branches:
-      - main
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
+  workflow_run:
+    workflows:
+      - Deploy production
+    types:
+      - completed
 
 concurrency:
   group: sync-block-editor
@@ -20,6 +22,7 @@ permissions:
 jobs:
   sync:
     name: Pull production Home page and open PR
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production
@@ -137,13 +140,17 @@ jobs:
           fi
 
       - name: Dispatch CI for the sync PR
-        if: steps.diff.outputs.changed == 'true' || steps.branch.outputs.pr_number != ''
+        if: steps.diff.outputs.changed == 'true' || steps.branch.outputs.branch_updated == 'true' || steps.branch.outputs.pr_number != ''
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ steps.branch.outputs.branch }}
           PR_NUMBER: ${{ steps.branch.outputs.pr_number }}
+          BRANCH_UPDATED: ${{ steps.branch.outputs.branch_updated }}
+          CONTENT_CHANGED: ${{ steps.diff.outputs.changed }}
         run: |
-          if [ -n "$PR_NUMBER" ]; then
+          if [ "$BRANCH_UPDATED" = true ] || [ "$CONTENT_CHANGED" = true ]; then
+            echo 'The sync branch changed in this run; dispatching CI for its new head.'
+          elif [ -n "$PR_NUMBER" ]; then
             ci_bucket="$(gh pr checks "$PR_NUMBER" --required --json name,bucket --jq '[.[] | select(.name == "CI / test")] | .[0].bucket // empty' 2>/dev/null || true)"
             if [ "$ci_bucket" = pass ]; then
               echo 'CI already passes for the current sync PR head.'

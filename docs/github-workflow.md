@@ -48,9 +48,9 @@ variables if the hosting account changes.
 
 ## Syncing block-editor edits
 
-The **Sync block editor content** workflow runs when `main` changes, daily at
-03:17 UTC, and is also available through **Actions → Sync block editor content
-→ Run workflow**. It
+The **Sync block editor content** workflow runs after a successful production
+deployment from `main`, daily at 03:17 UTC, and is also available through
+**Actions → Sync block editor content → Run workflow**. It
 reads the published `Home` page from production, compares it with the current
 sync branch, and updates one reusable `automation/sync-block-editor` PR when it
 finds a difference. If that PR has not been merged yet, later runs merge the
@@ -62,3 +62,8 @@ document back to production. Because GitHub does not automatically fan out new
 workflow events from the repository's `GITHUB_TOKEN`, the sync workflow
 explicitly dispatches the required CI check against the updated branch;
 Copilot review is requested by the ruleset.
+
+The repository's active `Protect main` ruleset is the source of truth for
+required checks and approvals. The legacy `Copilot approval` Actions check was
+removed when that ruleset was enabled; native Copilot review plus its approval
+setting now supplies the review requirement.
