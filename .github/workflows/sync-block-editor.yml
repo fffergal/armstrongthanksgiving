@@ -87,9 +87,15 @@ jobs:
           fi
 
           echo "branch_updated=$branch_updated" >> "$GITHUB_OUTPUT"
+          git switch main
 
       - name: Pull the published Home page
         run: npm run sync:block-editor -- pull
+
+      - name: Preserve the trusted production content
+        run: |
+          cp content/pages/home.html "$RUNNER_TEMP/home.html"
+          git restore --worktree -- content/pages/home.html
 
       - name: Update the sync branch when content changed
         id: diff
@@ -98,6 +104,8 @@ jobs:
           BRANCH_UPDATED: ${{ steps.branch.outputs.branch_updated }}
           RESET_REMOTE: ${{ steps.branch.outputs.reset_remote }}
         run: |
+          git switch "$BRANCH"
+          cp "$RUNNER_TEMP/home.html" content/pages/home.html
           changed=false
           if git diff --quiet -- content/pages/home.html; then
             echo 'changed=false' >> "$GITHUB_OUTPUT"
