@@ -1,6 +1,9 @@
 name: Sync block editor content
 
 on:
+  push:
+    branches:
+      - main
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
@@ -63,14 +66,25 @@ jobs:
 
           if [ -n "$pr_number" ]; then
             git switch --create "$branch" --track "origin/$branch"
+            branch_head_before="$(git rev-parse HEAD)"
+            git merge --no-edit main
+            if [ "$(git rev-parse HEAD)" != "$branch_head_before" ]; then
+              branch_updated=true
+            else
+              branch_updated=false
+            fi
             echo 'reset_remote=false' >> "$GITHUB_OUTPUT"
           elif [ "$remote_branch_exists" = true ]; then
             git switch --create "$branch"
+            branch_updated=false
             echo 'reset_remote=true' >> "$GITHUB_OUTPUT"
           else
             git switch --create "$branch"
+            branch_updated=false
             echo 'reset_remote=false' >> "$GITHUB_OUTPUT"
           fi
+
+          echo "branch_updated=$branch_updated" >> "$GITHUB_OUTPUT"
 
       - name: Pull the published Home page
         run: npm run sync:block-editor -- pull
@@ -79,22 +93,28 @@ jobs:
         id: diff
         env:
           BRANCH: ${{ steps.branch.outputs.branch }}
+          BRANCH_UPDATED: ${{ steps.branch.outputs.branch_updated }}
           RESET_REMOTE: ${{ steps.branch.outputs.reset_remote }}
         run: |
+          changed=false
           if git diff --quiet -- content/pages/home.html; then
             echo 'changed=false' >> "$GITHUB_OUTPUT"
             echo 'Production Home page already matches main.'
-            exit 0
-          fi
-          echo 'changed=true' >> "$GITHUB_OUTPUT"
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add content/pages/home.html
-          git commit -m 'Sync Home page from block editor'
-          if [ "$RESET_REMOTE" = true ]; then
-            git push --force-with-lease --set-upstream origin "$BRANCH"
           else
-            git push --set-upstream origin "$BRANCH"
+            changed=true
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add content/pages/home.html
+            git commit -m 'Sync Home page from block editor'
+          fi
+
+          if [ "$BRANCH_UPDATED" = true ] || [ "$changed" = true ]; then
+            if [ "$RESET_REMOTE" = true ]; then
+              git push --force-with-lease --set-upstream origin "$BRANCH"
+            else
+              git push --set-upstream origin "$BRANCH"
+            fi
           fi
 
       - name: Open pull request
