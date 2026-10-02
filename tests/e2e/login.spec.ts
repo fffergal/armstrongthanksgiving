@@ -43,6 +43,13 @@ test('login fields only show the focus ring during keyboard navigation', async (
   await expect(remember).toHaveCSS('outline-color', 'rgb(76, 37, 24)');
 
   await remember.press('Tab');
+  const help = page.getByRole('button', { name: 'Help', exact: true });
+  await expect(help).toBeFocused();
+  await expect(help).toHaveCSS('outline-style', 'solid');
+  await expect(help).toHaveCSS('outline-width', '3px');
+  await expect(help).toHaveCSS('outline-color', 'rgb(76, 37, 24)');
+
+  await help.press('Tab');
   const submit = page.locator('#wp-submit');
   await expect(submit).toBeFocused();
   await expect(submit).toHaveCSS('outline-style', 'solid');
