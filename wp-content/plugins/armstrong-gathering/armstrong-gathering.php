@@ -161,18 +161,8 @@ function at_gathering_migrate_content() {
 	// Replace the previous demo menu with the confirmed Thanksgiving potluck list.
 	// The turkey is supplied by the hosts and is intentionally not a guest option.
 	update_option( 'at_gathering_foods', at_gathering_default_foods() );
-	// Replace the old public date label with the settings-backed shortcode.
-	$home = get_page_by_path( 'home' );
-	if ( $home && false === strpos( (string) $home->post_content, '[at_event_details]' ) && preg_match( '/<p class="at-date-card">.*?<\/p>/s', (string) $home->post_content ) ) {
-		$home_content = preg_replace( '/<p class="at-date-card">.*?<\/p>/s', '[at_event_details]', (string) $home->post_content, 1 );
-	} else {
-		$home_content = $home ? (string) $home->post_content : '';
-	}
-	if ( $home && false === strpos( $home_content, '[at_event_address]' ) && false !== strpos( $home_content, '<!-- /wp:buttons -->' ) ) {
-		$home_content = str_replace( '<!-- /wp:buttons -->', "<!-- /wp:buttons -->\n<!-- wp:shortcode -->\n[at_event_address]\n<!-- /wp:shortcode -->", $home_content );
-	}
-	if ( $home && $home_content !== (string) $home->post_content ) {
-		wp_update_post( array( 'ID' => $home->ID, 'post_content' => $home_content ) );
+	if ( false === get_option( 'at_gathering_event_details', false ) ) {
+		update_option( 'at_gathering_event_details', array() );
 	}
 	if ( false === get_option( 'at_gathering_invite_key', false ) ) {
 		update_option( 'at_gathering_invite_key', wp_generate_password( 32, false, false ) );

@@ -126,6 +126,7 @@ test('a signed-in RSVP has no login prompt, emails its full payload, and repopul
     'Dietary notes: Vegetarian; no walnuts',
     'Note for the hosts: Please put us near the window.',
   ]) expect(firstMailPayload.message).toContain(value);
+  expect(firstMailPayload.message).toMatch(/12 December 2026 · 6:42 pm<br\s*\/?>(?:\s|\n)*123 Example Lane, Testville/);
 
   await page.goto('/rsvp/');
   await expect(page.getByLabel('I’m coming')).toBeChecked();
