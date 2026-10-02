@@ -52,14 +52,27 @@ images for the next worktree.
 ## Feature screenshots
 
 When implementing a feature that changes the site's visible interface, finish
-by capturing a screenshot of the running local result at a useful viewport
-size. Use the internal browser, and use the worktree URL recorded in
-`.worktree/runtime.json`. Include the screenshot directly in the completion
-message so the user can review the result without opening the local site. For
-responsive or materially different interface states, include the screenshots
-needed to show those states. If the feature has no visible interface, or the
-local site cannot be brought up, say so in the completion message instead of
-presenting an unrelated screenshot.
+by capturing an actual screenshot image of the running local result at a useful
+viewport size. Use the internal browser and the worktree URL recorded in
+`.worktree/runtime.json`. Make the image itself available in the completion
+message, embedded as an image; opening a browser tab, linking to the local page,
+or saying that a screenshot was taken does not count. Save screenshots outside
+the repository or in ignored output directories. For responsive or materially
+different interface states, include the images needed to show those states. If
+the feature has no visible interface, or the local site cannot be brought up,
+explain that in the completion message.
+
+## Sandbox troubleshooting
+
+When Docker commands, internal browser automation, or the `gh` CLI fail,
+consider sandbox and filesystem or process permissions before concluding that
+the tool, credentials, or project setup are broken. Check the relevant error
+and permissions, then retry the smallest relevant diagnostic or operation with
+the required elevated access when available. Compare the restricted and
+elevated results before changing credentials, reinstalling tools, or altering
+project configuration. Keep using the internal browser for browser automation.
+If it is unavailable, check permissions on `/private/tmp/codex-browser-use`
+before investigating other causes.
 
 Keep `.worktree/`, `node_modules/`, test reports, Lighthouse reports, and
 Docker-generated state out of commits. Never use a broad Docker prune command
