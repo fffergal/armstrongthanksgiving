@@ -385,7 +385,7 @@ function at_gathering_trim_album_assets() {
 		return;
 	}
 	$album_handles = array( 'wppa-decls', 'wppa-utils', 'wppa-main', 'wppa-slideshow', 'wppa-ajax-front', 'wppa-lightbox', 'wppa-popup', 'wppa-touch', 'wppa-zoom', 'wppa-spheric', 'wppa-flatpan', 'wppa' );
-	global $wp_scripts;
+	$wp_scripts = wp_scripts();
 	foreach ( $wp_scripts->queue as $handle ) {
 		$registered = $wp_scripts->registered[ $handle ] ?? null;
 		if ( $registered && false !== strpos( (string) $registered->src, '/wp-photo-album-plus' ) ) {
