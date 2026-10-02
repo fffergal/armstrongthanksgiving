@@ -1,0 +1,310 @@
+/* Page-specific styles are only needed on interactive gathering pages. */
+#bbpress-forums, .bbp-user-page { color: var(--at-ink); }
+#bbpress-forums .bbp-breadcrumb { display: none; }
+#bbpress-forums .bbp-forum-description, #bbpress-forums .bbp-topic-description,
+#bbpress-forums .bbp-pagination-count,
+#bbpress-forums .bbp-template-notice,
+#bbpress-forums .bbp-topic-form .bbp-template-notice,
+#bbpress-forums .bbp-forum-topic-count, #bbpress-forums .bbp-forum-reply-count,
+#bbpress-forums .bbp-forum-freshness, #bbpress-forums .bbp-topic-voice-count,
+#bbpress-forums .bbp-topic-reply-count, #bbpress-forums .bbp-topic-freshness,
+#bbpress-forums .bbp-topic-meta, #bbpress-forums .bbp-author-role,
+#bbpress-forums .bbp-reply-ip,
+#bbpress-forums .bbp-subscribe-link, #bbpress-forums .subscription-toggle,
+#bbpress-forums #subscription-toggle, #bbpress-forums #favorite-toggle,
+#bbpress-forums [id^="subscribe-"], #bbpress-forums .bbp-topic-favorite-link,
+#bbpress-forums .favorite-toggle, #bbpress-forums [id^="favorite-"],
+#bbpress-forums .bbp-reply-permalink,
+#bbpress-forums li.bbp-footer, #bbpress-forums .bbp-topic-tags,
+#bbpress-forums .bbp-topic-type, #bbpress-forums .bbp-topic-status,
+#bbpress-forums .bbp-topic-form .bbp-topic-tags,
+#bbpress-forums .bbp-topic-form .bbp-topic-type,
+#bbpress-forums .bbp-topic-form .bbp-topic-status { display: none; }
+#bbpress-forums .bbp-admin-links { display: inline; }
+#bbpress-forums p:has(#bbp_topic_tags),
+#bbpress-forums p:has(#bbp_stick_topic_select),
+#bbpress-forums p:has(#bbp_topic_status_select) { display: none; }
+#bbpress-forums .bbp-forum-info, #bbpress-forums .bbp-topic-title { width: 100%; }
+#bbpress-forums .bbp-reply-content, #bbpress-forums .bbp-topic-content { font-family: Georgia, 'Times New Roman', serif; font-size: 1.05rem; }
+#bbpress-forums .bbp-replies .bbp-direct-reply {
+  border-inline-start: .35rem solid var(--at-mustard);
+  background: rgba(255, 248, 239, .78);
+}
+#bbpress-forums .bbp-replies .bbp-direct-reply .bbp-reply-header { background: transparent; }
+#bbpress-forums .bbp-replies ul.bbp-threaded-replies {
+  margin-left: clamp(1rem, 4vw, 3rem);
+  margin-inline-start: clamp(1rem, 4vw, 3rem);
+  padding-left: 0;
+  padding-inline-start: 0;
+}
+#bbpress-forums .bbp-author-name { font-weight: 700; }
+#bbpress-forums a { color: var(--at-brown); }
+#bbpress-forums .bbp-forum-title, #bbpress-forums .bbp-topic-permalink { color: var(--at-orange); font-weight: 800; }
+#bbpress-forums li.bbp-header, #bbpress-forums li.bbp-footer { background: var(--at-olive); color: #fff; border: 0; }
+#bbpress-forums .bbp-replies > li.bbp-header { display: none; }
+#bbpress-forums li.bbp-body ul.forum, #bbpress-forums li.bbp-body ul.topic { background: rgba(255,255,255,.48); border-color: rgba(76,37,24,.12); }
+#bbpress-forums fieldset.bbp-form { padding: 1rem; border: 1px solid rgba(76,37,24,.18); border-radius: 1rem; background: rgba(255,255,255,.48); }
+#bbpress-forums input, #bbpress-forums textarea, #bbpress-forums select { max-width: 100%; border: 1px solid rgba(76,37,24,.25); border-radius: .6rem; background: #fffaf4; }
+#bbpress-forums textarea, #bbpress-forums input[type="text"], #bbpress-forums input[type="email"],
+#bbpress-forums input[type="url"], #bbpress-forums input[type="password"], #bbpress-forums select {
+  -webkit-appearance: none;
+  appearance: none;
+  box-shadow: none;
+}
+#bbpress-forums .wp-editor-container {
+  border: 1px solid rgba(76, 37, 24, .25);
+  border-radius: .6rem;
+  background: #fffaf4;
+  overflow: hidden;
+}
+#bbpress-forums textarea#bbp_topic_content,
+#bbpress-forums textarea#bbp_reply_content {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  display: block;
+  width: 100%;
+  min-height: 16rem;
+  padding: 10px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: none !important;
+  background: transparent;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: none !important;
+}
+#bbpress-forums .bbp-the-content-wrapper .quicktags-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .25rem;
+  min-height: 2.5rem;
+  padding: .5rem;
+  border-bottom: 1px solid rgba(76, 37, 24, .14);
+  background: rgba(246, 237, 225, .72);
+}
+#bbpress-forums .bbp-the-content-wrapper .quicktags-toolbar .ed_button {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 2rem;
+  padding: .3rem .45rem;
+  border: 0;
+  border-radius: .35rem;
+  background: transparent;
+  color: var(--at-brown);
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 700;
+  line-height: 1;
+}
+#bbpress-forums .bbp-the-content-wrapper .quicktags-toolbar .ed_button:hover,
+#bbpress-forums .bbp-the-content-wrapper .quicktags-toolbar .ed_button:focus-visible {
+  background: #fff8ef;
+  color: var(--at-orange);
+}
+#bbpress-forums #bbp_topic_submit, #bbpress-forums #bbp_reply_submit {
+  -webkit-appearance: none;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: .7rem 1.25rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--at-coral);
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: none;
+}
+#bbpress-forums #bbp_topic_submit:hover, #bbpress-forums #bbp_reply_submit:hover,
+#bbpress-forums #bbp_topic_submit:focus-visible, #bbpress-forums #bbp_reply_submit:focus-visible { background: var(--at-brown); }
+
+/* WP Photo Album Plus: stable plugin selectors, kept in the theme for updates. */
+.wppa-container, .wppa-box { color: var(--at-ink); font-family: inherit; }
+.wppa-container a, .wppa-box a { color: var(--at-brown); }
+.wppa-thumb, .wppa-cover-box { border-radius: 1rem; overflow: hidden; box-shadow: none !important; }
+.wppa-title, .wppa-album-title { color: var(--at-orange); font-weight: 800; }
+.wppa-button, .wppa-upload-button { border: 0; border-radius: 999px; background: var(--at-coral); color: #fff; font-weight: 800; }
+.wppa-container .wppa-nav.wppa-bc { background: transparent !important; border: 0 !important; padding: 0 0 .75rem !important; }
+.wppa-container .wppa-cover-box { background: #fff8ef !important; border: 1px solid rgba(76,37,24,.14) !important; }
+.wppa-container .wppa-box { background: rgba(255,255,255,.48) !important; border-color: rgba(76,37,24,.14) !important; border-radius: 1rem !important; box-shadow: none !important; }
+.wppa-container .wppa-cover-box, .wppa-container .wppa-thumb { border-radius: 1rem !important; box-shadow: none !important; }
+.wppa-container .wppa-title { color: var(--at-orange) !important; }
+.wppa-container .wppa-cover-box * { max-width: 100%; overflow-wrap: break-word; word-break: normal; }
+.wppa-container .wppa-box-text-desc { display: none !important; }
+.wppa-container .wppa-nav, .wppa-container .wppa-bc, .wppa-container .wppa-metadata,
+.wppa-container .wppa-owner, .wppa-container .wppa-help, .wppa-container .wppa-comment-count { display: none !important; }
+.wppa-container .wppa-thumb, .wppa-container .wppa-cover-box { background: #fffaf4 !important; }
+.wppa-container input, .wppa-container select, .wppa-container textarea { font: inherit; border-radius: .7rem; }
+
+/* A topic is still useful, but the forum should feel like a small gathering
+ * board rather than a general-purpose message-board administration screen. */
+#bbpress-forums li.bbp-header, #bbpress-forums li.bbp-footer { font-family: Georgia, 'Times New Roman', serif; }
+#bbpress-forums .bbp-form { box-shadow: none; }
+#bbpress-forums li.bbp-header > *, #bbpress-forums li.bbp-footer > * { font-size: .95rem; line-height: 1.35; }
+#bbpress-forums .bbp-meta a.bbp-reply-permalink { display: none !important; }
+
+@media (max-width: 850px) {
+  #bbpress-forums .bbp-reply-author { width: auto; float: none; min-height: 0; padding: .8rem 0 0; text-align: left; }
+  #bbpress-forums .bbp-reply-content { margin-left: 0; padding: 1rem 0; }
+  #bbpress-forums .bbp-body div.bbp-reply-content { margin-left: 0; }
+}
+
+/* Form controls that are only needed on interactive gathering pages. */
+#bbpress-forums input[type="checkbox"], #bbpress-forums input[type="radio"],
+.at-rsvp-form input[type="checkbox"], .at-rsvp-form input[type="radio"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: inline-grid;
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  border: 2px solid #9b7967;
+  border-radius: .3rem;
+  background: #fffaf4;
+  color: #fff;
+  cursor: pointer;
+  vertical-align: middle;
+  place-content: center;
+  place-items: center;
+  -webkit-tap-highlight-color: transparent;
+}
+#bbpress-forums input[type="checkbox"]::before, .at-rsvp-form input[type="checkbox"]::before {
+  content: "";
+  width: .7rem;
+  height: .6rem;
+  border: 0;
+  background: currentColor;
+  -webkit-clip-path: polygon(0 38%, 15% 23%, 40% 57%, 84% 0, 100% 17%, 40% 100%);
+  clip-path: polygon(0 38%, 15% 23%, 40% 57%, 84% 0, 100% 17%, 40% 100%);
+  transform: scale(0);
+}
+#bbpress-forums input[type="radio"], .at-rsvp-form input[type="radio"] { border-radius: 50%; }
+#bbpress-forums input[type="radio"]::before, .at-rsvp-form input[type="radio"]::before {
+  content: "";
+  width: .45rem;
+  height: .45rem;
+  border-radius: 50%;
+  background: currentColor;
+  transform: scale(0);
+}
+#bbpress-forums input[type="checkbox"]:checked, #bbpress-forums input[type="radio"]:checked,
+.at-rsvp-form input[type="checkbox"]:checked, .at-rsvp-form input[type="radio"]:checked {
+  border-color: var(--at-coral);
+  background: var(--at-coral);
+}
+#bbpress-forums input[type="checkbox"]:checked::before, .at-rsvp-form input[type="checkbox"]:checked::before { transform: scale(1); }
+#bbpress-forums input[type="radio"]:checked::before, .at-rsvp-form input[type="radio"]:checked::before { transform: scale(1); }
+body.at-focus-script-ready:not(.at-keyboard-focus) #bbpress-forums input[type="checkbox"]:focus,
+body.at-focus-script-ready:not(.at-keyboard-focus) #bbpress-forums input[type="radio"]:focus,
+body.at-focus-script-ready:not(.at-keyboard-focus) .at-rsvp-form input[type="checkbox"]:focus,
+body.at-focus-script-ready:not(.at-keyboard-focus) .at-rsvp-form input[type="radio"]:focus {
+  outline: none;
+  box-shadow: none;
+}
+body.at-focus-script-ready.at-keyboard-focus #bbpress-forums input[type="checkbox"]:focus,
+body.at-focus-script-ready.at-keyboard-focus #bbpress-forums input[type="radio"]:focus,
+body.at-focus-script-ready.at-keyboard-focus .at-rsvp-form input[type="checkbox"]:focus,
+body.at-focus-script-ready.at-keyboard-focus .at-rsvp-form input[type="radio"]:focus {
+  outline: 3px solid var(--at-brown);
+  outline-offset: 3px;
+  box-shadow: none;
+}
+@media (forced-colors: active) {
+  #bbpress-forums input[type="checkbox"], #bbpress-forums input[type="radio"],
+  .at-rsvp-form input[type="checkbox"], .at-rsvp-form input[type="radio"] {
+    -webkit-appearance: auto !important;
+    appearance: auto !important;
+    background: Canvas !important;
+    border-color: ButtonText !important;
+    color: ButtonText !important;
+    forced-color-adjust: auto !important;
+  }
+  #bbpress-forums input[type="checkbox"]::before, #bbpress-forums input[type="radio"]::before,
+  .at-rsvp-form input[type="checkbox"]::before, .at-rsvp-form input[type="radio"]::before { content: none !important; transform: none !important; }
+}
+
+body.at-focus-script-ready.at-keyboard-focus #bbpress-forums textarea:focus, body.at-focus-script-ready.at-keyboard-focus #bbpress-forums input[type="text"]:focus,
+body.at-focus-script-ready.at-keyboard-focus #bbpress-forums input[type="email"]:focus, body.at-focus-script-ready.at-keyboard-focus #bbpress-forums input[type="url"]:focus,
+body.at-focus-script-ready.at-keyboard-focus #bbpress-forums input[type="password"]:focus, body.at-focus-script-ready.at-keyboard-focus #bbpress-forums select:focus {
+  border-color: var(--at-orange);
+  outline: 3px solid var(--at-brown);
+  outline-offset: 3px;
+  box-shadow: none;
+}
+body.at-focus-script-ready:not(.at-keyboard-focus) #bbpress-forums textarea#bbp_topic_content:focus,
+body.at-focus-script-ready:not(.at-keyboard-focus) #bbpress-forums textarea#bbp_reply_content:focus {
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+body.at-focus-script-ready.at-keyboard-focus #bbpress-forums textarea#bbp_topic_content:focus,
+body.at-focus-script-ready.at-keyboard-focus #bbpress-forums textarea#bbp_reply_content:focus {
+  border: 0 !important;
+  outline: 3px solid var(--at-brown) !important;
+  outline-offset: -3px;
+  box-shadow: none !important;
+}
+
+/* WP Photo Album Plus controls. */
+.wppa-container .wppa-cover-box { padding: 1rem !important; }
+.wppa-container .wppa-box { padding: 1rem !important; }
+.wppa-container input[type="file"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: .55rem .75rem;
+  border: 1px solid rgba(76,37,24,.2);
+  border-radius: .7rem;
+  background: #fffaf4;
+  color: var(--at-brown);
+  line-height: 1.35;
+}
+.wppa-container input[type="file"]::file-selector-button {
+  margin-inline-end: .7rem;
+  padding: .45rem .75rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--at-coral);
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+}
+.wppa-container button, .wppa-container input[type="button"], .wppa-container input[type="submit"],
+.wppa-container input[id^="wppa-user-upload-"][id$="-display"],
+.wppa-container .wppa-button, .wppa-container .wppa-upload-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.7rem;
+  padding: .65rem 1.1rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--at-coral);
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+.wppa-container button:hover, .wppa-container input[type="button"]:hover,
+.wppa-container input[type="submit"]:hover, .wppa-container input[id^="wppa-user-upload-"][id$="-display"]:hover,
+.wppa-container .wppa-button:hover, .wppa-container .wppa-upload-button:hover,
+.wppa-container button:focus-visible, .wppa-container input[type="button"]:focus-visible,
+.wppa-container input[type="submit"]:focus-visible, .wppa-container input[id^="wppa-user-upload-"][id$="-display"]:focus-visible,
+.wppa-container .wppa-button:focus-visible, .wppa-container .wppa-upload-button:focus-visible {
+  background: var(--at-brown);
+  color: #fff;
+}

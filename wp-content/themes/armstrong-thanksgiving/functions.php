@@ -15,6 +15,19 @@ function armstrong_thanksgiving_enqueue_styles() {
 		array(),
 		$style_version
 	);
+	$is_bbpress_page = function_exists( 'is_bbpress' ) && is_bbpress();
+	if ( is_page( array( 'rsvp', 'signup', 'forum', 'albums' ) ) || $is_bbpress_page ) {
+		$form_controls_path = get_theme_file_path( 'assets/form-controls.css' );
+		wp_enqueue_style(
+			'armstrong-thanksgiving-form-controls',
+			get_theme_file_uri( 'assets/form-controls.css' ),
+			array( 'armstrong-thanksgiving' ),
+			file_exists( $form_controls_path ) ? (string) filemtime( $form_controls_path ) : $theme->get( 'Version' )
+		);
+	}
+	if ( ! $is_bbpress_page ) {
+		wp_dequeue_style( 'bbp-default' );
+	}
 	$focus_path = get_theme_file_path( 'assets/focus.js' );
 	wp_enqueue_script(
 		'armstrong-thanksgiving-focus',
@@ -24,7 +37,18 @@ function armstrong_thanksgiving_enqueue_styles() {
 		true
 	);
 }
-add_action( 'wp_enqueue_scripts', 'armstrong_thanksgiving_enqueue_styles' );
+add_action( 'wp_enqueue_scripts', 'armstrong_thanksgiving_enqueue_styles', 20 );
+
+function armstrong_thanksgiving_preload_home_styles() {
+	if ( ! is_front_page() ) {
+		return;
+	}
+	$style_path = get_theme_file_path( 'style.css' );
+	$version   = file_exists( $style_path ) ? (string) filemtime( $style_path ) : wp_get_theme()->get( 'Version' );
+	$href      = add_query_arg( 'ver', $version, get_stylesheet_uri() );
+	printf( '<link rel="preload" href="%s" as="style">', esc_url( $href ) );
+}
+add_action( 'wp_head', 'armstrong_thanksgiving_preload_home_styles', 1 );
 
 function armstrong_thanksgiving_editor_styles() {
 	add_theme_support( 'editor-styles' );
