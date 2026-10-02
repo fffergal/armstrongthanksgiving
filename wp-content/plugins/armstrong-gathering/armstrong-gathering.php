@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Armstrong Gathering
  * Description: The small, first-party RSVP and potluck layer for Armstrong Thanksgiving.
- * Version: 0.4.1
+ * Version: 0.5.4
  * Requires at least: 6.8
  * Requires PHP: 8.1
  * Author: Armstrong Thanksgiving
@@ -11,7 +11,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'AT_GATHERING_VERSION', '0.5.2' );
+define( 'AT_GATHERING_VERSION', '0.5.4' );
 define( 'AT_GATHERING_FILE', __FILE__ );
 define( 'AT_GATHERING_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AT_GATHERING_URL', plugin_dir_url( __FILE__ ) );
@@ -50,12 +50,39 @@ function at_gathering_foods() {
 }
 
 function at_gathering_event_details() {
+	$details = get_option( 'at_gathering_event_details', array() );
+	$details = is_array( $details ) ? $details : array();
 	return array(
-		'date'    => 'Friday 21 November',
-		'time'    => '16:00',
-		'address' => '52 Priestfield Crescent, Edinburgh EH16 5JG',
+		'date'    => sanitize_text_field( $details['date'] ?? '' ),
+		'time'    => sanitize_text_field( $details['time'] ?? '' ),
+		'address' => sanitize_text_field( $details['address'] ?? '' ),
 	);
 }
+
+function at_gathering_event_details_shortcode() {
+	$details = at_gathering_event_details();
+	if ( ! $details['date'] ) {
+		return '';
+	}
+	$output = '<p class="at-date-card">' . esc_html( $details['date'] );
+	if ( is_user_logged_in() ) {
+		if ( $details['time'] ) {
+			$output .= '<small class="at-event-time">' . esc_html( $details['time'] ) . '</small>';
+		}
+	}
+	$output .= '</p>';
+	return $output;
+}
+add_shortcode( 'at_event_details', 'at_gathering_event_details_shortcode' );
+
+function at_gathering_event_address_shortcode() {
+	$details = at_gathering_event_details();
+	if ( ! is_user_logged_in() || ! $details['address'] ) {
+		return '';
+	}
+	return '<p class="at-event-address"><strong>Location</strong><br>' . esc_html( $details['address'] ) . '</p>';
+}
+add_shortcode( 'at_event_address', 'at_gathering_event_address_shortcode' );
 
 function at_gathering_activate() {
 	global $wpdb;
@@ -134,6 +161,9 @@ function at_gathering_migrate_content() {
 	// Replace the previous demo menu with the confirmed Thanksgiving potluck list.
 	// The turkey is supplied by the hosts and is intentionally not a guest option.
 	update_option( 'at_gathering_foods', at_gathering_default_foods() );
+	if ( false === get_option( 'at_gathering_event_details', false ) ) {
+		update_option( 'at_gathering_event_details', array() );
+	}
 	if ( false === get_option( 'at_gathering_invite_key', false ) ) {
 		update_option( 'at_gathering_invite_key', wp_generate_password( 32, false, false ) );
 	}
@@ -632,6 +662,13 @@ add_action( 'admin_post_nopriv_at_signup', 'at_gathering_signup' );
 
 function at_gathering_confirmation_message( $user, $status, $guest_count, $guest_names, $foods, $dietary, $notes, $greeting_name = '' ) {
 	$details = at_gathering_event_details();
+	$event_lines = array_filter(
+		array(
+			implode( ' · ', array_filter( array( $details['date'], $details['time'] ) ) ),
+			$details['address'],
+		),
+		'strlen'
+	);
 	$food_text = $foods ? implode( ', ', $foods ) : 'Nothing chosen yet';
 	$greeting_name = $greeting_name ?: ( $user->display_name ?: $user->user_login );
 	$group_signup = at_gathering_rsvp_has_other_people( $guest_count, $guest_names )
@@ -639,7 +676,7 @@ function at_gathering_confirmation_message( $user, $status, $guest_count, $guest
 		: '';
 
 	return sprintf(
-		"Hi %s,\n\nThanks for letting us know about Thanksgiving.\n\nAttendance: %s\nPeople: %d\nNames: %s\nFood: %s\nDietary notes: %s\nNote for the hosts: %s\n\n%s · %s\n%s\n\nYou can update your RSVP any time from the site. Your account also gives you access to the forum and shared photos.%s\n\nSee you there!",
+		"Hi %s,\n\nThanks for letting us know about Thanksgiving.\n\nAttendance: %s\nPeople: %d\nNames: %s\nFood: %s\nDietary notes: %s\nNote for the hosts: %s\n\n%s\n\nYou can update your RSVP any time from the site. Your account also gives you access to the forum and shared photos.%s\n\nSee you there!",
 		$greeting_name,
 		at_gathering_status_label( $status ),
 		$guest_count,
@@ -647,9 +684,7 @@ function at_gathering_confirmation_message( $user, $status, $guest_count, $guest
 		$food_text,
 		$dietary ?: 'None noted',
 		$notes ?: 'None noted',
-		$details['date'],
-		$details['time'],
-		$details['address'],
+		implode( "\n", $event_lines ),
 		$group_signup
 	);
 }
@@ -779,10 +814,24 @@ function at_gathering_admin_page() {
 	$foods  = at_gathering_foods();
 	$counts = at_gathering_food_counts();
 	$admins = get_users( array( 'role' => 'administrator', 'orderby' => 'display_name', 'order' => 'ASC' ) );
+	$event  = at_gathering_event_details();
 	?>
 	<div class="wrap at-gathering-admin">
 		<h1>Gathering RSVPs</h1>
 		<p>Host view: attendance, notes, and what is coming to the table.</p>
+		<h2>Event details</h2>
+		<p>These details appear on the homepage for signed-in members and in RSVP confirmation emails.</p>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="at-event-details-form">
+			<input type="hidden" name="action" value="at_save_event_details">
+			<?php wp_nonce_field( 'at_save_event_details', 'at_event_details_nonce' ); ?>
+			<table class="form-table" role="presentation"><tbody>
+				<tr><th scope="row"><label for="at-event-date">Date</label></th><td><input class="regular-text" id="at-event-date" name="at_event_date" type="text" value="<?php echo esc_attr( $event['date'] ); ?>" placeholder="Enter the event date"></td></tr>
+				<tr><th scope="row"><label for="at-event-time">Time</label></th><td><input class="regular-text" id="at-event-time" name="at_event_time" type="text" value="<?php echo esc_attr( $event['time'] ); ?>" placeholder="e.g. 4:00 pm"></td></tr>
+				<tr><th scope="row"><label for="at-event-address">Address</label></th><td><input class="large-text" id="at-event-address" name="at_event_address" type="text" value="<?php echo esc_attr( $event['address'] ); ?>"></td></tr>
+			</tbody></table>
+			<?php submit_button( 'Save event details' ); ?>
+		</form>
+		<?php if ( 'saved' === ( $_GET['at_event_details'] ?? '' ) ) : ?><div class="notice notice-success is-dismissible"><p>Event details saved.</p></div><?php endif; ?>
 		<?php if ( 'sent' === ( $_GET['at_sample_mail'] ?? '' ) ) : ?><div class="notice notice-success is-dismissible"><p>Sample RSVP confirmation sent through WordPress mail.</p></div><?php elseif ( 'failed' === ( $_GET['at_sample_mail'] ?? '' ) ) : ?><div class="notice notice-error is-dismissible"><p>WordPress could not send the sample RSVP confirmation.</p></div><?php endif; ?>
 		<table class="widefat striped at-admin-foods">
 			<thead><tr><th scope="col">Food</th><th scope="col">People bringing it</th></tr></thead>
@@ -833,6 +882,26 @@ function at_gathering_send_sample_rsvp_email() {
 	exit;
 }
 add_action( 'admin_post_at_send_sample_rsvp_email', 'at_gathering_send_sample_rsvp_email' );
+
+function at_gathering_save_event_details() {
+	if ( ! current_user_can( 'manage_options' ) || ! isset( $_POST['at_event_details_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['at_event_details_nonce'] ) ), 'at_save_event_details' ) ) {
+		wp_die( 'Sorry, the event details could not be saved.' );
+	}
+	update_option(
+		'at_gathering_event_details',
+		array(
+			'date'    => sanitize_text_field( wp_unslash( $_POST['at_event_date'] ?? '' ) ),
+			'time'    => sanitize_text_field( wp_unslash( $_POST['at_event_time'] ?? '' ) ),
+			'address' => sanitize_text_field( wp_unslash( $_POST['at_event_address'] ?? '' ) ),
+		)
+	);
+	if ( function_exists( 'wp_cache_clear_cache' ) ) {
+		wp_cache_clear_cache();
+	}
+	wp_safe_redirect( admin_url( 'admin.php?page=at-gathering&at_event_details=saved' ) );
+	exit;
+}
+add_action( 'admin_post_at_save_event_details', 'at_gathering_save_event_details' );
 
 function at_gathering_add_food() {
 	if ( ! current_user_can( 'manage_options' ) || ! isset( $_POST['at_food_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['at_food_nonce'] ) ), 'at_add_food' ) ) {

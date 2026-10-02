@@ -4,6 +4,17 @@ export async function logIn(page: Page): Promise<void> {
   const username = process.env.WP_TEST_USER ?? 'guest';
   const password = process.env.WP_TEST_PASSWORD ?? 'password';
 
+  await logInWithCredentials(page, username, password);
+}
+
+export async function logInAsAdmin(page: Page): Promise<void> {
+  const username = process.env.WP_ADMIN_USER ?? 'admin';
+  const password = process.env.WP_ADMIN_PASSWORD ?? 'password';
+
+  await logInWithCredentials(page, username, password);
+}
+
+async function logInWithCredentials(page: Page, username: string, password: string): Promise<void> {
   await page.goto('/wp-login.php');
   // Set fixture values in the page and dispatch normal input events so browser
   // autofill cannot swap them while the form is loading.

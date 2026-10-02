@@ -60,6 +60,8 @@ wp(['plugin', 'activate', 'bbpress.latest-stable', 'wp-photo-album-plus.latest-s
 wp(['plugin', 'activate', 'armstrong-gathering']);
 wp(['plugin', 'deactivate', 'magic-login.latest-stable'], { allowFailure: true });
 wp(['option', 'update', 'blogname', 'Armstrong Thanksgiving']);
+wp(['eval', "delete_option('at_gathering_event_details'); update_option('at_gathering_db_version', '0.5.2'); at_gathering_maybe_upgrade(); $event = get_option('at_gathering_event_details', false); if ( ! is_array($event) || ! empty($event['date']) || ! empty($event['time']) || ! empty($event['address']) ) { WP_CLI::error('Event details should be empty for admin setup.'); }"]);
+wp(['eval', "update_option('at_gathering_event_details', array('date' => '12 December 2026', 'time' => '6:42 pm', 'address' => '123 Example Lane, Testville'));"]);
 wp(['option', 'update', 'users_can_register', '0']);
 wp(['option', 'update', '_bbp_root_slug', 'community']);
 wp(['option', 'update', '_bbp_topic_slug', 'topic']);

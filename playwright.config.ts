@@ -49,6 +49,12 @@ export default defineConfig({
     { name: 'member', testMatch: /member\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
     { name: 'forum', testMatch: /forum\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
     { name: 'rsvp', testMatch: /rsvp\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
-    { name: 'rsvp-mobile', testMatch: /rsvp\.spec\.ts/, use: { ...devices['iPhone 13'] } }
+    { name: 'rsvp-mobile', testMatch: /rsvp\.spec\.ts/, use: { ...devices['iPhone 13'] } },
+    {
+      name: 'admin',
+      testMatch: /admin\.spec\.ts/,
+      dependencies: ['desktop-chromium', 'mobile-safari', 'login', 'accessibility', 'visual', 'member', 'forum', 'rsvp', 'rsvp-mobile'],
+      use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions }
+    }
   ]
 });
