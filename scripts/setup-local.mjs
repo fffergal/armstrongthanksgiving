@@ -58,7 +58,7 @@ function ensurePhotoAlbum() {
   const albumId = result.stdout?.match(/(\d+)\s*$/)?.[1] ?? '';
   if (result.status !== 0 || !albumId || albumId === '0') {
     console.error(result.stderr || 'Could not create the local Shared Photos album.');
-    process.exit(result.status ?? 1);
+    process.exit(result.status > 0 ? result.status : 1);
   }
   return albumId;
 }

@@ -210,9 +210,22 @@ a.at-button.is-secondary { background: var(--at-olive); }
 .at-rsvp-form input[type="checkbox"]:focus:not(:focus-visible), .at-rsvp-form input[type="radio"]:focus:not(:focus-visible) { outline: none; }
 #bbpress-forums input[type="checkbox"]:focus-visible, #bbpress-forums input[type="radio"]:focus-visible,
 .at-rsvp-form input[type="checkbox"]:focus-visible, .at-rsvp-form input[type="radio"]:focus-visible {
-  outline: 3px solid var(--at-mustard);
+  outline: 3px solid var(--at-brown);
   outline-offset: 2px;
   box-shadow: none;
+}
+@media (forced-colors: active) {
+  #bbpress-forums input[type="checkbox"], #bbpress-forums input[type="radio"],
+  .at-rsvp-form input[type="checkbox"], .at-rsvp-form input[type="radio"] {
+    -webkit-appearance: auto;
+    appearance: auto;
+    background: Canvas;
+    border-color: ButtonText;
+    color: ButtonText;
+    forced-color-adjust: auto;
+  }
+  #bbpress-forums input[type="checkbox"]::before, #bbpress-forums input[type="radio"]::before,
+  .at-rsvp-form input[type="checkbox"]::before, .at-rsvp-form input[type="radio"]::before { content: none; }
 }
 #bbpress-forums textarea, #bbpress-forums input[type="text"], #bbpress-forums input[type="email"],
 #bbpress-forums input[type="url"], #bbpress-forums input[type="password"], #bbpress-forums select {

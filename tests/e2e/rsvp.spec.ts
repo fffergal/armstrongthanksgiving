@@ -42,7 +42,7 @@ test('a signed-in friend gets the RSVP and potluck form', async ({ page }) => {
   await expect(foodCheckbox).toHaveCSS('-webkit-appearance', 'none');
   await foodCheckbox.check();
   await expect(foodCheckbox).toHaveCSS('background-color', 'rgb(179, 63, 49)');
-  expect(await foodCheckbox.evaluate((element) => getComputedStyle(element, '::before').transform)).not.toBe('none');
+  expect(await foodCheckbox.evaluate((element) => getComputedStyle(element, '::before').transform)).toBe('matrix(1, 0, 0, 1, 0, 0)');
 });
 
 test('the RSVP form remains usable on a phone', async ({ page }) => {
