@@ -49,6 +49,18 @@ community plugins on every start. After editing those files, restart with
 the worktree's Docker data and generated runtime state while preserving Docker
 images for the next worktree.
 
+## Feature screenshots
+
+When implementing a feature that changes the site's visible interface, finish
+by capturing a screenshot of the running local result at a useful viewport
+size. Use the internal browser, and use the worktree URL recorded in
+`.worktree/runtime.json`. Include the screenshot directly in the completion
+message so the user can review the result without opening the local site. For
+responsive or materially different interface states, include the screenshots
+needed to show those states. If the feature has no visible interface, or the
+local site cannot be brought up, say so in the completion message instead of
+presenting an unrelated screenshot.
+
 Keep `.worktree/`, `node_modules/`, test reports, Lighthouse reports, and
 Docker-generated state out of commits. Never use a broad Docker prune command
 while another worktree is running; the wrappers scope cleanup to this
