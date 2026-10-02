@@ -15,10 +15,10 @@ requests into `main`:
    production secrets, and disables checkout credentials. Separate trusted
    jobs create and complete `CI / test` with `checks: write`, including when a
    token-created automation PR cannot start a normal pull-request workflow.
-4. The repository ruleset automatically requests Copilot review on new pull
-   requests and new pushes. Copilot's native approval counts as the required
-   pull-request approval when repository Copilot approval settings are enabled.
-5. After the checks and approval are complete, squash-merge the pull request.
+4. Codex review is enabled. Review any feedback it provides and address useful
+   findings before merging; reviewer approval is not required.
+5. After required checks pass and review feedback is addressed, squash-merge the
+   pull request.
 6. A push to `main` deploys changed theme, plugin, and block-editor content in
    sequence, then checks the public site. When publishing a changed Home page,
    deployment compares production against the previous committed page (or the
@@ -32,20 +32,21 @@ requests into `main`:
 The `Protect main` repository ruleset configures the `main` branch with:
 
 - Require a pull request before merging; no direct pushes or bypasses.
-- Require one approval and dismiss stale approvals.
-- Automatically request Copilot review on new pull requests and new pushes.
+- Require zero approvals.
+- Do not automatically request Copilot review.
+- Codex review is enabled; use its feedback to improve the change, but it is not
+  an approval gate.
 - Require the `CI / test` status check.
 - Require branches to be up to date before merging.
 - Require conversation resolution before merging.
 - Disable merge commits and rebase merges; leave squash merging enabled.
 - Disable branch deletion and force pushes.
 
-In the repository's Copilot code-review settings, enable **Allow Copilot to
-approve pull requests** and **Allow Copilot approvals to count toward merge
-requirements**. Copilot approvals are currently a GitHub public-preview
-feature. The ruleset handles review requests and the normal pull-request
-approval gate handles the approval itself; no custom Actions reviewer check is
-needed.
+The current review configuration has Copilot reviewer requests turned off and
+no required approvals. Codex review is enabled and may leave feedback; assess
+and address useful comments before merging. Keep the `CI / test` check,
+up-to-date branch requirement, and conversation-resolution requirement as the
+merge gates.
 
 The deployment workflow expects these Actions secrets, preferably on a
 `production` environment with any required approval gate:
@@ -68,26 +69,11 @@ finds a difference. If that PR has not been merged yet, later runs merge the
 latest `main` into it and add a new content commit instead of opening
 duplicates. If the PR is merged, the next scheduled or manual run can create a
 new one.
-The PR receives the same CI and native Copilot approval gate as every other
-change. Once merged, the deployment workflow publishes the checked-in block
+The PR receives the same CI checks as every other change. Codex review may
+provide feedback, but no reviewer approval is required. Once merged, the
+deployment workflow publishes the checked-in block
 document back to production. Since the sync workflow writes with
 `GITHUB_TOKEN`, it explicitly dispatches the trusted CI workflow from `main`
 with the PR number and head SHA; that workflow reports the required
-`CI / test` check on the PR commit. Copilot review is requested by the ruleset.
-
-## When Copilot cannot approve a change
-
-Copilot may be unable to approve a change whose correctness depends on
-repository-level settings that are not visible in the checkout: rulesets,
-required checks, environment approvals, deployment secrets, or other GitHub
-configuration. A comment saying that the change looks good does not satisfy
-GitHub's approval requirement, and copying an arbitrary human-authored branch
-into a bot-authored PR would undermine the independent-review gate.
-
-Keep those changes in a normal human-authored PR and have an independent
-reviewer approve them. The initial workflow setup PR is the one-time bootstrap
-exception: after checking the diff and the relevant settings, an administrator
-can temporarily add themselves as a ruleset bypass, squash-merge that PR, and
-remove the bypass immediately. The block-editor sync PR is different: it is
-bot-authored from content read from the published site, not from an arbitrary
-coding branch, and still goes through the normal checks and Copilot approval.
+`CI / test` check on the PR commit. Codex review feedback can be addressed as
+part of the ordinary PR conversation; it does not create an approval gate.
