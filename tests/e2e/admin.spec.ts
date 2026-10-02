@@ -11,7 +11,7 @@ test('an administrator can save event details from Gathering RSVPs', async ({ pa
     address: '123 Example Lane, Testville',
   };
   const updated = {
-    date: fixture.date,
+    date: '13 December 2026',
     time: '7:15 pm',
     address: '456 Example Street, Testville',
   };
