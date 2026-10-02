@@ -5,14 +5,16 @@
 			return;
 		}
 
+		var keyboardNavigationKeys = ['Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 		document.addEventListener('keydown', function (event) {
-			if (event.key === 'Tab') {
+			if (keyboardNavigationKeys.indexOf(event.key) !== -1) {
 				body.classList.add('at-keyboard-focus');
 			}
 		}, true);
 		document.addEventListener('pointerdown', function () {
 			body.classList.remove('at-keyboard-focus');
 		}, true);
+		body.classList.add('at-focus-script-ready');
 	}
 
 	if (document.body) {

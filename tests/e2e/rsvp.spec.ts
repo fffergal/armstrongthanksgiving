@@ -74,6 +74,15 @@ test('form controls only show the brown focus ring during keyboard navigation', 
   await people.click();
   await expect(people).toHaveCSS('outline-style', 'none');
 
+  const coming = page.getByLabel('I’m coming');
+  await coming.click();
+  await coming.press('ArrowRight');
+  const maybe = page.getByLabel('Maybe');
+  await expect(maybe).toBeFocused();
+  await expect(maybe).toHaveCSS('outline-style', 'solid');
+  await expect(maybe).toHaveCSS('outline-width', '3px');
+  await expect(maybe).toHaveCSS('outline-color', 'rgb(76, 37, 24)');
+
   const signOut = page.getByRole('link', { name: 'Sign out' });
   await signOut.focus();
   await page.keyboard.press('Tab');

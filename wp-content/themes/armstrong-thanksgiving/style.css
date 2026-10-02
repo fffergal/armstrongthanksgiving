@@ -204,19 +204,17 @@ a.at-button.is-secondary { background: var(--at-olive); }
 }
 #bbpress-forums input[type="checkbox"]:checked::before, .at-rsvp-form input[type="checkbox"]:checked::before { transform: scale(1); }
 #bbpress-forums input[type="radio"]:checked::before, .at-rsvp-form input[type="radio"]:checked::before { transform: scale(1); }
-#bbpress-forums input[type="checkbox"]:focus, #bbpress-forums input[type="radio"]:focus,
-.at-rsvp-form input[type="checkbox"]:focus, .at-rsvp-form input[type="radio"]:focus { box-shadow: none; }
-#bbpress-forums input[type="checkbox"]:focus:not(:focus-visible), #bbpress-forums input[type="radio"]:focus:not(:focus-visible),
-.at-rsvp-form input[type="checkbox"]:focus:not(:focus-visible), .at-rsvp-form input[type="radio"]:focus:not(:focus-visible) { outline: none; }
-#bbpress-forums input[type="checkbox"]:focus, #bbpress-forums input[type="radio"]:focus,
-.at-rsvp-form input[type="checkbox"]:focus, .at-rsvp-form input[type="radio"]:focus {
+body.at-focus-script-ready:not(.at-keyboard-focus) #bbpress-forums input[type="checkbox"]:focus,
+body.at-focus-script-ready:not(.at-keyboard-focus) #bbpress-forums input[type="radio"]:focus,
+body.at-focus-script-ready:not(.at-keyboard-focus) .at-rsvp-form input[type="checkbox"]:focus,
+body.at-focus-script-ready:not(.at-keyboard-focus) .at-rsvp-form input[type="radio"]:focus {
   outline: none;
   box-shadow: none;
 }
-body.at-keyboard-focus #bbpress-forums input[type="checkbox"]:focus,
-body.at-keyboard-focus #bbpress-forums input[type="radio"]:focus,
-body.at-keyboard-focus .at-rsvp-form input[type="checkbox"]:focus,
-body.at-keyboard-focus .at-rsvp-form input[type="radio"]:focus {
+body.at-focus-script-ready.at-keyboard-focus #bbpress-forums input[type="checkbox"]:focus,
+body.at-focus-script-ready.at-keyboard-focus #bbpress-forums input[type="radio"]:focus,
+body.at-focus-script-ready.at-keyboard-focus .at-rsvp-form input[type="checkbox"]:focus,
+body.at-focus-script-ready.at-keyboard-focus .at-rsvp-form input[type="radio"]:focus {
   outline: 3px solid var(--at-brown);
   outline-offset: 3px;
   box-shadow: none;
@@ -240,9 +238,9 @@ body.at-keyboard-focus .at-rsvp-form input[type="radio"]:focus {
   appearance: none;
   box-shadow: none;
 }
-body.at-keyboard-focus #bbpress-forums textarea:focus, body.at-keyboard-focus #bbpress-forums input[type="text"]:focus,
-body.at-keyboard-focus #bbpress-forums input[type="email"]:focus, body.at-keyboard-focus #bbpress-forums input[type="url"]:focus,
-body.at-keyboard-focus #bbpress-forums input[type="password"]:focus, body.at-keyboard-focus #bbpress-forums select:focus {
+body.at-focus-script-ready.at-keyboard-focus #bbpress-forums textarea:focus, body.at-focus-script-ready.at-keyboard-focus #bbpress-forums input[type="text"]:focus,
+body.at-focus-script-ready.at-keyboard-focus #bbpress-forums input[type="email"]:focus, body.at-focus-script-ready.at-keyboard-focus #bbpress-forums input[type="url"]:focus,
+body.at-focus-script-ready.at-keyboard-focus #bbpress-forums input[type="password"]:focus, body.at-focus-script-ready.at-keyboard-focus #bbpress-forums select:focus {
   border-color: var(--at-orange);
   outline: 3px solid var(--at-brown);
   outline-offset: 3px;
@@ -300,10 +298,8 @@ body.at-keyboard-focus #bbpress-forums input[type="password"]:focus, body.at-key
   background: #fff8ef;
   color: var(--at-orange);
 }
-#bbpress-forums textarea#bbp_topic_content:focus,
-#bbpress-forums textarea#bbp_topic_content:focus-visible,
-#bbpress-forums textarea#bbp_reply_content:focus,
-#bbpress-forums textarea#bbp_reply_content:focus-visible {
+body.at-focus-script-ready:not(.at-keyboard-focus) #bbpress-forums textarea#bbp_topic_content:focus,
+body.at-focus-script-ready:not(.at-keyboard-focus) #bbpress-forums textarea#bbp_reply_content:focus {
   border: 0 !important;
   outline: none !important;
   box-shadow: none !important;
@@ -421,28 +417,25 @@ body.at-keyboard-focus #bbpress-forums input[type="password"]:focus, body.at-key
 
 /* Keep focus quiet for pointer/touch interaction, but make keyboard focus
  * consistent across theme and plugin controls. */
-:where(a, button, input, select, textarea, summary, [tabindex]):focus {
-  outline: none;
-  box-shadow: none;
-}
-body.at-keyboard-focus :where(a, button, input, select, textarea, summary, [tabindex]):focus {
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 3px solid var(--at-brown);
   outline-offset: 3px;
   box-shadow: none;
 }
-body.at-keyboard-focus .at-footer :where(a, button, input, select, textarea, summary, [tabindex]):focus {
+.at-footer :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline-color: var(--at-cream);
   box-shadow: 0 0 0 1px var(--at-brown);
 }
-body:not(.at-keyboard-focus) .at-rsvp-form input:focus,
-body:not(.at-keyboard-focus) .at-rsvp-form select:focus,
-body:not(.at-keyboard-focus) .at-rsvp-form textarea:focus,
-body:not(.at-keyboard-focus) #bbpress-forums input:focus,
-body:not(.at-keyboard-focus) #bbpress-forums select:focus,
-body:not(.at-keyboard-focus) #bbpress-forums textarea:focus,
-body:not(.at-keyboard-focus) .wppa-container input:focus,
-body:not(.at-keyboard-focus) .wppa-container select:focus,
-body:not(.at-keyboard-focus) .wppa-container textarea:focus {
+body.at-focus-script-ready :where(a, button, input, select, textarea, summary, [tabindex]):focus {
   outline: none;
   box-shadow: none;
+}
+body.at-focus-script-ready.at-keyboard-focus :where(a, button, input, select, textarea, summary, [tabindex]):focus {
+  outline: 3px solid var(--at-brown);
+  outline-offset: 3px;
+  box-shadow: none;
+}
+body.at-focus-script-ready.at-keyboard-focus .at-footer :where(a, button, input, select, textarea, summary, [tabindex]):focus {
+  outline-color: var(--at-cream);
+  box-shadow: 0 0 0 1px var(--at-brown);
 }

@@ -104,19 +104,45 @@ function armstrong_thanksgiving_theme_login_branding() {
 		.login input[type="checkbox"]::before { content:""; width:.7rem; height:.6rem; border:0; background:currentColor; -webkit-clip-path:polygon(0 38%,15% 23%,40% 57%,84% 0,100% 17%,40% 100%); clip-path:polygon(0 38%,15% 23%,40% 57%,84% 0,100% 17%,40% 100%); transform:scale(0); }
 		.login input[type="checkbox"]:checked { border-color:var(--at-coral); background:var(--at-coral); }
 		.login input[type="checkbox"]:checked::before { transform:scale(1); }
-		.login input[type="checkbox"]:focus { box-shadow:none; }
-		.login input[type="checkbox"]:focus:not(:focus-visible) { outline:none; }
-		body.at-keyboard-focus.login input[type="checkbox"]:focus { outline:3px solid var(--at-brown); outline-offset:3px; box-shadow:none; }
-		.login input[type="text"]:focus, .login input[type="email"]:focus, .login input[type="password"]:focus,
-		.login select:focus, .login textarea:focus, .login button:focus, .login input[type="submit"]:focus,
-		.login input[type="button"]:focus, .login a:focus { outline:none; box-shadow:none; }
-		body.at-keyboard-focus.login input[type="text"]:focus, body.at-keyboard-focus.login input[type="email"]:focus, body.at-keyboard-focus.login input[type="password"]:focus,
-		body.at-keyboard-focus.login select:focus, body.at-keyboard-focus.login textarea:focus, body.at-keyboard-focus.login button:focus,
-		body.at-keyboard-focus.login input[type="submit"]:focus, body.at-keyboard-focus.login input[type="button"]:focus,
-		body.at-keyboard-focus.login a:focus { outline:3px solid var(--at-brown); outline-offset:3px; box-shadow:none; }
-		.login button.wp-hide-pw:focus, .login button.wp-tooltip__toggle:focus, .login button.wp-tooltip__close:focus { border:0 !important; outline:none !important; box-shadow:none !important; }
-		body.at-keyboard-focus.login button.wp-hide-pw:focus, body.at-keyboard-focus.login button.wp-tooltip__toggle:focus,
-		body.at-keyboard-focus.login button.wp-tooltip__close:focus { outline:3px solid var(--at-brown) !important; outline-offset:3px; }
+		body.login:not(.at-focus-script-ready) input[type="checkbox"]:focus-visible,
+		body.login:not(.at-focus-script-ready) input[type="text"]:focus-visible,
+		body.login:not(.at-focus-script-ready) input[type="email"]:focus-visible,
+		body.login:not(.at-focus-script-ready) input[type="password"]:focus-visible,
+		body.login:not(.at-focus-script-ready) select:focus-visible,
+		body.login:not(.at-focus-script-ready) textarea:focus-visible,
+		body.login:not(.at-focus-script-ready) button:focus-visible,
+		body.login:not(.at-focus-script-ready) input[type="submit"]:focus-visible,
+		body.login:not(.at-focus-script-ready) input[type="button"]:focus-visible,
+		body.login:not(.at-focus-script-ready) a:focus-visible { outline:3px solid var(--at-brown) !important; outline-offset:3px; box-shadow:none !important; }
+		body.login:not(.at-focus-script-ready) button.wp-hide-pw:focus-visible,
+		body.login:not(.at-focus-script-ready) button.wp-tooltip__toggle:focus-visible,
+		body.login:not(.at-focus-script-ready) button.wp-tooltip__close:focus-visible { border:0 !important; }
+		body.at-focus-script-ready.login:not(.at-keyboard-focus) input[type="checkbox"]:focus,
+		body.at-focus-script-ready.login:not(.at-keyboard-focus) input[type="text"]:focus,
+		body.at-focus-script-ready.login:not(.at-keyboard-focus) input[type="email"]:focus,
+		body.at-focus-script-ready.login:not(.at-keyboard-focus) input[type="password"]:focus,
+		body.at-focus-script-ready.login:not(.at-keyboard-focus) select:focus,
+		body.at-focus-script-ready.login:not(.at-keyboard-focus) textarea:focus,
+		body.at-focus-script-ready.login:not(.at-keyboard-focus) button:focus,
+		body.at-focus-script-ready.login:not(.at-keyboard-focus) input[type="submit"]:focus,
+		body.at-focus-script-ready.login:not(.at-keyboard-focus) input[type="button"]:focus,
+		body.at-focus-script-ready.login:not(.at-keyboard-focus) a:focus { outline:none; box-shadow:none; }
+		body.at-focus-script-ready.at-keyboard-focus.login input[type="checkbox"]:focus,
+		body.at-focus-script-ready.at-keyboard-focus.login input[type="text"]:focus,
+		body.at-focus-script-ready.at-keyboard-focus.login input[type="email"]:focus,
+		body.at-focus-script-ready.at-keyboard-focus.login input[type="password"]:focus,
+		body.at-focus-script-ready.at-keyboard-focus.login select:focus,
+		body.at-focus-script-ready.at-keyboard-focus.login textarea:focus,
+		body.at-focus-script-ready.at-keyboard-focus.login button:focus,
+		body.at-focus-script-ready.at-keyboard-focus.login input[type="submit"]:focus,
+		body.at-focus-script-ready.at-keyboard-focus.login input[type="button"]:focus,
+		body.at-focus-script-ready.at-keyboard-focus.login a:focus { outline:3px solid var(--at-brown); outline-offset:3px; box-shadow:none; }
+		body.at-focus-script-ready.login:not(.at-keyboard-focus) button.wp-hide-pw:focus,
+		body.at-focus-script-ready.login:not(.at-keyboard-focus) button.wp-tooltip__toggle:focus,
+		body.at-focus-script-ready.login:not(.at-keyboard-focus) button.wp-tooltip__close:focus { border:0 !important; outline:none !important; box-shadow:none !important; }
+		body.at-focus-script-ready.at-keyboard-focus.login button.wp-hide-pw:focus,
+		body.at-focus-script-ready.at-keyboard-focus.login button.wp-tooltip__toggle:focus,
+		body.at-focus-script-ready.at-keyboard-focus.login button.wp-tooltip__close:focus { border:0 !important; outline:3px solid var(--at-brown) !important; outline-offset:3px; box-shadow:none !important; }
 		@media (forced-colors: active) {
 			.login input[type="checkbox"] { -webkit-appearance:auto !important; appearance:auto !important; background:Canvas !important; border-color:ButtonText !important; color:ButtonText !important; forced-color-adjust:auto !important; }
 			.login input[type="checkbox"]::before { content:none !important; transform:none !important; }
