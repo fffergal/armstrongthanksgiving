@@ -18,6 +18,10 @@ test('a signed-in friend can use the gathering pages', async ({ page }) => {
     await expect(page.getByRole('heading', { name: heading, exact: false })).toBeVisible();
   }
 
+  await page.goto('/albums/');
+  await expect(page.locator('.wppa-upload-cover, .wppa-upload-uploadbox').first()).toBeVisible();
+  await expect(page.locator('.wppa-upload-cover:visible, .wppa-upload-uploadbox:visible')).toHaveCount(1);
+
   await page.goto('/');
   await expect(page.getByRole('link', { name: 'Sign out' })).toBeVisible();
   await expect(page.locator('.at-date-card')).toContainText('12 December 2026');

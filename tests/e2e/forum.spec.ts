@@ -15,6 +15,13 @@ test('a member can create, reply to, and edit their own forum posts', async ({ p
   const editedReplyBody = `Edited reply body ${suffix}`;
 
   await expect(page.locator('#bbp_topic_title')).toBeVisible();
+  const subscription = page.locator('#bbp_topic_subscription');
+  await expect(subscription).toBeVisible();
+  await expect(subscription).toHaveCSS('-webkit-appearance', 'none');
+  await expect(subscription).toHaveCSS('border-radius', '4.8px');
+  await subscription.check();
+  await expect(subscription).toHaveCSS('background-color', 'rgb(179, 63, 49)');
+  expect(await subscription.evaluate((element) => getComputedStyle(element, '::before').transform)).not.toBe('none');
   await expect(page.locator('#bbp_topic_content')).toHaveCSS('border-width', '0px');
   await expect(page.locator('#bbp_topic_content')).toHaveCSS('outline-style', 'none');
   await expect(page.locator('#qt_bbp_topic_content_toolbar')).toBeVisible();

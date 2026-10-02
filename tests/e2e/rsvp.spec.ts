@@ -36,6 +36,13 @@ test('a signed-in friend gets the RSVP and potluck form', async ({ page }) => {
   await expect(page.getByText('52 Priestfield Crescent')).toHaveCount(0);
   await expect(page.getByText('One quick form')).toHaveCount(0);
   await expect(page.getByRole('button', { name: /RSVP/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /RSVP/ })).toHaveCSS('background-color', 'rgb(179, 63, 49)');
+  await expect(page.getByRole('button', { name: /RSVP/ })).toHaveCSS('-webkit-appearance', 'none');
+  const foodCheckbox = page.locator('input[name="at_food[]"]').first();
+  await expect(foodCheckbox).toHaveCSS('-webkit-appearance', 'none');
+  await foodCheckbox.check();
+  await expect(foodCheckbox).toHaveCSS('background-color', 'rgb(179, 63, 49)');
+  expect(await foodCheckbox.evaluate((element) => getComputedStyle(element, '::before').transform)).not.toBe('none');
 });
 
 test('the RSVP form remains usable on a phone', async ({ page }) => {
@@ -45,6 +52,8 @@ test('the RSVP form remains usable on a phone', async ({ page }) => {
   await expect(page.locator('.at-rsvp-app')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
   const submit = page.getByRole('button', { name: /RSVP/ });
+  await expect(submit).toHaveCSS('background-color', 'rgb(179, 63, 49)');
+  await expect(submit).toHaveCSS('-webkit-appearance', 'none');
   await submit.scrollIntoViewIfNeeded();
   await expect(submit).toBeInViewport();
 });

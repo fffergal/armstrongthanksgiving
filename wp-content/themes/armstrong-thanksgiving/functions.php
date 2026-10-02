@@ -6,12 +6,14 @@
 defined( 'ABSPATH' ) || exit;
 
 function armstrong_thanksgiving_enqueue_styles() {
-	$theme = wp_get_theme();
+	$theme         = wp_get_theme();
+	$style_path    = get_theme_file_path( 'style.css' );
+	$style_version = file_exists( $style_path ) ? (string) filemtime( $style_path ) : $theme->get( 'Version' );
 	wp_enqueue_style(
 		'armstrong-thanksgiving',
 		get_stylesheet_uri(),
 		array(),
-		$theme->get( 'Version' )
+		$style_version
 	);
 }
 add_action( 'wp_enqueue_scripts', 'armstrong_thanksgiving_enqueue_styles' );
@@ -78,7 +80,7 @@ add_filter( 'bbp_get_reply_class', 'armstrong_thanksgiving_reply_classes', 10, 2
 function armstrong_thanksgiving_theme_login_branding() {
 	?>
 	<style>
-		:root { --at-cream:#f6ede1; --at-coral:#b34b38; --at-brown:#4c2518; --at-olive:#777844; }
+		:root { --at-cream:#f6ede1; --at-coral:#b33f31; --at-brown:#4c2518; --at-olive:#706e3d; }
 		body.login { background:var(--at-cream); }
 		body.login #login { width:min(92%, 420px); padding-top:8vh; }
 		.login h1 a { width:auto; max-width:100%; height:auto; margin:0 0 1.5rem; background-image:none !important; color:var(--at-brown); font:700 clamp(1.35rem,7vw,2rem)/1.1 ui-rounded,"Trebuchet MS",system-ui,sans-serif; text-indent:0; text-decoration:none; white-space:normal; overflow-wrap:break-word; word-break:normal; }
@@ -87,6 +89,13 @@ function armstrong_thanksgiving_theme_login_branding() {
 		.login #wp-submit, .login #wp-login-submit { width:100%; border:0; border-radius:999px; background:var(--at-coral) !important; border-color:var(--at-coral) !important; color:#fff; text-shadow:none; box-shadow:none; }
 		.login form #wp-submit, .login form #wp-login-submit { float:none; }
 		.login #wp-submit:hover, .login #wp-submit:focus, .login #wp-login-submit:hover, .login #wp-login-submit:focus { background:var(--at-brown) !important; }
+		.login input[type="checkbox"] { -webkit-appearance:none; appearance:none; display:inline-grid; width:1.15rem; height:1.15rem; margin:0 .35rem 0 0; padding:0; border:2px solid #9b7967; border-radius:.3rem; background:#fffaf4; color:#fff; vertical-align:-.25rem; place-content:center; place-items:center; -webkit-tap-highlight-color:transparent; }
+		.login input[type="checkbox"]::before { content:""; width:.7rem; height:.6rem; border:0; background:currentColor; -webkit-clip-path:polygon(0 38%,15% 23%,40% 57%,84% 0,100% 17%,40% 100%); clip-path:polygon(0 38%,15% 23%,40% 57%,84% 0,100% 17%,40% 100%); transform:scale(0); }
+		.login input[type="checkbox"]:checked { border-color:var(--at-coral); background:var(--at-coral); }
+		.login input[type="checkbox"]:checked::before { transform:scale(1); }
+		.login input[type="checkbox"]:focus { box-shadow:none; }
+		.login input[type="checkbox"]:focus:not(:focus-visible) { outline:none; }
+		.login input[type="checkbox"]:focus-visible { outline:3px solid var(--at-mustard); outline-offset:2px; box-shadow:none; }
 		.login a { color:var(--at-brown); }
 		.login .message { border-left-color:var(--at-olive); background:#fff8ef; color:var(--at-brown); }
 	</style>
