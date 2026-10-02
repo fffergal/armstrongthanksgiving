@@ -146,15 +146,16 @@ jobs:
           EXISTING_PR_NUMBER: ${{ steps.branch.outputs.pr_number }}
         run: |
           pr_number="$EXISTING_PR_NUMBER"
+          pr_body=$'This PR was created by the **Sync block editor content** workflow.\n\nIt imports the published WordPress Home page into `content/pages/home.html`. Trusted CI is dispatched from `main` and reports the required `CI / test` check on this PR commit. Codex review may provide feedback, but no reviewer approval is required.'
           if [ -z "$pr_number" ]; then
             pr_url="$(gh pr create \
               --base main \
               --head "$BRANCH" \
               --title 'Sync Home page from block editor' \
-              --body $'This PR was created by the **Sync block editor content** workflow.\n\nIt imports the published WordPress Home page into `content/pages/home.html`. Trusted CI is dispatched from `main` and reports the required `CI / test` check on this PR commit. Codex review may provide feedback, but no reviewer approval is required.')"
+              --body "$pr_body")"
             pr_number="$(gh pr view "$pr_url" --json number --jq .number)"
           else
-            echo "Updating existing sync PR #$pr_number."
+            gh pr edit "$pr_number" --body "$pr_body"
           fi
 
           echo "number=$pr_number" >> "$GITHUB_OUTPUT"
