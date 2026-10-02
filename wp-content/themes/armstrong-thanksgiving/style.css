@@ -304,6 +304,13 @@ body.at-focus-script-ready:not(.at-keyboard-focus) #bbpress-forums textarea#bbp_
   outline: none !important;
   box-shadow: none !important;
 }
+body.at-focus-script-ready.at-keyboard-focus #bbpress-forums textarea#bbp_topic_content:focus,
+body.at-focus-script-ready.at-keyboard-focus #bbpress-forums textarea#bbp_reply_content:focus {
+  border: 0 !important;
+  outline: 3px solid var(--at-brown) !important;
+  outline-offset: -3px;
+  box-shadow: none !important;
+}
 #bbpress-forums #bbp_topic_submit, #bbpress-forums #bbp_reply_submit {
   -webkit-appearance: none;
   appearance: none;

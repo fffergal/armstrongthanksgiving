@@ -14,6 +14,7 @@
 		document.addEventListener('pointerdown', function () {
 			body.classList.remove('at-keyboard-focus');
 		}, true);
+		body.classList.add('at-keyboard-focus');
 		body.classList.add('at-focus-script-ready');
 	}
 
