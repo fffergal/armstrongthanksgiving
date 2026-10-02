@@ -99,6 +99,7 @@ function armstrong_thanksgiving_theme_login_branding() {
 		.login #wp-submit, .login #wp-login-submit { width:100%; border:0; border-radius:999px; background:var(--at-coral) !important; border-color:var(--at-coral) !important; color:#fff; text-shadow:none; box-shadow:none; }
 		.login form #wp-submit, .login form #wp-login-submit { float:none; }
 		.login #wp-submit:hover, .login #wp-submit:focus, .login #wp-login-submit:hover, .login #wp-login-submit:focus { background:var(--at-brown) !important; }
+		.login .wp-hide-pw, .login .wp-tooltip__toggle, .login .wp-tooltip__close { border:0; background:transparent; color:var(--at-brown); box-shadow:none; }
 		.login input[type="checkbox"] { -webkit-appearance:none; appearance:none; display:inline-grid; width:1.15rem; height:1.15rem; margin:0 .35rem 0 0; padding:0; border:2px solid #9b7967; border-radius:.3rem; background:#fffaf4; color:#fff; vertical-align:-.25rem; place-content:center; place-items:center; -webkit-tap-highlight-color:transparent; }
 		.login input[type="checkbox"]::before { content:""; width:.7rem; height:.6rem; border:0; background:currentColor; -webkit-clip-path:polygon(0 38%,15% 23%,40% 57%,84% 0,100% 17%,40% 100%); clip-path:polygon(0 38%,15% 23%,40% 57%,84% 0,100% 17%,40% 100%); transform:scale(0); }
 		.login input[type="checkbox"]:checked { border-color:var(--at-coral); background:var(--at-coral); }
@@ -107,9 +108,15 @@ function armstrong_thanksgiving_theme_login_branding() {
 		.login input[type="checkbox"]:focus:not(:focus-visible) { outline:none; }
 		body.at-keyboard-focus.login input[type="checkbox"]:focus { outline:3px solid var(--at-brown); outline-offset:3px; box-shadow:none; }
 		.login input[type="text"]:focus, .login input[type="email"]:focus, .login input[type="password"]:focus,
-		.login select:focus, .login textarea:focus { outline:none; box-shadow:none; }
+		.login select:focus, .login textarea:focus, .login button:focus, .login input[type="submit"]:focus,
+		.login input[type="button"]:focus, .login a:focus { outline:none; box-shadow:none; }
 		body.at-keyboard-focus.login input[type="text"]:focus, body.at-keyboard-focus.login input[type="email"]:focus, body.at-keyboard-focus.login input[type="password"]:focus,
-		body.at-keyboard-focus.login select:focus, body.at-keyboard-focus.login textarea:focus { outline:3px solid var(--at-brown); outline-offset:3px; box-shadow:none; }
+		body.at-keyboard-focus.login select:focus, body.at-keyboard-focus.login textarea:focus, body.at-keyboard-focus.login button:focus,
+		body.at-keyboard-focus.login input[type="submit"]:focus, body.at-keyboard-focus.login input[type="button"]:focus,
+		body.at-keyboard-focus.login a:focus { outline:3px solid var(--at-brown); outline-offset:3px; box-shadow:none; }
+		.login button.wp-hide-pw:focus, .login button.wp-tooltip__toggle:focus, .login button.wp-tooltip__close:focus { border:0 !important; outline:none !important; box-shadow:none !important; }
+		body.at-keyboard-focus.login button.wp-hide-pw:focus, body.at-keyboard-focus.login button.wp-tooltip__toggle:focus,
+		body.at-keyboard-focus.login button.wp-tooltip__close:focus { outline:3px solid var(--at-brown) !important; outline-offset:3px; }
 		@media (forced-colors: active) {
 			.login input[type="checkbox"] { -webkit-appearance:auto !important; appearance:auto !important; background:Canvas !important; border-color:ButtonText !important; color:ButtonText !important; forced-color-adjust:auto !important; }
 			.login input[type="checkbox"]::before { content:none !important; transform:none !important; }

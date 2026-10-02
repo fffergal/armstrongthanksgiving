@@ -73,6 +73,15 @@ test('form controls only show the brown focus ring during keyboard navigation', 
   const people = page.getByLabel('How many people are coming?');
   await people.click();
   await expect(people).toHaveCSS('outline-style', 'none');
+
+  const signOut = page.getByRole('link', { name: 'Sign out' });
+  await signOut.focus();
+  await page.keyboard.press('Tab');
+  await signOut.focus();
+  await expect(signOut).toBeFocused();
+  await expect(signOut).toHaveCSS('outline-style', 'solid');
+  await expect(signOut).toHaveCSS('outline-width', '3px');
+  await expect(signOut).toHaveCSS('outline-color', 'rgb(246, 237, 225)');
 });
 
 test('a group RSVP explains that other people can sign up separately', async ({ page }) => {

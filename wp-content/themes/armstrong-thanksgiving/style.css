@@ -430,6 +430,10 @@ body.at-keyboard-focus :where(a, button, input, select, textarea, summary, [tabi
   outline-offset: 3px;
   box-shadow: none;
 }
+body.at-keyboard-focus .at-footer :where(a, button, input, select, textarea, summary, [tabindex]):focus {
+  outline-color: var(--at-cream);
+  box-shadow: 0 0 0 1px var(--at-brown);
+}
 body:not(.at-keyboard-focus) .at-rsvp-form input:focus,
 body:not(.at-keyboard-focus) .at-rsvp-form select:focus,
 body:not(.at-keyboard-focus) .at-rsvp-form textarea:focus,
