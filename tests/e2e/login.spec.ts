@@ -15,6 +15,7 @@ test('login page explains sign-in and uses the standard form', async ({ page }) 
 
 test('login fields only show the focus ring during keyboard navigation', async ({ page }) => {
   await page.goto('/wp-login.php');
+  await page.waitForTimeout(300);
 
   const username = page.locator('#user_login');
   await username.click();
