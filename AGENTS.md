@@ -94,11 +94,12 @@ finish, finish up, complete, call it done, tidy up, clean up, tear down, archive
 remove, or delete a worktree, branch, task, or associated work as a request to
 run this full integration workflow through a PR. Apply the PR route regardless
 of which of these phrases the user chooses. Run or confirm the relevant checks,
-create a PR, resolve any Copilot reviewer comments, and wait for Copilot
-reviewer approval. Then squash merge the PR. If the merge triggers a production
-deployment, wait for it to succeed. If the deployment workflow skips because no
-production components changed, confirm that the skip was expected. After a
-successful deployment or a confirmed expected skip, tear down the local
+create a PR, review any Codex reviewer feedback and address useful findings,
+then squash-merge after the required checks pass. No reviewer approval is
+required. If the merge triggers a production deployment, wait for it to
+succeed. If the deployment workflow skips because no production components
+changed, confirm that the skip was expected. After a successful deployment or
+a confirmed expected skip, tear down the local
 worktree environment and pull the updated `main` branch in the project
 directory. Then remove the worktree and its disposable environment. Do not
 rewrite a shared or already published branch; preserve user-authored commits

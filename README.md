@@ -88,16 +88,14 @@ invite flow, deliverability follow-up, and the evidence needed to confirm a real
 
 The GitHub workflow for multiple concurrent worktrees is documented in
 [GitHub workflow](docs/github-workflow.md). Pull requests into `main` run the
-complete browser and Lighthouse suite, automatically request Copilot review,
-and require a current Copilot approval before merge. Squash merges to `main` deploy the
-changed theme, plugin, and block-editor content. The **Sync block editor
-content** workflow can pull the published Home page into a PR. If Copilot
-cannot approve a settings-dependent change, the documented bootstrap exception
-allows a temporary, reviewed ruleset bypass for the initial setup PR; arbitrary
-human-authored branches are not relabeled as bot-authored PRs.
+complete browser and Lighthouse suite. No reviewer approval is required;
+Codex review is enabled and its useful feedback can be addressed before merge.
+Squash merges to `main` deploy the changed theme, plugin, and block-editor
+content. The **Sync block editor content** workflow can pull the published Home
+page into a PR.
 
-Production deployment uses the server's SSH-accessible WP-CLI. From a clean,
-committed source state, preview or deploy the relevant component with:
+Production deployment uses the server's SSH-accessible WP-CLI. From a committed
+source state, preview or deploy the relevant component with:
 
 ```sh
 npm run deploy:production -- plugin --dry-run
