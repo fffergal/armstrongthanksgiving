@@ -53,7 +53,7 @@ function removePage(slug) {
 function ensurePhotoAlbum() {
   const result = wp([
     'eval',
-    `$id = function_exists('wppa_get_album_id') ? wppa_get_album_id('Shared Photos') : 0; if (!$id && function_exists('wppa_create_album_entry')) { $id = wppa_create_album_entry(array('name' => 'Shared Photos', 'description' => 'Photos shared by the gathering.', 'owner' => '--- public ---')); } if ($id) { update_option('wppa_user_upload_on', 'yes'); } echo (int) $id;`,
+    `$wpdb = $GLOBALS['wpdb']; $albumTable = $wpdb->wppa_albums ?? ''; $albumTableExists = $albumTable && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $albumTable)); if (!$albumTableExists && function_exists('wppa_setup')) { wppa_setup(true); } $id = function_exists('wppa_get_album_id') ? wppa_get_album_id('Shared Photos') : 0; if (!$id && function_exists('wppa_create_album_entry')) { $id = wppa_create_album_entry(array('name' => 'Shared Photos', 'description' => 'Photos shared by the gathering.', 'owner' => '--- public ---')); } if ($id) { update_option('wppa_user_upload_on', 'yes'); } echo (int) $id;`,
   ], { allowFailure: true });
   const albumId = result.stdout?.match(/(\d+)\s*$/)?.[1] ?? '';
   if (result.status !== 0 || !albumId || albumId === '0') {
