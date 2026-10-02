@@ -15,6 +15,14 @@ function armstrong_thanksgiving_enqueue_styles() {
 		array(),
 		$style_version
 	);
+	$focus_path = get_theme_file_path( 'assets/focus.js' );
+	wp_enqueue_script(
+		'armstrong-thanksgiving-focus',
+		get_theme_file_uri( 'assets/focus.js' ),
+		array(),
+		file_exists( $focus_path ) ? (string) filemtime( $focus_path ) : $theme->get( 'Version' ),
+		true
+	);
 }
 add_action( 'wp_enqueue_scripts', 'armstrong_thanksgiving_enqueue_styles' );
 
@@ -78,6 +86,8 @@ function armstrong_thanksgiving_reply_classes( $classes, $reply_id ) {
 add_filter( 'bbp_get_reply_class', 'armstrong_thanksgiving_reply_classes', 10, 2 );
 
 function armstrong_thanksgiving_theme_login_branding() {
+	$focus_path    = get_theme_file_path( 'assets/focus.js' );
+	$focus_version = file_exists( $focus_path ) ? (string) filemtime( $focus_path ) : wp_get_theme()->get( 'Version' );
 	?>
 	<style>
 		:root { --at-cream:#f6ede1; --at-coral:#b33f31; --at-brown:#4c2518; --at-olive:#706e3d; }
@@ -95,7 +105,11 @@ function armstrong_thanksgiving_theme_login_branding() {
 		.login input[type="checkbox"]:checked::before { transform:scale(1); }
 		.login input[type="checkbox"]:focus { box-shadow:none; }
 		.login input[type="checkbox"]:focus:not(:focus-visible) { outline:none; }
-		.login input[type="checkbox"]:focus-visible { outline:3px solid var(--at-brown); outline-offset:2px; box-shadow:none; }
+		body.at-keyboard-focus.login input[type="checkbox"]:focus { outline:3px solid var(--at-brown); outline-offset:3px; box-shadow:none; }
+		.login input[type="text"]:focus, .login input[type="email"]:focus, .login input[type="password"]:focus,
+		.login select:focus, .login textarea:focus { outline:none; box-shadow:none; }
+		body.at-keyboard-focus.login input[type="text"]:focus, body.at-keyboard-focus.login input[type="email"]:focus, body.at-keyboard-focus.login input[type="password"]:focus,
+		body.at-keyboard-focus.login select:focus, body.at-keyboard-focus.login textarea:focus { outline:3px solid var(--at-brown); outline-offset:3px; box-shadow:none; }
 		@media (forced-colors: active) {
 			.login input[type="checkbox"] { -webkit-appearance:auto !important; appearance:auto !important; background:Canvas !important; border-color:ButtonText !important; color:ButtonText !important; forced-color-adjust:auto !important; }
 			.login input[type="checkbox"]::before { content:none !important; transform:none !important; }
@@ -103,6 +117,7 @@ function armstrong_thanksgiving_theme_login_branding() {
 		.login a { color:var(--at-brown); }
 		.login .message { border-left-color:var(--at-olive); background:#fff8ef; color:var(--at-brown); }
 	</style>
+	<script src="<?php echo esc_url( add_query_arg( 'ver', $focus_version, get_theme_file_uri( 'assets/focus.js' ) ) ); ?>"></script>
 	<?php
 }
 add_action( 'login_head', 'armstrong_thanksgiving_theme_login_branding' );

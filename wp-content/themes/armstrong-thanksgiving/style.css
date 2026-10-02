@@ -208,10 +208,17 @@ a.at-button.is-secondary { background: var(--at-olive); }
 .at-rsvp-form input[type="checkbox"]:focus, .at-rsvp-form input[type="radio"]:focus { box-shadow: none; }
 #bbpress-forums input[type="checkbox"]:focus:not(:focus-visible), #bbpress-forums input[type="radio"]:focus:not(:focus-visible),
 .at-rsvp-form input[type="checkbox"]:focus:not(:focus-visible), .at-rsvp-form input[type="radio"]:focus:not(:focus-visible) { outline: none; }
-#bbpress-forums input[type="checkbox"]:focus-visible, #bbpress-forums input[type="radio"]:focus-visible,
-.at-rsvp-form input[type="checkbox"]:focus-visible, .at-rsvp-form input[type="radio"]:focus-visible {
+#bbpress-forums input[type="checkbox"]:focus, #bbpress-forums input[type="radio"]:focus,
+.at-rsvp-form input[type="checkbox"]:focus, .at-rsvp-form input[type="radio"]:focus {
+  outline: none;
+  box-shadow: none;
+}
+body.at-keyboard-focus #bbpress-forums input[type="checkbox"]:focus,
+body.at-keyboard-focus #bbpress-forums input[type="radio"]:focus,
+body.at-keyboard-focus .at-rsvp-form input[type="checkbox"]:focus,
+body.at-keyboard-focus .at-rsvp-form input[type="radio"]:focus {
   outline: 3px solid var(--at-brown);
-  outline-offset: 2px;
+  outline-offset: 3px;
   box-shadow: none;
 }
 @media (forced-colors: active) {
@@ -233,12 +240,12 @@ a.at-button.is-secondary { background: var(--at-olive); }
   appearance: none;
   box-shadow: none;
 }
-#bbpress-forums textarea:focus-visible, #bbpress-forums input[type="text"]:focus-visible,
-#bbpress-forums input[type="email"]:focus-visible, #bbpress-forums input[type="url"]:focus-visible,
-#bbpress-forums input[type="password"]:focus-visible, #bbpress-forums select:focus-visible {
+body.at-keyboard-focus #bbpress-forums textarea:focus, body.at-keyboard-focus #bbpress-forums input[type="text"]:focus,
+body.at-keyboard-focus #bbpress-forums input[type="email"]:focus, body.at-keyboard-focus #bbpress-forums input[type="url"]:focus,
+body.at-keyboard-focus #bbpress-forums input[type="password"]:focus, body.at-keyboard-focus #bbpress-forums select:focus {
   border-color: var(--at-orange);
-  outline: 2px solid var(--at-mustard);
-  outline-offset: 2px;
+  outline: 3px solid var(--at-brown);
+  outline-offset: 3px;
   box-shadow: none;
 }
 #bbpress-forums .wp-editor-container {
@@ -412,4 +419,26 @@ a.at-button.is-secondary { background: var(--at-olive); }
   .at-nav { justify-content: flex-start; }
 }
 
-:focus-visible { outline: 3px solid var(--at-mustard); outline-offset: 3px; }
+/* Keep focus quiet for pointer/touch interaction, but make keyboard focus
+ * consistent across theme and plugin controls. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus {
+  outline: none;
+  box-shadow: none;
+}
+body.at-keyboard-focus :where(a, button, input, select, textarea, summary, [tabindex]):focus {
+  outline: 3px solid var(--at-brown);
+  outline-offset: 3px;
+  box-shadow: none;
+}
+body:not(.at-keyboard-focus) .at-rsvp-form input:focus,
+body:not(.at-keyboard-focus) .at-rsvp-form select:focus,
+body:not(.at-keyboard-focus) .at-rsvp-form textarea:focus,
+body:not(.at-keyboard-focus) #bbpress-forums input:focus,
+body:not(.at-keyboard-focus) #bbpress-forums select:focus,
+body:not(.at-keyboard-focus) #bbpress-forums textarea:focus,
+body:not(.at-keyboard-focus) .wppa-container input:focus,
+body:not(.at-keyboard-focus) .wppa-container select:focus,
+body:not(.at-keyboard-focus) .wppa-container textarea:focus {
+  outline: none;
+  box-shadow: none;
+}

@@ -58,6 +58,23 @@ test('the RSVP form remains usable on a phone', async ({ page }) => {
   await expect(submit).toBeInViewport();
 });
 
+test('form controls only show the brown focus ring during keyboard navigation', async ({ page }) => {
+  await logIn(page);
+  await page.goto('/rsvp/');
+
+  const names = page.getByLabel('Names');
+  await names.click();
+  await expect(names).toHaveCSS('outline-style', 'none');
+
+  await page.keyboard.press('Tab');
+  await expect(page.locator(':focus')).toHaveCSS('outline-style', 'solid');
+  await expect(page.locator(':focus')).toHaveCSS('outline-color', 'rgb(76, 37, 24)');
+
+  const people = page.getByLabel('How many people are coming?');
+  await people.click();
+  await expect(people).toHaveCSS('outline-style', 'none');
+});
+
 test('a group RSVP explains that other people can sign up separately', async ({ page }) => {
   await page.goto('/rsvp/');
   const hint = page.locator('[data-at-rsvp-group-hint]');
