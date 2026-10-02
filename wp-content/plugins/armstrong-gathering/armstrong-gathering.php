@@ -895,6 +895,9 @@ function at_gathering_save_event_details() {
 			'address' => sanitize_text_field( wp_unslash( $_POST['at_event_address'] ?? '' ) ),
 		)
 	);
+	if ( function_exists( 'wp_cache_clear_cache' ) ) {
+		wp_cache_clear_cache();
+	}
 	wp_safe_redirect( admin_url( 'admin.php?page=at-gathering&at_event_details=saved' ) );
 	exit;
 }
