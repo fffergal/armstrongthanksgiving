@@ -49,6 +49,29 @@ community plugins on every start. After editing those files, restart with
 the worktree's Docker data and generated runtime state while preserving Docker
 images for the next worktree.
 
+## Feature screenshots
+
+When implementing a feature that changes the site's visible interface, finish
+by capturing an actual screenshot image of the running local result at a useful
+viewport size. Use the internal browser and the worktree URL recorded in
+`.worktree/runtime.json`. Make the image itself available in the completion
+message, embedded as an image; opening a browser tab, linking to the local page,
+or saying that a screenshot was taken does not count. Save screenshots outside
+the repository or in ignored output directories. For responsive or materially
+different interface states, include the images needed to show those states. If
+the feature has no visible interface, or the local site cannot be brought up,
+explain that in the completion message.
+
+## Sandbox troubleshooting
+
+When Docker commands, internal browser automation, or the `gh` CLI fail,
+consider sandbox and filesystem or process permissions before concluding that
+the tool, credentials, or project setup are broken. Check the relevant error
+and permissions, then retry the smallest relevant diagnostic or operation with
+the required elevated access when available. Compare the restricted and
+elevated results before changing credentials, reinstalling tools, or altering
+project configuration. Keep using the internal browser for browser automation.
+
 Keep `.worktree/`, `node_modules/`, test reports, Lighthouse reports, and
 Docker-generated state out of commits. Never use a broad Docker prune command
 while another worktree is running; the wrappers scope cleanup to this
@@ -66,17 +89,20 @@ state recorded. This repository does not require GPG-signed commits; when the
 local Git configuration attempts signing, commit with
 `git -c commit.gpgsign=false commit -m "..."`.
 
-When the user says to close out a worktree, treat that as an integration task,
-not just a cleanup request. Run or confirm the relevant checks, create a PR,
-resolve any Copilot reviewer comments, and wait for Copilot reviewer approval.
-Then squash merge the PR. If the merge triggers a production deployment, wait
-for it to succeed. If the deployment workflow skips because no production
-components changed, confirm that the skip was expected. After a successful
-deployment or a confirmed expected skip, tear down the local worktree
-environment and pull the updated `main` branch in the project directory. Then
-remove the worktree and its disposable environment. Do not rewrite a shared or
-already published branch; preserve user-authored commits and ask before
-discarding uncommitted work.
+Treat requests to close, close out, close down, wind down, shut down, wrap up,
+finish, finish up, complete, call it done, tidy up, clean up, tear down, archive,
+remove, or delete a worktree, branch, task, or associated work as a request to
+run this full integration workflow through a PR. Apply the PR route regardless
+of which of these phrases the user chooses. Run or confirm the relevant checks,
+create a PR, resolve any Copilot reviewer comments, and wait for Copilot
+reviewer approval. Then squash merge the PR. If the merge triggers a production
+deployment, wait for it to succeed. If the deployment workflow skips because no
+production components changed, confirm that the skip was expected. After a
+successful deployment or a confirmed expected skip, tear down the local
+worktree environment and pull the updated `main` branch in the project
+directory. Then remove the worktree and its disposable environment. Do not
+rewrite a shared or already published branch; preserve user-authored commits
+and ask before discarding uncommitted work.
 
 For production-scoped changes, deployment is part of closeout: run the
 relevant checks and tests first (or confirm they already passed), then deploy
