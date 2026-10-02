@@ -384,9 +384,63 @@ function at_gathering_trim_album_assets() {
 	if ( is_page( 'albums' ) ) {
 		return;
 	}
-	foreach ( array( 'wppa-decls', 'wppa-utils', 'wppa-main', 'wppa-slideshow', 'wppa-ajax-front', 'wppa-lightbox', 'wppa-popup', 'wppa-touch', 'wppa-zoom', 'wppa-spheric', 'wppa-flatpan', 'wppa' ) as $handle ) {
+	$album_handles = array( 'wppa-decls', 'wppa-utils', 'wppa-main', 'wppa-slideshow', 'wppa-ajax-front', 'wppa-lightbox', 'wppa-popup', 'wppa-touch', 'wppa-zoom', 'wppa-spheric', 'wppa-flatpan', 'wppa' );
+	global $wp_scripts;
+	foreach ( $wp_scripts->queue as $handle ) {
+		$registered = $wp_scripts->registered[ $handle ] ?? null;
+		if ( $registered && false !== strpos( (string) $registered->src, '/wp-photo-album-plus' ) ) {
+			$album_handles[] = $handle;
+		}
+	}
+	$album_handles      = array_unique( $album_handles );
+	$album_dependencies = array();
+	$collect_dependencies = static function ( $handle ) use ( &$collect_dependencies, &$album_dependencies, $wp_scripts ) {
+		if ( isset( $album_dependencies[ $handle ] ) ) {
+			return;
+		}
+		$album_dependencies[ $handle ] = true;
+		$registered = $wp_scripts->registered[ $handle ] ?? null;
+		if ( ! $registered ) {
+			return;
+		}
+		foreach ( $registered->deps as $dependency ) {
+			$collect_dependencies( $dependency );
+		}
+	};
+	foreach ( $album_handles as $handle ) {
+		$collect_dependencies( $handle );
 		wp_dequeue_script( $handle );
 	}
+
+	// Dequeueing a script does not dequeue its dependencies. Collect the
+	// dependencies still required by other queued scripts, then remove only
+	// album-only dependencies such as jQuery UI and its helpers.
+	$needed_scripts = array();
+	$collect_needed_scripts = static function ( $handle ) use ( &$collect_needed_scripts, &$needed_scripts, $wp_scripts ) {
+		if ( isset( $needed_scripts[ $handle ] ) ) {
+			return;
+		}
+		$needed_scripts[ $handle ] = true;
+		$registered = $wp_scripts->registered[ $handle ] ?? null;
+		if ( ! $registered ) {
+			return;
+		}
+		foreach ( $registered->deps as $dependency ) {
+			$collect_needed_scripts( $dependency );
+		}
+	};
+	foreach ( $wp_scripts->queue as $handle ) {
+		if ( isset( $album_dependencies[ $handle ] ) ) {
+			continue;
+		}
+		$collect_needed_scripts( $handle );
+	}
+	foreach ( array_keys( $album_dependencies ) as $handle ) {
+		if ( ! isset( $needed_scripts[ $handle ] ) ) {
+			wp_dequeue_script( $handle );
+		}
+	}
+
 	wp_dequeue_style( 'wppa_style' );
 }
 add_action( 'wp_enqueue_scripts', 'at_gathering_trim_album_assets', 100 );

@@ -54,8 +54,13 @@ const failures = [
   results.accessibility < 0.95 && `Accessibility ${results.accessibility} < 0.95`,
   results.bestPractices < 0.9 && `Best practices ${results.bestPractices} < 0.9`
 ].filter(Boolean);
+const warnings = [
+  results.largestContentfulPaint > 1500
+    && `LCP ${Math.round(results.largestContentfulPaint)}ms > 1500ms early-warning threshold (hard budget: 2500ms)`
+].filter(Boolean);
 
 console.table(results);
+if (warnings.length) console.warn(`Performance warnings:\n${warnings.join('\n')}`);
 if (failures.length) {
   console.error(failures.join('\n'));
   process.exitCode = 1;
