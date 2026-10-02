@@ -46,7 +46,7 @@ The start wrapper stages the theme and must-use plugin in Docker Desktop's share
 - `npm test`: Chromium desktop and mobile-Safari-emulated privacy checks, standard WordPress sign-in, plus authenticated member, RSVP, forum, food, and album journeys, with trace/video/screenshots retained on failure.
 - `npm run test:visual`: screenshot regression checks. Establish intentional baselines with `npm run test:update-snapshots`.
 - `npm run test:a11y`: axe automated accessibility checks.
-- `npm run test:performance`: current Lighthouse engine, run three times with median budgets for LCP, layout shift, blocking time, accessibility, and best practices. Raw reports are retained locally.
+- `npm run test:performance`: current Lighthouse engine, run three times with median budgets for LCP, layout shift, blocking time, accessibility, and best practices. LCP warns above 1.5 seconds and fails above 2.5 seconds. Raw reports are retained locally.
 - `npm run test:all`: browser acceptance followed by Lighthouse budgets.
 
 The local browser suite changes its disposable database: RSVP tests create
