@@ -67,13 +67,16 @@ local Git configuration attempts signing, commit with
 `git -c commit.gpgsign=false commit -m "..."`.
 
 When the user says to close out a worktree, treat that as an integration task,
-not just a cleanup request. First run or confirm the relevant checks, rebase
-the worktree branch onto the intended base, and squash related implementation
-commits into a small, coherent history. Then bring the result into `main`,
-verify that `main` contains the changes, complete any required deployment and
-production verification, and only then remove the worktree and its disposable
-environment. Do not rewrite a shared or already published branch; preserve
-user-authored commits and ask before discarding uncommitted work.
+not just a cleanup request. Run or confirm the relevant checks, create a PR,
+resolve any Copilot reviewer comments, and wait for Copilot reviewer approval.
+Then squash merge the PR. If the merge triggers a production deployment, wait
+for it to succeed. If the deployment workflow skips because no production
+components changed, confirm that the skip was expected. After a successful
+deployment or a confirmed expected skip, tear down the local worktree
+environment and pull the updated `main` branch in the project directory. Then
+remove the worktree and its disposable environment. Do not rewrite a shared or
+already published branch; preserve user-authored commits and ask before
+discarding uncommitted work.
 
 For production-scoped changes, deployment is part of closeout: run the
 relevant checks and tests first (or confirm they already passed), then deploy
