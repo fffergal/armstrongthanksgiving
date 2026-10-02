@@ -23,6 +23,8 @@
 }
 .at-date-card { position: absolute; left: 12%; bottom: 8%; padding: 1rem 1.4rem; border-radius: 1.6rem; background: var(--at-olive); color: #fff; font-family: Georgia, serif; font-size: clamp(1.7rem, 4vw, 2.8rem); line-height: .95; text-align: center; transform: rotate(-6deg); }
 .at-date-card small { display: block; margin-top: .5rem; font-family: inherit; font-size: .45em; letter-spacing: .04em; }
+.at-event-address { max-width: 28rem; margin: 1.5rem 0 0; padding-left: 1rem; border-left: 3px solid var(--at-orange); color: var(--at-brown); font-size: .95rem; line-height: 1.4; }
+.at-event-address strong { color: var(--at-coral); font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; }
 .editor-styles-wrapper .at-date-card {
   position: absolute !important;
   width: max-content !important;
@@ -87,13 +89,16 @@
 				<!-- /wp:button -->
 			</div>
 			<!-- /wp:buttons -->
+			<!-- wp:shortcode -->
+			[at_event_address]
+			<!-- /wp:shortcode -->
 		</div>
 		<!-- /wp:group -->
 		<!-- wp:group {"className":"at-illustration","layout":{"type":"default"}} -->
 		<div class="wp-block-group at-illustration">
-			<!-- wp:paragraph {"className":"at-date-card"} -->
-			<p class="at-date-card">Nov 21</p>
-			<!-- /wp:paragraph -->
+			<!-- wp:shortcode -->
+			[at_event_details]
+			<!-- /wp:shortcode -->
 		</div>
 		<!-- /wp:group -->
 	</div>

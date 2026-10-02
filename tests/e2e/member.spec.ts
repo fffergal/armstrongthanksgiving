@@ -20,6 +20,15 @@ test('a signed-in friend can use the gathering pages', async ({ page }) => {
 
   await page.goto('/');
   await expect(page.getByRole('link', { name: 'Sign out' })).toBeVisible();
+  await expect(page.locator('.at-date-card')).toContainText('12 December 2026');
+  await expect(page.locator('.at-date-card')).toContainText('6:42 pm');
+  await expect(page.locator('.at-date-card .at-event-address')).toHaveCount(0);
+  await expect(page.locator('.at-event-address')).toContainText('123 Example Lane, Testville');
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await expect(page.locator('.at-event-address')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 
   await page.goto('/forum/');
   expect(await page.locator('img.avatar[src*="turkey-"]').count()).toBeGreaterThan(0);

@@ -228,6 +228,10 @@ test('the ordinary RSVP URL is public and explains account access', async ({ pag
   await page.goto('/rsvp/');
   await expect(page.getByRole('group', { name: 'Create your account' })).toBeVisible();
   await expect(page.getByText('gathering forum and shared photos')).toBeVisible();
+  await page.goto('/');
+  await expect(page.locator('.at-date-card')).toContainText('12 December 2026');
+  await expect(page.locator('.at-date-card')).not.toContainText('6:42 pm');
+  await expect(page.locator('.at-event-address')).toHaveCount(0);
 });
 
 test('the sign-in option comes before registration and keeps the RSVP draft', async ({ page }) => {
