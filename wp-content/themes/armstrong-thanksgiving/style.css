@@ -217,15 +217,15 @@ a.at-button.is-secondary { background: var(--at-olive); }
 @media (forced-colors: active) {
   #bbpress-forums input[type="checkbox"], #bbpress-forums input[type="radio"],
   .at-rsvp-form input[type="checkbox"], .at-rsvp-form input[type="radio"] {
-    -webkit-appearance: auto;
-    appearance: auto;
-    background: Canvas;
-    border-color: ButtonText;
-    color: ButtonText;
-    forced-color-adjust: auto;
+    -webkit-appearance: auto !important;
+    appearance: auto !important;
+    background: Canvas !important;
+    border-color: ButtonText !important;
+    color: ButtonText !important;
+    forced-color-adjust: auto !important;
   }
   #bbpress-forums input[type="checkbox"]::before, #bbpress-forums input[type="radio"]::before,
-  .at-rsvp-form input[type="checkbox"]::before, .at-rsvp-form input[type="radio"]::before { content: none; }
+  .at-rsvp-form input[type="checkbox"]::before, .at-rsvp-form input[type="radio"]::before { content: none !important; transform: none !important; }
 }
 #bbpress-forums textarea, #bbpress-forums input[type="text"], #bbpress-forums input[type="email"],
 #bbpress-forums input[type="url"], #bbpress-forums input[type="password"], #bbpress-forums select {

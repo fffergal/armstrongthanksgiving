@@ -97,8 +97,8 @@ function armstrong_thanksgiving_theme_login_branding() {
 		.login input[type="checkbox"]:focus:not(:focus-visible) { outline:none; }
 		.login input[type="checkbox"]:focus-visible { outline:3px solid var(--at-brown); outline-offset:2px; box-shadow:none; }
 		@media (forced-colors: active) {
-			.login input[type="checkbox"] { -webkit-appearance:auto; appearance:auto; background:Canvas; border-color:ButtonText; color:ButtonText; forced-color-adjust:auto; }
-			.login input[type="checkbox"]::before { content:none; }
+			.login input[type="checkbox"] { -webkit-appearance:auto !important; appearance:auto !important; background:Canvas !important; border-color:ButtonText !important; color:ButtonText !important; forced-color-adjust:auto !important; }
+			.login input[type="checkbox"]::before { content:none !important; transform:none !important; }
 		}
 		.login a { color:var(--at-brown); }
 		.login .message { border-left-color:var(--at-olive); background:#fff8ef; color:var(--at-brown); }
