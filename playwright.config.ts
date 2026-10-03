@@ -25,6 +25,7 @@ const chromiumLaunchOptions = {
 
 export default defineConfig({
   testDir: './tests/e2e',
+  globalSetup: './scripts/playwright-global-setup.mjs',
   outputDir: 'test-results',
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),

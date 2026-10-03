@@ -49,8 +49,14 @@ The start wrapper stages the theme and must-use plugin in Docker Desktop's share
 - `npm run test:performance`: current Lighthouse engine, run three times with median budgets for LCP, layout shift, blocking time, accessibility, and best practices. LCP warns above 1.5 seconds and fails above 2.5 seconds. Raw reports are retained locally.
 - `npm run test:all`: browser acceptance followed by Lighthouse budgets.
 
-The local browser suite changes its disposable database: RSVP tests create
-accounts and reservations. For a deterministic run after a reset, use:
+Every Playwright run against this worktree's local WordPress site automatically
+resets browser-generated test data and restores the standard pages, settings,
+and forum fixture before the tests start. This includes RSVP rows, test-created
+accounts, forum topics/replies, and captured test email. Administrator accounts
+and the configured `WP_TEST_USER` are retained. Remote `BASE_URL` targets are
+left untouched.
+
+For a manual reset outside Playwright, use:
 
 ```sh
 npm run wp:reset
