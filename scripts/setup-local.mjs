@@ -50,6 +50,19 @@ function removePage(slug) {
   if (id) wp(['post', 'delete', id, '--force']);
 }
 
+function ensurePhotoAlbum() {
+  const result = wp([
+    'eval',
+    `$wpdb = $GLOBALS['wpdb']; $albumTable = $wpdb->wppa_albums ?? ''; $albumTableExists = $albumTable && $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $albumTable)); if (!$albumTableExists && function_exists('wppa_setup')) { wppa_setup(true); } $id = function_exists('wppa_get_album_id') ? wppa_get_album_id('Shared Photos') : 0; if (!$id && function_exists('wppa_create_album_entry')) { $id = wppa_create_album_entry(array('name' => 'Shared Photos', 'description' => 'Photos shared by the gathering.', 'owner' => '--- public ---')); } if ($id) { update_option('wppa_user_upload_on', 'yes'); } echo (int) $id;`,
+  ], { allowFailure: true });
+  const albumId = result.stdout?.match(/(\d+)\s*$/)?.[1] ?? '';
+  if (result.status !== 0 || !albumId || albumId === '0') {
+    console.error(result.stderr || 'Could not create the local Shared Photos album.');
+    process.exit(result.status > 0 ? result.status : 1);
+  }
+  return albumId;
+}
+
 // The GitHub Actions CLI image does not include git, which the package's VCS
 // install needs. Browser tests only need the plugin itself; production
 // deployment checks install and verify the WP-CLI package on the server.
@@ -81,7 +94,8 @@ if (wp(['user', 'get', 'guest', '--field=ID'], { allowFailure: true }).status !=
 
 const homeId = ensurePage('home', 'Home', homepageContent);
 removePage('food');
-ensurePage('albums', 'Shared Albums', '<p>After dinner, come back to share your photos and see the day through everyone else’s eyes.</p>[wppa type="generic"]<p>[wppa type="upload" album="1"]</p>');
+ensurePhotoAlbum();
+ensurePage('albums', 'Shared Albums', '<p>After dinner, come back to share your photos and see the day through everyone else’s eyes.</p>[wppa type="generic"]');
 const forumPageId = ensurePage('forum', 'The Gathering', '<p>Use this forum for hellos, small plans, and anything that does not belong on the RSVP.</p>[bbp-forum-index]');
 ensurePage('rsvp', 'RSVP', '[at_rsvp]');
 ensurePage('rsvp-confirmation', 'RSVP confirmation', '[at_rsvp_confirmation]');

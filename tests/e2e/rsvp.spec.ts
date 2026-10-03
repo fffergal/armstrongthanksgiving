@@ -36,6 +36,13 @@ test('a signed-in friend gets the RSVP and potluck form', async ({ page }) => {
   await expect(page.getByText('52 Priestfield Crescent')).toHaveCount(0);
   await expect(page.getByText('One quick form')).toHaveCount(0);
   await expect(page.getByRole('button', { name: /RSVP/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /RSVP/ })).toHaveCSS('background-color', 'rgb(179, 63, 49)');
+  await expect(page.getByRole('button', { name: /RSVP/ })).toHaveCSS('-webkit-appearance', 'none');
+  const foodCheckbox = page.locator('input[name="at_food[]"]').first();
+  await expect(foodCheckbox).toHaveCSS('-webkit-appearance', 'none');
+  await foodCheckbox.check();
+  await expect(foodCheckbox).toHaveCSS('background-color', 'rgb(179, 63, 49)');
+  expect(await foodCheckbox.evaluate((element) => getComputedStyle(element, '::before').transform)).toBe('matrix(1, 0, 0, 1, 0, 0)');
 });
 
 test('the RSVP form remains usable on a phone', async ({ page }) => {
@@ -45,8 +52,45 @@ test('the RSVP form remains usable on a phone', async ({ page }) => {
   await expect(page.locator('.at-rsvp-app')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
   const submit = page.getByRole('button', { name: /RSVP/ });
+  await expect(submit).toHaveCSS('background-color', 'rgb(179, 63, 49)');
+  await expect(submit).toHaveCSS('-webkit-appearance', 'none');
   await submit.scrollIntoViewIfNeeded();
   await expect(submit).toBeInViewport();
+});
+
+test('form controls only show the brown focus ring during keyboard navigation', async ({ page }) => {
+  await logIn(page);
+  await page.goto('/rsvp/');
+
+  const names = page.getByLabel('Names');
+  await names.click();
+  await expect(names).toHaveCSS('outline-style', 'none');
+
+  await page.keyboard.press('Tab');
+  await expect(page.locator(':focus')).toHaveCSS('outline-style', 'solid');
+  await expect(page.locator(':focus')).toHaveCSS('outline-color', 'rgb(76, 37, 24)');
+
+  const people = page.getByLabel('How many people are coming?');
+  await people.click();
+  await expect(people).toHaveCSS('outline-style', 'none');
+
+  const coming = page.getByLabel('I’m coming');
+  await coming.click();
+  await coming.press('ArrowRight');
+  const maybe = page.getByLabel('Maybe');
+  await expect(maybe).toBeFocused();
+  await expect(maybe).toHaveCSS('outline-style', 'solid');
+  await expect(maybe).toHaveCSS('outline-width', '3px');
+  await expect(maybe).toHaveCSS('outline-color', 'rgb(76, 37, 24)');
+
+  const signOut = page.getByRole('link', { name: 'Sign out' });
+  await signOut.focus();
+  await page.keyboard.press('Tab');
+  await signOut.focus();
+  await expect(signOut).toBeFocused();
+  await expect(signOut).toHaveCSS('outline-style', 'solid');
+  await expect(signOut).toHaveCSS('outline-width', '3px');
+  await expect(signOut).toHaveCSS('outline-color', 'rgb(246, 237, 225)');
 });
 
 test('a group RSVP explains that other people can sign up separately', async ({ page }) => {

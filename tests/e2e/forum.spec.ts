@@ -15,8 +15,21 @@ test('a member can create, reply to, and edit their own forum posts', async ({ p
   const editedReplyBody = `Edited reply body ${suffix}`;
 
   await expect(page.locator('#bbp_topic_title')).toBeVisible();
-  await expect(page.locator('#bbp_topic_content')).toHaveCSS('border-width', '0px');
-  await expect(page.locator('#bbp_topic_content')).toHaveCSS('outline-style', 'none');
+  const subscription = page.locator('#bbp_topic_subscription');
+  await expect(subscription).toBeVisible();
+  await expect(subscription).toHaveCSS('-webkit-appearance', 'none');
+  await expect(subscription).toHaveCSS('border-radius', '4.8px');
+  await subscription.check();
+  await expect(subscription).toHaveCSS('background-color', 'rgb(179, 63, 49)');
+  expect(await subscription.evaluate((element) => getComputedStyle(element, '::before').transform)).toBe('matrix(1, 0, 0, 1, 0, 0)');
+  const topicContent = page.locator('#bbp_topic_content');
+  await expect(topicContent).toHaveCSS('border-width', '0px');
+  await topicContent.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(topicContent).toBeFocused();
+  await expect(topicContent).toHaveCSS('outline-style', 'solid');
+  await expect(topicContent).toHaveCSS('outline-width', '3px');
+  await expect(topicContent).toHaveCSS('outline-offset', '-3px');
   await expect(page.locator('#qt_bbp_topic_content_toolbar')).toBeVisible();
   await page.locator('#bbp_topic_title').fill(topicTitle);
   await page.locator('#bbp_topic_content').fill(topicBody);
@@ -34,7 +47,13 @@ test('a member can create, reply to, and edit their own forum posts', async ({ p
   await expect(page.locator('#bbp_reply_submit')).toHaveCSS('-webkit-appearance', 'none');
   await expect(page.locator('#bbp_reply_content')).toHaveCSS('-webkit-appearance', 'none');
   await expect(page.locator('#bbp_reply_content')).toHaveCSS('border-width', '0px');
-  await expect(page.locator('#bbp_reply_content')).toHaveCSS('outline-style', 'none');
+  const replyContent = page.locator('#bbp_reply_content');
+  await replyContent.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(replyContent).toBeFocused();
+  await expect(replyContent).toHaveCSS('outline-style', 'solid');
+  await expect(replyContent).toHaveCSS('outline-width', '3px');
+  await expect(replyContent).toHaveCSS('outline-offset', '-3px');
   await expect(page.locator('#bbp_reply_content')).toHaveCSS('display', 'block');
   await expect(page.locator('#bbp_reply_content')).toHaveCSS('padding', '10px');
   await expect(page.locator('#bbp_reply_content')).toHaveCSS('font-family', 'Consolas, Monaco, monospace');
