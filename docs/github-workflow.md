@@ -33,20 +33,17 @@ The `Protect main` repository ruleset configures the `main` branch with:
 
 - Require a pull request before merging; no direct pushes or bypasses.
 - Require zero approvals.
-- Do not automatically request Copilot review.
-- Codex review is enabled; use its feedback to improve the change, but it is not
-  an approval gate.
+- Codex review feedback is advisory and is not an approval gate.
 - Require the `CI / test` status check.
 - Require branches to be up to date before merging.
 - Require conversation resolution before merging.
 - Disable merge commits and rebase merges; leave squash merging enabled.
 - Disable branch deletion and force pushes.
 
-The current review configuration has Copilot reviewer requests turned off and
-no required approvals. Codex review is enabled and may leave feedback; assess
-and address useful comments before merging. Keep the `CI / test` check,
-up-to-date branch requirement, and conversation-resolution requirement as the
-merge gates.
+The review process uses Codex feedback as an advisory part of the pull request
+conversation. Assess and address useful comments before merging; reviewer
+approval is not required. Keep the `CI / test` check, up-to-date branch
+requirement, and conversation-resolution requirement as the merge gates.
 
 The deployment workflow expects these Actions secrets, preferably on a
 `production` environment with any required approval gate:
