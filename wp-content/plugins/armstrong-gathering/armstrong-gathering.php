@@ -575,6 +575,7 @@ function at_gathering_rsvp_shortcode() {
 	$custom_food_counts = at_gathering_custom_food_counts( $foods );
 	$chosen            = $rsvp ? (array) json_decode( $rsvp->foods, true ) : array();
 	$values            = at_gathering_form_values();
+	// A saved RSVP is authoritative; only restore a handoff for accounts without one.
 	if ( $rsvp && ! empty( $values['_at_rsvp_handoff'] ) ) {
 		$values = array();
 	}
