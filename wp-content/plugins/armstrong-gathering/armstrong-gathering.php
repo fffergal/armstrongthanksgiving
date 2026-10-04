@@ -351,9 +351,11 @@ function at_gathering_enqueue_assets() {
 	if ( ! is_page( array( 'rsvp', 'rsvp-confirmation', 'signup', 'food' ) ) && ! is_singular( array( 'forum', 'topic', 'reply' ) ) ) {
 		return;
 	}
-	wp_enqueue_style( 'armstrong-gathering', AT_GATHERING_URL . 'assets/gathering.css', array(), AT_GATHERING_VERSION );
-	if ( is_page( 'rsvp' ) ) {
-		wp_enqueue_script( 'armstrong-gathering-rsvp', AT_GATHERING_URL . 'assets/rsvp.js', array(), AT_GATHERING_VERSION, true );
+	$style_version = file_exists( AT_GATHERING_DIR . 'assets/gathering.css' ) ? filemtime( AT_GATHERING_DIR . 'assets/gathering.css' ) : AT_GATHERING_VERSION;
+	wp_enqueue_style( 'armstrong-gathering', AT_GATHERING_URL . 'assets/gathering.css', array(), $style_version );
+	if ( is_page( array( 'rsvp', 'rsvp-confirmation' ) ) ) {
+		$script_version = file_exists( AT_GATHERING_DIR . 'assets/rsvp.js' ) ? filemtime( AT_GATHERING_DIR . 'assets/rsvp.js' ) : AT_GATHERING_VERSION;
+		wp_enqueue_script( 'armstrong-gathering-rsvp', AT_GATHERING_URL . 'assets/rsvp.js', array(), $script_version, true );
 	}
 }
 add_action( 'wp_enqueue_scripts', 'at_gathering_enqueue_assets' );
@@ -362,7 +364,8 @@ function at_gathering_admin_enqueue_assets( $hook_suffix ) {
 	if ( 'toplevel_page_at-gathering' !== $hook_suffix ) {
 		return;
 	}
-	wp_enqueue_style( 'armstrong-gathering-admin', AT_GATHERING_URL . 'assets/gathering.css', array(), AT_GATHERING_VERSION );
+	$style_version = file_exists( AT_GATHERING_DIR . 'assets/gathering.css' ) ? filemtime( AT_GATHERING_DIR . 'assets/gathering.css' ) : AT_GATHERING_VERSION;
+	wp_enqueue_style( 'armstrong-gathering-admin', AT_GATHERING_URL . 'assets/gathering.css', array(), $style_version );
 }
 add_action( 'admin_enqueue_scripts', 'at_gathering_admin_enqueue_assets' );
 
@@ -426,14 +429,80 @@ function at_gathering_food_counts() {
 	$counts = array();
 	$rows   = $wpdb->get_col( 'SELECT foods FROM ' . at_gathering_table() . " WHERE status IN ('yes','maybe')" );
 	foreach ( $rows as $json ) {
-		$foods = json_decode( $json, true );
-		foreach ( (array) $foods as $food ) {
-			$food = sanitize_text_field( $food );
+		$foods = array_unique( array_map( 'sanitize_text_field', (array) json_decode( $json, true ) ) );
+		foreach ( $foods as $food ) {
 			if ( $food ) {
 				$counts[ $food ] = ( $counts[ $food ] ?? 0 ) + 1;
 			}
 		}
 	}
+	return $counts;
+}
+
+function at_gathering_food_contributors() {
+	global $wpdb;
+
+	$contributors = array();
+	$rows         = $wpdb->get_results(
+		"SELECT r.foods, r.guest_names, u.display_name
+		FROM " . at_gathering_table() . ' AS r
+		LEFT JOIN ' . $wpdb->users . " AS u ON u.ID = r.user_id
+		WHERE r.status IN ('yes','maybe')"
+	);
+
+	foreach ( $rows as $row ) {
+		$name  = trim( (string) $row->guest_names );
+		$name  = $name ? $name : ( trim( (string) $row->display_name ) ?: 'Unknown friend' );
+		$foods = array_unique( array_map( 'sanitize_text_field', (array) json_decode( $row->foods, true ) ) );
+
+		foreach ( $foods as $food ) {
+			if ( $food ) {
+				$contributors[ $food ][] = $name;
+			}
+		}
+	}
+
+	return $contributors;
+}
+
+function at_gathering_custom_food_counts( $listed_foods = null ) {
+	global $wpdb;
+
+	$listed_foods = null === $listed_foods ? at_gathering_foods() : (array) $listed_foods;
+	$counts       = array();
+	$rows         = $wpdb->get_results(
+		"SELECT r.custom_food, r.guest_names, u.display_name
+		FROM " . at_gathering_table() . ' AS r
+		LEFT JOIN ' . $wpdb->users . " AS u ON u.ID = r.user_id
+		WHERE r.status IN ('yes','maybe')"
+	);
+
+	foreach ( $rows as $row ) {
+		$custom_food = trim( sanitize_text_field( $row->custom_food ) );
+		if ( ! $custom_food || in_array( $custom_food, $listed_foods, true ) ) {
+			continue;
+		}
+
+		$key = strtolower( $custom_food );
+		if ( ! isset( $counts[ $key ] ) ) {
+			$counts[ $key ] = array(
+				'label' => $custom_food,
+				'count' => 0,
+				'names' => array(),
+			);
+		}
+		$counts[ $key ]['count']++;
+		$name = trim( (string) $row->guest_names );
+		$counts[ $key ]['names'][] = $name ? $name : ( trim( (string) $row->display_name ) ?: 'Unknown friend' );
+	}
+
+	uasort(
+		$counts,
+		static function ( $a, $b ) {
+			return strcasecmp( $a['label'], $b['label'] );
+		}
+	);
+
 	return $counts;
 }
 
@@ -448,15 +517,24 @@ function at_gathering_status_label( $status ) {
 function at_gathering_rsvp_shortcode() {
 	$user    = wp_get_current_user();
 	$rsvp    = $user->exists() ? at_gathering_get_rsvp( $user->ID ) : null;
-	$foods   = at_gathering_foods();
-	$counts  = at_gathering_food_counts();
-	$chosen  = $rsvp ? (array) json_decode( $rsvp->foods, true ) : array();
-	$values  = at_gathering_form_values();
+	$foods             = at_gathering_foods();
+	$counts            = at_gathering_food_counts();
+	$food_contributors = at_gathering_food_contributors();
+	$custom_food_counts = at_gathering_custom_food_counts( $foods );
+	$chosen            = $rsvp ? (array) json_decode( $rsvp->foods, true ) : array();
+	$values            = at_gathering_form_values();
 	if ( $values ) {
 		$chosen = (array) ( $values['foods'] ?? array() );
 	}
 	$form_status = $values['status'] ?? ( $rsvp ? $rsvp->status : 'yes' );
 	$form_count  = isset( $values['guest_count'] ) ? (int) $values['guest_count'] : ( $rsvp ? (int) $rsvp->guest_count : 1 );
+	$rsvp_updated_at = 0;
+	if ( $rsvp && ! empty( $rsvp->updated_at ) ) {
+		$updated_at = DateTimeImmutable::createFromFormat( 'Y-m-d H:i:s', $rsvp->updated_at, wp_timezone() );
+		if ( $updated_at ) {
+			$rsvp_updated_at = $updated_at->getTimestamp() * 1000;
+		}
+	}
 
 	ob_start();
 	?>
@@ -464,7 +542,7 @@ function at_gathering_rsvp_shortcode() {
 		<?php if ( isset( $_GET['at_rsvp'] ) && 'error' === sanitize_key( $_GET['at_rsvp'] ) ) : ?>
 			<div class="at-success at-error" role="alert"><strong>We could not save that RSVP.</strong><br><?php echo esc_html( sanitize_text_field( wp_unslash( $_GET['at_message'] ?? 'Please check the form and try again.' ) ) ); ?></div>
 		<?php endif; ?>
-		<form class="at-rsvp-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post">
+		<form class="at-rsvp-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post" data-rsvp-updated-at="<?php echo esc_attr( $rsvp_updated_at ); ?>">
 			<div class="at-rsvp-intro">
 				<h2>Will you join us?</h2>
 				<p>Let us know if you can make it, who’s joining you, and what you might bring.</p>
@@ -498,12 +576,22 @@ function at_gathering_rsvp_shortcode() {
 			</label>
 			<fieldset>
 				<legend>What could you bring?</legend>
-				<p class="at-field-help">Pick as many as make sense. The number shows how many RSVPs have claimed each one.</p>
+				<p class="at-field-help">Each choice shows the total RSVPs that have claimed it and the names on those RSVPs.</p>
 				<div class="at-food-list">
 					<?php foreach ( $foods as $food ) : ?>
-						<label><input type="checkbox" name="at_food[]" value="<?php echo esc_attr( $food ); ?>" <?php checked( in_array( $food, $chosen, true ) ); ?>><span><?php echo esc_html( $food ); ?></span><small><?php echo esc_html( (int) ( $counts[ $food ] ?? 0 ) ); ?> bringing</small></label>
+						<label><input type="checkbox" name="at_food[]" value="<?php echo esc_attr( $food ); ?>" <?php checked( in_array( $food, $chosen, true ) ); ?>><span><?php echo esc_html( $food ); ?></span><small><?php echo esc_html( (int) ( $counts[ $food ] ?? 0 ) ); ?> total<?php if ( ! empty( $food_contributors[ $food ] ) ) : ?> from <?php echo esc_html( implode( ', ', $food_contributors[ $food ] ) ); ?><?php endif; ?></small></label>
 					<?php endforeach; ?>
 				</div>
+				<?php if ( $custom_food_counts ) : ?>
+					<div class="at-custom-food-list" aria-label="Other things people are bringing">
+						<p class="at-field-help">Other things people are bringing</p>
+						<ul>
+							<?php foreach ( $custom_food_counts as $item ) : ?>
+								<li><span><?php echo esc_html( $item['label'] ); ?></span><small><?php echo esc_html( (int) $item['count'] ); ?> total from <?php echo esc_html( implode( ', ', $item['names'] ) ); ?></small></li>
+							<?php endforeach; ?>
+						</ul>
+					</div>
+				<?php endif; ?>
 				<label>Something else?
 					<input type="text" name="at_custom_food" value="<?php echo esc_attr( $values['custom_food'] ?? ( $rsvp ? $rsvp->custom_food : '' ) ); ?>" placeholder="Add a dish or drink">
 				</label>
