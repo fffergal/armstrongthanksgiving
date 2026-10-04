@@ -44,10 +44,22 @@ The start wrapper stages the theme and must-use plugin in Docker Desktop's share
 ## Test layers
 
 - `npm test`: Chromium desktop and mobile-Safari-emulated privacy checks, standard WordPress sign-in, plus authenticated member, RSVP, forum, food, and album journeys, with trace/video/screenshots retained on failure.
-- `npm run test:visual`: screenshot regression checks. Establish intentional baselines with `npm run test:update-snapshots`.
+- `npm run test:visual`: screenshot regression checks against both the native
+  platform and a Linux container. On Apple Silicon, Docker runs the x64 Linux
+  image under QEMU with Chromium's GPU and zygote processes disabled. The
+  container includes DejaVu Sans, matching Ubuntu 24.04's bold system font and
+  the single Linux snapshot set used by GitHub Actions. CI runs its visual
+  project in this same image.
+- `npm run test:update-snapshots`: refreshes both native and Linux screenshot
+  baselines for an intentional visual change. On Apple Silicon, Linux
+  baselines are updated in the x64 container used by GitHub Actions. Review and
+  commit the changed images from
+  `tests/e2e/visual.spec.ts-snapshots/`.
+- `npm run test:visual:linux`: runs only the shared Linux baseline pass.
 - `npm run test:a11y`: axe automated accessibility checks.
 - `npm run test:performance`: current Lighthouse engine, run three times with median budgets for LCP, layout shift, blocking time, accessibility, and best practices. LCP warns above 1.5 seconds and fails above 2.5 seconds. Raw reports are retained locally.
-- `npm run test:all`: browser acceptance followed by Lighthouse budgets.
+- `npm run test:all`: browser acceptance (including Linux screenshot checks)
+  followed by Lighthouse budgets.
 
 Every Playwright run against this worktree's local WordPress site automatically
 resets browser-generated test data and restores the standard pages, settings,

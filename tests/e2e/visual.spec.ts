@@ -32,7 +32,10 @@ test('public signup and RSVP visual contract on mobile', async ({ page }) => {
 test('RSVP visual contract on iPad', async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 1024 });
   await logIn(page);
-  await page.goto('/rsvp/');
+  // The preceding public mobile test can leave a guest RSVP page in the local
+  // page cache. A query string makes this signed-in screenshot load fresh HTML.
+  await page.goto('/rsvp/?visual-test=ipad');
+  await expect(page.getByRole('link', { name: 'Sign out' })).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
   await expect(page).toHaveScreenshot('rsvp-ipad.png', { fullPage: true, mask: [page.locator('.at-food-list small')] });
 });
