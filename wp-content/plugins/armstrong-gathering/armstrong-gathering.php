@@ -581,7 +581,7 @@ function at_gathering_rsvp_shortcode() {
 				<p class="at-field-help"><?php echo $can_view_contributors ? 'Each choice shows the total RSVPs that have claimed it and the names on those RSVPs.' : 'Each choice shows how many RSVPs have claimed it. Sign in to see the names.'; ?></p>
 				<div class="at-food-list">
 					<?php foreach ( $foods as $food ) : ?>
-						<label><input type="checkbox" name="at_food[]" value="<?php echo esc_attr( $food ); ?>" <?php checked( in_array( $food, $chosen, true ) ); ?>><span><?php echo esc_html( $food ); ?></span><small><?php echo esc_html( (int) ( $counts[ $food ] ?? 0 ) ); ?> total<?php if ( ! empty( $food_contributors[ $food ] ) ) : ?><?php if ( $can_view_contributors ) : ?> from <?php echo esc_html( implode( ', ', $food_contributors[ $food ] ) ); ?><?php else : ?> · <a href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>">Sign in to see the names</a><?php endif; ?><?php endif; ?></small></label>
+						<label><input type="checkbox" name="at_food[]" value="<?php echo esc_attr( $food ); ?>" <?php checked( in_array( $food, $chosen, true ) ); ?>><span><?php echo esc_html( $food ); ?></span><small><?php echo esc_html( (int) ( $counts[ $food ] ?? 0 ) ); ?> total<?php if ( ! empty( $food_contributors[ $food ] ) ) : ?><?php if ( $can_view_contributors ) : ?> from <?php echo esc_html( implode( ', ', $food_contributors[ $food ] ) ); ?><?php else : ?> · <a data-at-rsvp-login href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>">Sign in to see the names</a><?php endif; ?><?php endif; ?></small></label>
 					<?php endforeach; ?>
 				</div>
 				<?php if ( $custom_food_counts ) : ?>
@@ -589,7 +589,7 @@ function at_gathering_rsvp_shortcode() {
 						<p class="at-field-help">Other things people are bringing</p>
 						<ul>
 							<?php foreach ( $custom_food_counts as $item ) : ?>
-								<li><span><?php echo esc_html( $item['label'] ); ?></span><small><?php echo esc_html( (int) $item['count'] ); ?> total<?php if ( $can_view_contributors ) : ?> from <?php echo esc_html( implode( ', ', $item['names'] ) ); ?><?php else : ?> · <a href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>">Sign in to see the names</a><?php endif; ?></small></li>
+								<li><span><?php echo esc_html( $item['label'] ); ?></span><small><?php echo esc_html( (int) $item['count'] ); ?> total<?php if ( $can_view_contributors ) : ?> from <?php echo esc_html( implode( ', ', $item['names'] ) ); ?><?php else : ?> · <a data-at-rsvp-login href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>">Sign in to see the names</a><?php endif; ?></small></li>
 							<?php endforeach; ?>
 						</ul>
 					</div>

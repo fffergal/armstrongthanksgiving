@@ -91,6 +91,17 @@ test('food contributor names are shown to signed-in guests only', async ({ page,
     await observer.screenshot({ path: testInfo.outputPath('rsvp-listed-food-contributor-mobile.png') });
     await customFoodList.scrollIntoViewIfNeeded();
     await observer.screenshot({ path: testInfo.outputPath('rsvp-custom-food-mobile.png') });
+
+    await observer.getByLabel('Names', { exact: true }).fill('Draft from names link');
+    await observer.getByLabel('Something else?').fill('Draft cider');
+    await customFoodRow.getByRole('link', { name: 'Sign in to see the names' }).click();
+    await expect(observer).toHaveURL(/wp-login\.php/);
+    await observer.locator('#user_login').fill(process.env.WP_TEST_USER ?? 'guest');
+    await observer.locator('#user_pass').fill(process.env.WP_TEST_PASSWORD ?? 'password');
+    await observer.locator('#wp-submit').click();
+    await observer.waitForURL(/\/rsvp\//);
+    await expect(observer.getByLabel('Names', { exact: true })).toHaveValue('Draft from names link');
+    await expect(observer.getByLabel('Something else?')).toHaveValue('Draft cider');
   } finally {
     await observerContext.close();
   }

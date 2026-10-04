@@ -86,8 +86,9 @@
     });
   }
 
-  var loginLink = form.querySelector('[data-at-rsvp-login]');
-  if (loginLink) loginLink.addEventListener('click', saveDraft);
+  form.querySelectorAll('[data-at-rsvp-login]').forEach(function (loginLink) {
+    loginLink.addEventListener('click', saveDraft);
+  });
 
   var guestCount = form.querySelector('[name="at_guest_count"]');
   var guestNames = form.querySelector('[name="at_guest_names"]');
