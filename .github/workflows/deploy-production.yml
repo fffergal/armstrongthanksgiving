@@ -1,14 +1,23 @@
 name: Deploy production
 
 on:
-  push:
-    branches: [main]
+  workflow_call:
+    inputs:
+      before_sha:
+        description: Commit before the push that was tested
+        required: true
+        type: string
+      after_sha:
+        description: Commit that passed CI
+        required: true
+        type: string
 
 concurrency:
   group: production-deploy
   cancel-in-progress: false
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
@@ -16,6 +25,7 @@ jobs:
     name: Detect deployable changes
     runs-on: ubuntu-latest
     outputs:
+      baseline: ${{ steps.baseline.outputs.sha }}
       theme: ${{ steps.changes.outputs.theme }}
       plugin: ${{ steps.changes.outputs.plugin }}
       content: ${{ steps.changes.outputs.content }}
@@ -23,13 +33,92 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v5
         with:
-          fetch-depth: 2
+          ref: ${{ inputs.after_sha }}
+          fetch-depth: 0
+
+      - name: Find the previous successful main CI run
+        id: baseline
+        uses: actions/github-script@v7
+        env:
+          BEFORE_SHA: ${{ inputs.before_sha }}
+          AFTER_SHA: ${{ inputs.after_sha }}
+        with:
+          script: |
+            const { data: mainRef } = await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/main',
+            });
+
+            if (mainRef.object.sha !== process.env.AFTER_SHA) {
+              core.setFailed(`Refusing stale main run for ${process.env.AFTER_SHA}; current main is ${mainRef.object.sha}.`);
+              return;
+            }
+
+            if (process.env.BEFORE_SHA === '0000000000000000000000000000000000000000') {
+              core.setOutput('sha', process.env.BEFORE_SHA);
+              return;
+            }
+
+            const runQuery = {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              branch: 'main',
+              event: 'push',
+              status: 'success',
+              per_page: 100,
+            };
+            const { data: ciRuns } = await github.rest.actions.listWorkflowRuns({
+              ...runQuery,
+              workflow_id: 'ci.yml',
+            });
+            const previousCiRun = ciRuns.workflow_runs.find(run =>
+              run.head_branch === 'main'
+              && run.event === 'push'
+              && run.conclusion === 'success'
+              && run.head_sha !== process.env.AFTER_SHA
+            );
+
+            if (previousCiRun) {
+              const { data: workflowFile } = await github.rest.repos.getContent({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                path: '.github/workflows/ci.yml',
+                ref: previousCiRun.head_sha,
+              });
+              const previousWorkflow = Buffer.from(workflowFile.content, 'base64').toString('utf8');
+
+              if (/^  deploy_production:/m.test(previousWorkflow)) {
+                core.setOutput('sha', previousCiRun.head_sha);
+                return;
+              }
+            }
+
+            // Before CI owned deployment, use the last successful standalone
+            // deployment as the migration baseline.
+            const { data: deployRuns } = await github.rest.actions.listWorkflowRuns({
+              ...runQuery,
+              workflow_id: 'deploy-production.yml',
+            });
+            const previousDeployRun = deployRuns.workflow_runs.find(run =>
+              run.head_branch === 'main'
+              && run.event === 'push'
+              && run.conclusion === 'success'
+              && run.head_sha !== process.env.AFTER_SHA
+            );
+
+            if (!previousDeployRun) {
+              core.setFailed('No previous successful production baseline was found; refusing to deploy an incomplete commit range.');
+              return;
+            }
+
+            core.setOutput('sha', previousDeployRun.head_sha);
 
       - name: Detect changed components
         id: changes
         env:
-          BEFORE_SHA: ${{ github.event.before }}
-          AFTER_SHA: ${{ github.sha }}
+          BEFORE_SHA: ${{ steps.baseline.outputs.sha }}
+          AFTER_SHA: ${{ inputs.after_sha }}
         run: |
           if [ "$BEFORE_SHA" = '0000000000000000000000000000000000000000' ]; then
             echo 'Initial repository push: skip production deployment.'
@@ -60,7 +149,8 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v5
         with:
-          fetch-depth: 2
+          ref: ${{ inputs.after_sha }}
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -91,7 +181,7 @@ jobs:
       - name: Publish block-editor content
         if: needs.changed-components.outputs.content == 'true'
         env:
-          BEFORE_SHA: ${{ github.event.before }}
+          BEFORE_SHA: ${{ needs.changed-components.outputs.baseline }}
         run: |
           npm run sync:block-editor -- push --confirm --baseline-sha "$BEFORE_SHA"
 

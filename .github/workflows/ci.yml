@@ -17,8 +17,10 @@ on:
         type: string
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}
+  # Let main pushes finish any deployment in progress; the deploy baseline
+  # accounts for newer pending pushes replacing one another.
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 permissions:
   contents: read
@@ -192,3 +194,16 @@ jobs:
                 summary: `The trusted CI runner completed with conclusion: ${conclusion}.`,
               },
             });
+
+  deploy_production:
+    name: Deploy production after CI
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.test.result == 'success'
+    uses: ./.github/workflows/deploy-production.yml
+    permissions:
+      actions: read
+      contents: read
+    with:
+      before_sha: ${{ github.event.before }}
+      after_sha: ${{ github.sha }}
+    secrets: inherit
