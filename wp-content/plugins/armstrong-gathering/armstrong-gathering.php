@@ -581,6 +581,11 @@ function at_gathering_custom_food_counts( $listed_foods = null ) {
 		if ( ! $custom_food || in_array( $custom_food, $listed_foods, true ) ) {
 			continue;
 		}
+		$amounts = at_gathering_rsvp_food_amounts( $row );
+		if ( empty( $amounts[ $custom_food ] ) ) {
+			continue;
+		}
+		$amount = absint( $amounts[ $custom_food ] );
 
 		$key = strtolower( $custom_food );
 		if ( ! isset( $counts[ $key ] ) ) {
@@ -590,8 +595,6 @@ function at_gathering_custom_food_counts( $listed_foods = null ) {
 				'names' => array(),
 			);
 		}
-		$amounts = at_gathering_rsvp_food_amounts( $row );
-		$amount = max( 1, absint( $amounts[ $custom_food ] ?? 1 ) );
 		$counts[ $key ]['count'] += $amount;
 		$name = trim( (string) $row->guest_names );
 		$counts[ $key ]['names'][] = ( $name ? $name : ( trim( (string) $row->display_name ) ?: 'Unknown friend' ) ) . ' × ' . $amount;
@@ -689,7 +692,7 @@ function at_gathering_rsvp_shortcode() {
 							<div class="at-food-choice-controls">
 								<div class="at-food-heading">
 									<strong id="at-food-<?php echo esc_attr( $food_key ); ?>"><?php echo esc_html( $food ); ?></strong>
-										<label class="at-food-bringing"><input type="checkbox" name="at_food_offers[<?php echo esc_attr( $food_key ); ?>]" value="1" aria-label="Bringing" aria-describedby="at-food-<?php echo esc_attr( $food_key ); ?>" <?php checked( $amount > 0 ); ?>><span>Bringing</span></label>
+										<label class="at-food-bringing"><input type="checkbox" name="at_food_offers[<?php echo esc_attr( $food_key ); ?>]" value="1" aria-label="Bringing <?php echo esc_attr( $food ); ?>" <?php checked( $amount > 0 ); ?>><span>Bringing</span></label>
 								</div>
 								<label class="at-food-amount" for="at-food-amount-<?php echo esc_attr( $food_key ); ?>">How many?</label>
 								<input id="at-food-amount-<?php echo esc_attr( $food_key ); ?>" type="number" name="at_food_amounts[<?php echo esc_attr( $food_key ); ?>]" aria-label="<?php echo esc_attr( $food ); ?>" min="0" max="9999" step="1" value="<?php echo esc_attr( $amount ); ?>">
