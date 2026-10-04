@@ -21,13 +21,14 @@
     "env:setup": "node scripts/worktree-setup.mjs",
     "env:teardown": "node scripts/wp-env.mjs cleanup",
     "test": "npm run test:e2e",
-    "test:e2e": "playwright test",
+    "test:e2e": "node scripts/test-local-e2e.mjs",
     "test:e2e:ui": "playwright test --ui",
-    "test:visual": "playwright test --project=visual",
+    "test:visual": "node scripts/test-local-e2e.mjs --visual-only",
+    "test:visual:linux": "node scripts/test-local-e2e.mjs --linux-visual-only",
     "test:a11y": "playwright test --project=accessibility",
     "test:performance": "node scripts/performance.mjs",
     "test:all": "npm run test:e2e && npm run test:performance",
-    "test:update-snapshots": "playwright test --project=visual --update-snapshots"
+    "test:update-snapshots": "node scripts/test-local-e2e.mjs --update-snapshots"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.2",

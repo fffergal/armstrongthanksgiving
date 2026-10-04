@@ -3,23 +3,31 @@
 The repository workflow is built around short-lived worktree branches and pull
 requests into `main`:
 
-1. Make a feature in its own worktree and push the branch.
-2. Open a pull request into `main`.
-3. The trusted CI workflow starts WordPress, seeds the fixture data, runs the
-   complete Playwright suite, and runs the Lighthouse budgets against the
-   immutable merge commit captured with the PR head used for the required
-   check. Its reports are retained as a workflow artifact. The
+1. Make a feature in its own worktree.
+2. Run `npm test` in the worktree before pushing. On macOS this runs the native
+   browser suite and repeats the visual contracts in an x64 Linux Playwright
+   container to match GitHub Actions. On Apple Silicon, Docker runs that image
+   under QEMU with Chromium's GPU and zygote processes disabled. If a
+   deliberate visual change needs new baselines, use
+   `npm run test:update-snapshots` locally, review the changed images, and
+   commit them with the code change before pushing.
+3. Push the branch and open a pull request into `main`.
+4. The trusted CI workflow starts WordPress, seeds the fixture data, runs the
+   browser acceptance suite and Lighthouse budgets on an x64 Ubuntu runner,
+   and runs visual contracts in the same x64 Playwright container used by local
+   snapshot checks. The shared container includes DejaVu Sans for the Ubuntu
+   system-font fallback. Reports are retained as workflow artifacts. The
    workflow definition comes from `main`, while the source under test comes
    from the pull request, so a PR cannot replace the required check by editing
    its own CI YAML. The test runner has only `contents: read`, does not use
    production secrets, and disables checkout credentials. Separate trusted
    jobs create and complete `CI / test` with `checks: write`, including when a
    token-created automation PR cannot start a normal pull-request workflow.
-4. Codex review is enabled. Review any feedback it provides and address useful
+5. Codex review is enabled. Review any feedback it provides and address useful
    findings before merging; reviewer approval is not required.
-5. After required checks pass and review feedback is addressed, squash-merge the
+6. After required checks pass and review feedback is addressed, squash-merge the
    pull request.
-6. A push to `main` deploys changed theme, plugin, and block-editor content in
+7. A push to `main` deploys changed theme, plugin, and block-editor content in
    sequence, then checks the public site. When publishing a changed Home page,
    deployment compares production against the previous committed page (or the
    incoming page) inside the same database transaction as the update, holding
