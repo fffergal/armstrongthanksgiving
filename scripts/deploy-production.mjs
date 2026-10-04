@@ -148,7 +148,7 @@ cleanup() {
 trap cleanup EXIT
 cd ${quoteShell(wpPath)}
 wp core is-installed
-wp super-cache status >/dev/null
+wp cli has-command super-cache
 expected_url='https://www.armstrongthanksgiving.com'
 home_url="$(wp option get home)"
 site_url="$(wp option get siteurl)"
