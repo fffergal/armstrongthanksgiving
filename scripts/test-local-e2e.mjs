@@ -13,7 +13,15 @@ const excludeVisual = process.argv.includes('--exclude-visual');
 const updateSnapshots = process.argv.includes('--update-snapshots');
 const localTarget = new URL(localBaseUrl());
 const isLoopbackTarget = ['localhost', '127.0.0.1', '[::1]'].includes(localTarget.hostname);
-const useSharedLinuxVisuals = process.platform === 'linux' && isLoopbackTarget;
+let worktreeRuntimeOrigin;
+try {
+  worktreeRuntimeOrigin = new URL(JSON.parse(fs.readFileSync(path.join(root, '.worktree/runtime.json'), 'utf8')).url).origin;
+} catch {
+  // Without worktree metadata, the shared container cannot join the local site.
+}
+const useSharedLinuxVisuals = process.platform === 'linux'
+  && isLoopbackTarget
+  && localTarget.origin === worktreeRuntimeOrigin;
 const helperFlags = new Set(['--visual-only', '--linux-visual-only', '--exclude-visual', '--update-snapshots']);
 const forwardedArgs = process.argv.slice(2).filter(argument => !helperFlags.has(argument));
 const playwrightArgs = visualOnly || linuxVisualOnly || updateSnapshots
