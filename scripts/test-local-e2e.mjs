@@ -11,7 +11,9 @@ const visualOnly = process.argv.includes('--visual-only');
 const linuxVisualOnly = process.argv.includes('--linux-visual-only');
 const excludeVisual = process.argv.includes('--exclude-visual');
 const updateSnapshots = process.argv.includes('--update-snapshots');
-const useSharedLinuxVisuals = process.platform === 'linux';
+const localTarget = new URL(localBaseUrl());
+const isLoopbackTarget = ['localhost', '127.0.0.1', '[::1]'].includes(localTarget.hostname);
+const useSharedLinuxVisuals = process.platform === 'linux' && isLoopbackTarget;
 const helperFlags = new Set(['--visual-only', '--linux-visual-only', '--exclude-visual', '--update-snapshots']);
 const forwardedArgs = process.argv.slice(2).filter(argument => !helperFlags.has(argument));
 const playwrightArgs = visualOnly || linuxVisualOnly || updateSnapshots
@@ -64,7 +66,7 @@ function updateWordPressUrl(value) {
   return 0;
 }
 
-function runLinuxVisuals({ reset = true, skipForRemoteTarget = false } = {}) {
+function runLinuxVisuals({ reset = true, skipForRemoteTarget = false, args = [] } = {}) {
   const localUrl = localBaseUrl();
   const localOrigin = new URL(localUrl).origin;
   const isLoopback = ['localhost', '127.0.0.1', '[::1]'].includes(new URL(localUrl).hostname);
@@ -137,7 +139,7 @@ function runLinuxVisuals({ reset = true, skipForRemoteTarget = false } = {}) {
     ...(process.env.CI ? ['--env', `CI=${process.env.CI}`] : []),
     localImage,
     'sh', '-lc',
-    `if [ ! -x node_modules/.bin/playwright ]; then npm ci; fi && npx playwright test --project=visual --workers=1${updateSnapshots ? ' --update-snapshots' : ''}${forwardedArgs.length ? ` ${forwardedArgs.map(shellQuote).join(' ')}` : ''}`,
+    `if [ ! -x node_modules/.bin/playwright ]; then npm ci; fi && npx playwright test --project=visual --workers=1${updateSnapshots ? ' --update-snapshots' : ''}${args.length ? ` ${args.map(shellQuote).join(' ')}` : ''}`,
   ];
   let status = updateWordPressUrl('http://wordpress');
   let restoreStatus = 0;
@@ -150,11 +152,11 @@ function runLinuxVisuals({ reset = true, skipForRemoteTarget = false } = {}) {
 }
 
 if (linuxVisualOnly) {
-  process.exit(runLinuxVisuals());
+  process.exit(runLinuxVisuals({ args: forwardedArgs }));
 }
 
 if (useSharedLinuxVisuals && (visualOnly || updateSnapshots)) {
-  process.exit(runLinuxVisuals());
+  process.exit(runLinuxVisuals({ args: forwardedArgs }));
 }
 
 const nativeStatus = run('npx', ['playwright', ...playwrightArgs]);
