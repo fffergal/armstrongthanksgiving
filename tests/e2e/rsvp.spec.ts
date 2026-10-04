@@ -388,6 +388,43 @@ test.describe('RSVP sign-in handoff', () => {
     await expect(page.getByLabel('Stuffing — vegetarian')).not.toBeChecked();
   });
 
+  test('an untouched sign-in handoff keeps the account’s existing RSVP', async ({ page }, testInfo) => {
+    const email = `untouched-handoff-${testInfo.project.name.replace(/\W/g, '')}-${Date.now()}@example.test`.toLowerCase();
+    const password = 'cranberry-sauce-2026';
+    await page.goto('/rsvp/');
+    await page.getByLabel('I can’t make it').check();
+    await page.getByLabel('Display name').fill('Untouched handoff test');
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password', { exact: true }).fill(password);
+    await page.getByLabel('Confirm password').fill(password);
+    await page.getByRole('button', { name: 'Save my RSVP' }).click();
+    await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
+
+    await page.context().clearCookies();
+    await page.goto('/rsvp/');
+    await page.getByRole('button', { name: 'Sign in first' }).click();
+    await expect(page).toHaveURL(/wp-login\.php/);
+    await page.locator('#user_login').fill(email);
+    await page.locator('#user_pass').fill(password);
+    await page.locator('#wp-submit').click();
+    await page.waitForURL(/\/rsvp\//);
+    await expect(page.getByLabel('I can’t make it')).toBeChecked();
+  });
+
+  test('a sign-in handoff from a stale signed-out tab returns to the signed-in RSVP', async ({ page }) => {
+    await page.goto('/rsvp/');
+    await page.getByLabel('Names', { exact: true }).fill('Late-tab draft guest');
+    await page.getByLabel('Stuffing — vegetarian').check();
+    const signedInTab = await page.context().newPage();
+    await logIn(signedInTab);
+    await page.getByRole('button', { name: 'Sign in first' }).click();
+    await page.waitForURL(/\/rsvp\//);
+    await expect(page.getByRole('heading', { name: 'Will you join us?' })).toBeVisible();
+    await expect(page.getByLabel('Names', { exact: true })).toHaveValue('Late-tab draft guest');
+    await expect(page.getByLabel('Stuffing — vegetarian')).toBeChecked();
+    await signedInTab.close();
+  });
+
   test('pressing Enter in an RSVP field submits the RSVP instead of starting sign-in', async ({ page }, testInfo) => {
     const email = `enter-submit-${testInfo.project.name.replace(/\W/g, '')}-${Date.now()}@example.test`.toLowerCase();
     await page.goto('/rsvp/');

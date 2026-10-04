@@ -281,14 +281,10 @@ function at_gathering_redirect_error( $return, $message, $values = array() ) {
 }
 
 function at_gathering_rsvp_signin() {
-	if ( ! isset( $_POST['at_rsvp_signin_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['at_rsvp_signin_nonce'] ) ), 'at_rsvp_signin' ) ) {
-		wp_die( 'Sorry, we could not save your RSVP draft.' );
-	}
-
 	$return = home_url( '/rsvp/' );
-	if ( is_user_logged_in() ) {
-		wp_safe_redirect( $return );
-		exit;
+	$logged_in = is_user_logged_in();
+	if ( ! $logged_in && ( ! isset( $_POST['at_rsvp_signin_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['at_rsvp_signin_nonce'] ) ), 'at_rsvp_signin' ) ) ) {
+		wp_die( 'Sorry, we could not save your RSVP draft.' );
 	}
 
 	$status = sanitize_key( wp_unslash( $_POST['at_status'] ?? 'yes' ) );
@@ -305,12 +301,14 @@ function at_gathering_rsvp_signin() {
 		'foods'       => $foods,
 		'custom_food' => sanitize_text_field( wp_unslash( $_POST['at_custom_food'] ?? '' ) ),
 		'notes'       => sanitize_textarea_field( wp_unslash( $_POST['at_notes'] ?? '' ) ),
+		'_at_rsvp_handoff' => 1,
+		'_at_rsvp_touched' => ! empty( $_POST['_at_rsvp_touched'] ) ? 1 : 0,
 	);
 
 	$token = strtolower( wp_generate_password( 32, false, false ) );
 	set_transient( 'at_gathering_rsvp_draft_' . $token, $values, 15 * MINUTE_IN_SECONDS );
 	$return = add_query_arg( 'at_rsvp_draft', $token, $return );
-	wp_safe_redirect( wp_login_url( $return ) );
+	wp_safe_redirect( $logged_in ? $return : wp_login_url( $return ) );
 	exit;
 }
 add_action( 'admin_post_at_rsvp_signin', 'at_gathering_rsvp_signin' );
@@ -566,6 +564,9 @@ function at_gathering_rsvp_shortcode() {
 	$custom_food_counts = at_gathering_custom_food_counts( $foods );
 	$chosen            = $rsvp ? (array) json_decode( $rsvp->foods, true ) : array();
 	$values            = at_gathering_form_values();
+	if ( $rsvp && ! empty( $values['_at_rsvp_handoff'] ) && empty( $values['_at_rsvp_touched'] ) ) {
+		$values = array();
+	}
 	if ( $values ) {
 		$chosen = (array) ( $values['foods'] ?? array() );
 	}
@@ -587,6 +588,7 @@ function at_gathering_rsvp_shortcode() {
 			<input type="hidden" name="at_return_url" value="<?php echo esc_url( get_permalink() ); ?>">
 			<?php wp_nonce_field( 'at_save_rsvp', 'at_rsvp_nonce' ); ?>
 			<?php wp_nonce_field( 'at_rsvp_signin', 'at_rsvp_signin_nonce' ); ?>
+			<input type="hidden" name="_at_rsvp_touched" value="0">
 			<p class="at-form-actions at-rsvp-submit-actions"><button class="at-button" type="submit" name="action" value="at_save_rsvp"><?php echo $rsvp ? 'Update my RSVP' : 'Save my RSVP'; ?></button></p>
 			<fieldset>
 				<legend>Attendance</legend>
@@ -911,6 +913,9 @@ function at_gathering_save_rsvp() {
 			wp_delete_user( $created_user_id );
 		}
 		at_gathering_redirect_error( $return, 'Please try again. Your account was not created.', $form_values );
+	}
+	if ( function_exists( 'wp_cache_clear_cache' ) ) {
+		wp_cache_clear_cache();
 	}
 
 	$message = at_gathering_confirmation_message( $user, $status, $guest_count, $guest_names, $foods, $data['dietary'], $data['notes'] );
