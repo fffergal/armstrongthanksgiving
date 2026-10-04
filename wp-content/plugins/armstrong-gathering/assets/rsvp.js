@@ -8,11 +8,30 @@
   function markRsvpTouched(event) {
     var field = event.target;
     if (!touched || !field || !field.matches('input, select, textarea') || field.type === 'hidden') return;
-    if (!/^(at_status|at_guest_count|at_guest_names|at_dietary|at_food\[\]|at_custom_food|at_notes)$/.test(field.name)) return;
+	if (!/^(at_status|at_guest_count|at_guest_names|at_dietary|at_custom_food|at_custom_food_amount|at_notes)$/.test(field.name) && field.name.indexOf('at_food_amounts[') !== 0 && field.name.indexOf('at_food_offers[') !== 0) return;
     touched.value = '1';
   }
   form.addEventListener('input', markRsvpTouched);
   form.addEventListener('change', markRsvpTouched);
+
+  function syncFoodOffer(event) {
+    var field = event.target;
+    var card = field.closest('.at-food-choice');
+    if (!card) return;
+
+    var offer = card.querySelector('[name^="at_food_offers["]');
+    var amount = card.querySelector('[name^="at_food_amounts["]');
+    if (!offer || !amount) return;
+
+    if (field === offer) {
+      if (offer.checked && Number(amount.value) < 1) amount.value = '1';
+      if (!offer.checked) amount.value = '0';
+    } else if (field === amount) {
+      offer.checked = Number(amount.value) > 0;
+    }
+  }
+  form.addEventListener('input', syncFoodOffer);
+  form.addEventListener('change', syncFoodOffer);
 
   var guestCount = form.querySelector('[name="at_guest_count"]');
   var guestNames = form.querySelector('[name="at_guest_names"]');
