@@ -64,6 +64,7 @@ test('food contributor names are shown to signed-in guests only', async ({ page,
   try {
     const observer = await observerContext.newPage();
     await observer.goto('/rsvp/');
+    await observer.screenshot({ path: testInfo.outputPath('rsvp-sign-in-and-food-desktop.png'), fullPage: true });
     const customFoodList = observer.locator('.at-custom-food-list');
     await expect(customFoodList).toBeVisible();
     const customFoodRow = customFoodList.getByRole('listitem').filter({ hasText: customFood });
@@ -387,6 +388,19 @@ test.describe('RSVP sign-in handoff without JavaScript', () => {
     await page.reload();
     await expect(page.getByLabel('Names', { exact: true })).not.toHaveValue('Draft guest');
     await expect(page.getByLabel('Stuffing — vegetarian')).not.toBeChecked();
+  });
+
+  test('pressing Enter in an RSVP field submits the RSVP instead of starting sign-in', async ({ page }, testInfo) => {
+    const email = `enter-submit-${testInfo.project.name.replace(/\W/g, '')}-${Date.now()}@example.test`.toLowerCase();
+    await page.goto('/rsvp/');
+    await page.getByLabel('Names', { exact: true }).fill('Enter key test guest');
+    await page.getByLabel('Display name').fill('Enter key test guest');
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password', { exact: true }).fill('cranberry-sauce-2026');
+    await page.getByLabel('Confirm password').fill('cranberry-sauce-2026');
+    await page.getByLabel('Names', { exact: true }).press('Enter');
+    await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
+    await expect(page.getByRole('heading', { name: 'RSVP confirmation' })).toBeVisible();
   });
 });
 

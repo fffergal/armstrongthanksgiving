@@ -587,6 +587,7 @@ function at_gathering_rsvp_shortcode() {
 			<input type="hidden" name="at_return_url" value="<?php echo esc_url( get_permalink() ); ?>">
 			<?php wp_nonce_field( 'at_save_rsvp', 'at_rsvp_nonce' ); ?>
 			<?php wp_nonce_field( 'at_rsvp_signin', 'at_rsvp_signin_nonce' ); ?>
+			<p class="at-form-actions at-rsvp-submit-actions"><button class="at-button" type="submit" name="action" value="at_save_rsvp"><?php echo $rsvp ? 'Update my RSVP' : 'Save my RSVP'; ?></button></p>
 			<fieldset>
 				<legend>Attendance</legend>
 				<div class="at-choice-row">
@@ -652,7 +653,6 @@ function at_gathering_rsvp_shortcode() {
 					</div>
 				</fieldset>
 			<?php endif; ?>
-			<p class="at-form-actions"><button class="at-button" type="submit" name="action" value="at_save_rsvp"><?php echo $rsvp ? 'Update my RSVP' : 'Save my RSVP'; ?></button></p>
 		</form>
 	</div>
 	<?php
