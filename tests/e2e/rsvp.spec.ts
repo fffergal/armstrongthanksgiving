@@ -94,12 +94,24 @@ test('food contributor names are shown to signed-in guests only', async ({ page,
     await customFoodList.scrollIntoViewIfNeeded();
     await observer.screenshot({ path: testInfo.outputPath('rsvp-custom-food-mobile.png') });
 
+    const signInEmail = `names-handoff-${unique}@example.test`;
+    const signInPassword = 'cranberry-sauce-2026';
+    await observer.goto('/signup/');
+    await observer.getByLabel('Display name').fill('Names Link Friend');
+    await observer.getByLabel('Email').fill(signInEmail);
+    await observer.getByLabel('Password', { exact: true }).fill(signInPassword);
+    await observer.getByLabel('Confirm password').fill(signInPassword);
+    await observer.getByRole('button', { name: 'Sign up' }).click();
+    await observer.waitForURL(/at_signup=saved/);
+    await observer.context().clearCookies();
+    await observer.goto('/rsvp/');
+
     await observer.getByLabel('Names', { exact: true }).fill('Draft from names link');
     await observer.getByLabel('Something else?').fill('Draft cider');
     await customFoodRow.getByRole('button', { name: 'Sign in to see the names' }).click();
     await expect(observer).toHaveURL(/wp-login\.php/);
-    await observer.locator('#user_login').fill(process.env.WP_TEST_USER ?? 'guest');
-    await observer.locator('#user_pass').fill(process.env.WP_TEST_PASSWORD ?? 'password');
+    await observer.locator('#user_login').fill(signInEmail);
+    await observer.locator('#user_pass').fill(signInPassword);
     await observer.locator('#wp-submit').click();
     await observer.waitForURL(/\/rsvp\//);
     await expect(observer.getByLabel('Names', { exact: true })).toHaveValue('Draft from names link');
@@ -368,7 +380,7 @@ test('the ordinary RSVP URL is public and explains account access', async ({ pag
 });
 
 test.describe('RSVP sign-in handoff', () => {
-  test('the sign-in option comes before registration and keeps the RSVP draft', async ({ page }) => {
+  test('an account’s saved RSVP takes precedence over a signed-out form', async ({ page }) => {
     await logIn(page);
     await page.goto('/rsvp/');
     await page.getByLabel('I can’t make it').check();
@@ -387,7 +399,6 @@ test.describe('RSVP sign-in handoff', () => {
     await expect(note).toBeVisible();
     expect(await note.evaluate((element, target) => Boolean(element.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING), await account.elementHandle())).toBe(true);
     await page.getByLabel('Something else?').fill('Draft mulled cider');
-    await page.locator('[name="_at_rsvp_touched"]').evaluate((element: HTMLInputElement) => { element.value = '0'; });
     await page.getByRole('button', { name: 'Sign in first' }).click();
     await expect(page).toHaveURL(/wp-login\.php/);
     await page.locator('#user_login').fill(process.env.WP_TEST_USER ?? 'guest');
@@ -399,13 +410,57 @@ test.describe('RSVP sign-in handoff', () => {
     await expect(page.getByLabel('How many people are coming?')).toHaveValue('0');
     await expect(page.getByLabel('Dietary notes (optional)')).toHaveValue('Saved dietary note');
     await expect(page.getByLabel('Cranberry sauce')).toBeChecked();
-    await expect(page.getByLabel('Something else?')).toHaveValue('Draft mulled cider');
+    await expect(page.getByLabel('Something else?')).toHaveValue('Saved cider');
     await expect(page.getByLabel('Anything else for the hosts? (optional)')).toHaveValue('Saved host note');
     await page.reload();
     await expect(page.getByLabel('Names', { exact: true })).toHaveValue('Saved RSVP baseline');
     await expect(page.getByLabel('I can’t make it')).toBeChecked();
+    await expect(page.getByLabel('How many people are coming?')).toHaveValue('0');
+    await expect(page.getByLabel('Dietary notes (optional)')).toHaveValue('Saved dietary note');
     await expect(page.getByLabel('Cranberry sauce')).toBeChecked();
     await expect(page.getByLabel('Something else?')).toHaveValue('Saved cider');
+    await expect(page.getByLabel('Anything else for the hosts? (optional)')).toHaveValue('Saved host note');
+  });
+
+  test('a new account restores the submitted RSVP once after sign-in', async ({ page }, testInfo) => {
+    const unique = `${testInfo.project.name.replace(/\W/g, '')}${Date.now()}`.toLowerCase();
+    const email = `handoff-${unique}@example.test`;
+    const password = 'cranberry-sauce-2026';
+    await page.goto('/signup/');
+    await page.getByLabel('Display name').fill('Handoff Test Friend');
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password', { exact: true }).fill(password);
+    await page.getByLabel('Confirm password').fill(password);
+    await page.getByRole('button', { name: 'Sign up' }).click();
+    await page.waitForURL(/at_signup=saved/);
+
+    await page.context().clearCookies();
+    await page.goto('/rsvp/');
+    await page.getByLabel('Maybe').check();
+    await page.getByLabel('I’m coming').check();
+    await page.getByLabel('How many people are coming?').selectOption('2');
+    await page.getByLabel('How many people are coming?').selectOption('1');
+    await page.getByLabel('Names', { exact: true }).fill('Handoff Guest');
+    await page.getByLabel('Cranberry sauce').check();
+    await page.getByLabel('Something else?').fill('Handoff mulled cider');
+    await page.getByRole('button', { name: 'Sign in first' }).click();
+    await expect(page).toHaveURL(/wp-login\.php/);
+    await page.locator('#user_login').fill(email);
+    await page.locator('#user_pass').fill(password);
+    await page.locator('#wp-submit').click();
+    await page.waitForURL(/\/rsvp\//);
+    await expect(page.getByLabel('I’m coming')).toBeChecked();
+    await expect(page.getByLabel('How many people are coming?')).toHaveValue('1');
+    await expect(page.getByLabel('Names', { exact: true })).toHaveValue('Handoff Guest');
+    await expect(page.getByLabel('Cranberry sauce')).toBeChecked();
+    await expect(page.getByLabel('Something else?')).toHaveValue('Handoff mulled cider');
+
+    await page.reload();
+    await expect(page.getByLabel('Names', { exact: true })).toHaveValue('');
+    await expect(page.getByLabel('I’m coming')).toBeChecked();
+    await expect(page.getByLabel('How many people are coming?')).toHaveValue('1');
+    await expect(page.getByLabel('Cranberry sauce')).not.toBeChecked();
+    await expect(page.getByLabel('Something else?')).toHaveValue('');
   });
 
   test('an untouched sign-in handoff keeps the account’s existing RSVP', async ({ page }, testInfo) => {
@@ -431,17 +486,23 @@ test.describe('RSVP sign-in handoff', () => {
     await expect(page.getByLabel('I can’t make it')).toBeChecked();
   });
 
-  test('a sign-in handoff from a stale signed-out tab returns to the signed-in RSVP', async ({ page }) => {
+  test('a stale signed-out tab does not replace the signed-in RSVP', async ({ page }) => {
     await page.goto('/rsvp/');
     await page.getByLabel('Names', { exact: true }).fill('Late-tab draft guest');
     await page.getByLabel('Stuffing — vegetarian').check();
     const signedInTab = await page.context().newPage();
     await logIn(signedInTab);
+    await signedInTab.goto('/rsvp/');
+    await signedInTab.getByLabel('Names', { exact: true }).fill('Saved stale-tab baseline');
+    await signedInTab.getByLabel('Cranberry sauce').check();
+    await signedInTab.locator('.at-rsvp-submit-actions button[type="submit"]').click();
+    await signedInTab.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
     await page.getByRole('button', { name: 'Sign in first' }).click();
     await page.waitForURL(/\/rsvp\//);
     await expect(page.getByRole('heading', { name: 'Will you join us?' })).toBeVisible();
-    await expect(page.getByLabel('Names', { exact: true })).toHaveValue('Late-tab draft guest');
-    await expect(page.getByLabel('Stuffing — vegetarian')).toBeChecked();
+    await expect(page.getByLabel('Names', { exact: true })).toHaveValue('Saved stale-tab baseline');
+    await expect(page.getByLabel('Cranberry sauce')).toBeChecked();
+    await expect(page.getByLabel('Stuffing — vegetarian')).not.toBeChecked();
     await signedInTab.close();
   });
 

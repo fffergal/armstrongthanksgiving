@@ -301,10 +301,7 @@ function at_gathering_rsvp_signin() {
 	$dietary = sanitize_textarea_field( wp_unslash( $_POST['at_dietary'] ?? '' ) );
 	$custom_food = sanitize_text_field( wp_unslash( $_POST['at_custom_food'] ?? '' ) );
 	$notes = sanitize_textarea_field( wp_unslash( $_POST['at_notes'] ?? '' ) );
-	$touched = ! empty( $_POST['_at_rsvp_touched'] );
-	if ( ! $logged_in ) {
-		$touched = $touched || 'yes' !== $status || 1 !== $guest_count || '' !== $guest_names || '' !== $dietary || ! empty( $foods ) || '' !== $custom_food || '' !== $notes;
-	}
+	$touched = ! empty( $_POST['_at_rsvp_touched'] ) || 'yes' !== $status || 1 !== $guest_count || '' !== $guest_names || '' !== $dietary || ! empty( $foods ) || '' !== $custom_food || '' !== $notes;
 	$values = array(
 		'status'            => $status,
 		'guest_count'       => $guest_count,
@@ -317,9 +314,11 @@ function at_gathering_rsvp_signin() {
 		'_at_rsvp_touched' => $touched ? 1 : 0,
 	);
 
-	$token = strtolower( wp_generate_password( 32, false, false ) );
-	set_transient( 'at_gathering_rsvp_draft_' . $token, $values, 15 * MINUTE_IN_SECONDS );
-	$return = add_query_arg( 'at_rsvp_draft', $token, $return );
+	if ( $touched ) {
+		$token = strtolower( wp_generate_password( 32, false, false ) );
+		set_transient( 'at_gathering_rsvp_draft_' . $token, $values, 15 * MINUTE_IN_SECONDS );
+		$return = add_query_arg( 'at_rsvp_draft', $token, $return );
+	}
 	wp_safe_redirect( $logged_in ? $return : wp_login_url( $return ) );
 	exit;
 }
@@ -577,30 +576,11 @@ function at_gathering_rsvp_shortcode() {
 	$chosen            = $rsvp ? (array) json_decode( $rsvp->foods, true ) : array();
 	$values            = at_gathering_form_values();
 	if ( $rsvp && ! empty( $values['_at_rsvp_handoff'] ) ) {
-		if ( empty( $values['_at_rsvp_touched'] ) ) {
-			$values = array();
-		} else {
-			$anonymous_defaults = array(
-				'status'      => 'yes',
-				'guest_count' => 1,
-				'guest_names' => '',
-				'dietary'     => '',
-				'foods'       => array(),
-				'custom_food' => '',
-				'notes'       => '',
-			);
-			foreach ( $anonymous_defaults as $field => $default ) {
-				if ( array_key_exists( $field, $values ) && $values[ $field ] === $default ) {
-					unset( $values[ $field ] );
-				}
-			}
-		}
+		$values = array();
 	}
 	if ( $values ) {
 		$draft_foods = (array) ( $values['foods'] ?? array() );
-		$chosen = ! empty( $values['_at_rsvp_handoff'] )
-			? array_values( array_unique( array_merge( $chosen, $draft_foods ) ) )
-			: $draft_foods;
+		$chosen = $draft_foods;
 	}
 	$form_status = $values['status'] ?? ( $rsvp ? $rsvp->status : 'yes' );
 	$form_count  = isset( $values['guest_count'] ) ? (int) $values['guest_count'] : ( $rsvp ? (int) $rsvp->guest_count : 1 );
