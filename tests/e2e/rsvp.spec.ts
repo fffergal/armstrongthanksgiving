@@ -373,8 +373,10 @@ test.describe('RSVP sign-in handoff', () => {
     await page.goto('/rsvp/');
     await page.getByLabel('I can’t make it').check();
     await page.getByLabel('Names', { exact: true }).fill('Saved RSVP baseline');
-    const savedFoods = page.locator('input[name="at_food[]"]:checked');
-    for (let i = await savedFoods.count() - 1; i >= 0; i--) await savedFoods.nth(i).uncheck();
+    await page.getByLabel('Dietary notes (optional)').fill('Saved dietary note');
+    await page.getByLabel('Cranberry sauce').check();
+    await page.getByLabel('Something else?').fill('Saved cider');
+    await page.getByLabel('Anything else for the hosts? (optional)').fill('Saved host note');
     await page.locator('.at-rsvp-submit-actions button[type="submit"]').click();
     await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
     await page.context().clearCookies();
@@ -384,8 +386,7 @@ test.describe('RSVP sign-in handoff', () => {
     const account = page.getByRole('group', { name: 'Create your account' });
     await expect(note).toBeVisible();
     expect(await note.evaluate((element, target) => Boolean(element.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING), await account.elementHandle())).toBe(true);
-    await page.getByLabel('Names', { exact: true }).fill('Draft guest');
-    await page.getByLabel('Stuffing — vegetarian').check();
+    await page.getByLabel('Something else?').fill('Draft mulled cider');
     await page.locator('[name="_at_rsvp_touched"]').evaluate((element: HTMLInputElement) => { element.value = '0'; });
     await page.getByRole('button', { name: 'Sign in first' }).click();
     await expect(page).toHaveURL(/wp-login\.php/);
@@ -393,12 +394,18 @@ test.describe('RSVP sign-in handoff', () => {
     await page.locator('#user_pass').fill(process.env.WP_TEST_PASSWORD ?? 'password');
     await page.locator('#wp-submit').click();
     await page.waitForURL(/\/rsvp\//);
-    await expect(page.getByLabel('Names', { exact: true })).toHaveValue('Draft guest');
-    await expect(page.getByLabel('Stuffing — vegetarian')).toBeChecked();
+    await expect(page.getByLabel('Names', { exact: true })).toHaveValue('Saved RSVP baseline');
+    await expect(page.getByLabel('I can’t make it')).toBeChecked();
+    await expect(page.getByLabel('How many people are coming?')).toHaveValue('0');
+    await expect(page.getByLabel('Dietary notes (optional)')).toHaveValue('Saved dietary note');
+    await expect(page.getByLabel('Cranberry sauce')).toBeChecked();
+    await expect(page.getByLabel('Something else?')).toHaveValue('Draft mulled cider');
+    await expect(page.getByLabel('Anything else for the hosts? (optional)')).toHaveValue('Saved host note');
     await page.reload();
     await expect(page.getByLabel('Names', { exact: true })).toHaveValue('Saved RSVP baseline');
     await expect(page.getByLabel('I can’t make it')).toBeChecked();
-    await expect(page.getByLabel('Stuffing — vegetarian')).not.toBeChecked();
+    await expect(page.getByLabel('Cranberry sauce')).toBeChecked();
+    await expect(page.getByLabel('Something else?')).toHaveValue('Saved cider');
   });
 
   test('an untouched sign-in handoff keeps the account’s existing RSVP', async ({ page }, testInfo) => {

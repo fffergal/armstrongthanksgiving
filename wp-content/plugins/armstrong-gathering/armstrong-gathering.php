@@ -576,11 +576,31 @@ function at_gathering_rsvp_shortcode() {
 	$custom_food_counts = at_gathering_custom_food_counts( $foods );
 	$chosen            = $rsvp ? (array) json_decode( $rsvp->foods, true ) : array();
 	$values            = at_gathering_form_values();
-	if ( $rsvp && ! empty( $values['_at_rsvp_handoff'] ) && empty( $values['_at_rsvp_touched'] ) ) {
-		$values = array();
+	if ( $rsvp && ! empty( $values['_at_rsvp_handoff'] ) ) {
+		if ( empty( $values['_at_rsvp_touched'] ) ) {
+			$values = array();
+		} else {
+			$anonymous_defaults = array(
+				'status'      => 'yes',
+				'guest_count' => 1,
+				'guest_names' => '',
+				'dietary'     => '',
+				'foods'       => array(),
+				'custom_food' => '',
+				'notes'       => '',
+			);
+			foreach ( $anonymous_defaults as $field => $default ) {
+				if ( array_key_exists( $field, $values ) && $values[ $field ] === $default ) {
+					unset( $values[ $field ] );
+				}
+			}
+		}
 	}
 	if ( $values ) {
-		$chosen = (array) ( $values['foods'] ?? array() );
+		$draft_foods = (array) ( $values['foods'] ?? array() );
+		$chosen = ! empty( $values['_at_rsvp_handoff'] )
+			? array_values( array_unique( array_merge( $chosen, $draft_foods ) ) )
+			: $draft_foods;
 	}
 	$form_status = $values['status'] ?? ( $rsvp ? $rsvp->status : 'yes' );
 	$form_count  = isset( $values['guest_count'] ) ? (int) $values['guest_count'] : ( $rsvp ? (int) $rsvp->guest_count : 1 );
