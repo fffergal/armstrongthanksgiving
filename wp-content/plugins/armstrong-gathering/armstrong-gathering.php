@@ -1124,6 +1124,9 @@ function at_gathering_save_food_goals() {
 		$goals[ $food ] = isset( $submitted[ $key ] ) ? min( 9999, absint( $submitted[ $key ] ) ) : 0;
 	}
 	update_option( 'at_gathering_food_goals', $goals );
+	if ( function_exists( 'wp_cache_clear_cache' ) ) {
+		wp_cache_clear_cache();
+	}
 	wp_safe_redirect( admin_url( 'admin.php?page=at-gathering' ) );
 	exit;
 }

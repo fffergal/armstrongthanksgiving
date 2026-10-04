@@ -6,6 +6,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const wrapper = path.join(root, 'scripts/wp-env.mjs');
 const cleanup = [
 	'global $wpdb;',
+	"require_once ABSPATH . 'wp-admin/includes/user.php';",
 	"$test_user = getenv('WP_TEST_USER') ?: 'guest';",
 	"foreach (get_users(array('fields' => 'all')) as $user) { if ($user->user_login !== $test_user && ! in_array('administrator', (array) $user->roles, true)) { wp_delete_user($user->ID); } }",
 	"$table = $wpdb->prefix . 'at_rsvps'; if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table)) === $table) { $wpdb->query('TRUNCATE TABLE ' . $table); }",
