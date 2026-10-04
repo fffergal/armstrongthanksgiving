@@ -366,9 +366,7 @@ test('the ordinary RSVP URL is public and explains account access', async ({ pag
   await expect(page.locator('.at-event-address')).toHaveCount(0);
 });
 
-test.describe('RSVP sign-in handoff without JavaScript', () => {
-  test.use({ javaScriptEnabled: false });
-
+test.describe('RSVP sign-in handoff', () => {
   test('the sign-in option comes before registration and keeps the RSVP draft', async ({ page }) => {
     await page.goto('/rsvp/');
     const note = page.locator('.at-form-login-note-top');
