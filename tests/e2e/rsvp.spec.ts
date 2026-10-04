@@ -5,6 +5,15 @@ import { logIn } from './helpers/auth';
 
 const root = path.resolve(__dirname, '../..');
 
+function runWpEval(code: string): void {
+  const result = spawnSync(process.execPath, [path.join(root, 'scripts/wp-env.mjs'), 'run', 'cli', 'wp', 'eval', code], {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: 'pipe',
+  });
+  if (result.status !== 0) throw new Error(result.stderr || result.stdout || 'Could not update the local RSVP fixture.');
+}
+
 test.afterEach(() => {
   const cleanup = spawnSync(process.execPath, [path.join(root, 'scripts/reset-rsvp-test-data.mjs')], {
     cwd: root,
@@ -375,6 +384,11 @@ test('a signed-in RSVP has no login prompt, emails its full payload, and repopul
   await expect(page.getByLabel('Pumpkin pie', { exact: true })).toHaveValue('0');
   await expect(page.getByLabel('Something else?')).toHaveValue('Sparkling cider');
   await expect(page.getByLabel('Anything else for the hosts? (optional)')).toHaveValue('Updated note for the hosts.');
+
+  runWpEval("global $wpdb; $rows = $wpdb->update(at_gathering_table(), array('foods' => wp_json_encode(array('Cranberry sauce', 'Sparkling cider')), 'food_amounts' => '{}'), array('custom_food' => 'Sparkling cider')); if ( false === $rows || 0 === $rows ) { WP_CLI::error('Could not create the legacy RSVP test fixture.'); }");
+  await page.reload();
+  await expect(page.getByLabel('Amount of something else')).toHaveValue('1');
+  await expect(page.locator('.at-custom-food-list').getByRole('listitem').filter({ hasText: 'Sparkling cider' }).locator('small')).toHaveText('1 from Signed-in Friend × 1');
 
   await page.getByLabel('Amount of something else').fill('0');
   await page.getByRole('button', { name: 'Update my RSVP' }).click();

@@ -570,7 +570,7 @@ function at_gathering_custom_food_counts( $listed_foods = null ) {
 	$listed_foods = null === $listed_foods ? at_gathering_foods() : (array) $listed_foods;
 	$counts       = array();
 	$rows         = $wpdb->get_results(
-		"SELECT r.custom_food, r.food_amounts, r.guest_names, u.display_name
+		"SELECT r.custom_food, r.foods, r.food_amounts, r.guest_names, u.display_name
 		FROM " . at_gathering_table() . ' AS r
 		LEFT JOIN ' . $wpdb->users . " AS u ON u.ID = r.user_id
 		WHERE r.status IN ('yes','maybe')"
