@@ -2,6 +2,9 @@
   'use strict';
 
   var storageKey = 'armstrong-thanksgiving-rsvp-draft';
+  if (new URLSearchParams(window.location.search).get('at_rsvp') === 'saved') {
+    try { sessionStorage.removeItem(storageKey); } catch (error) {}
+  }
   var editableFields = [
     'at_status',
     'at_guest_count',
@@ -49,6 +52,11 @@
       }
       return;
     }
+    var rsvpUpdatedAt = Number(form.getAttribute('data-rsvp-updated-at')) || 0;
+    if (rsvpUpdatedAt && draft.savedAt < rsvpUpdatedAt) {
+      try { sessionStorage.removeItem(storageKey); } catch (error) {}
+      return;
+    }
     form.querySelectorAll('[name]').forEach(function (field) {
       if (!isDraftField(field) || field.type === 'password' || field.type === 'hidden' || field.type === 'submit') return;
       var key = field.name;
@@ -76,9 +84,6 @@
   }
   if (guestCount) guestCount.addEventListener('change', updateGroupSignupHint);
   if (guestNames) guestNames.addEventListener('input', updateGroupSignupHint);
-  if (new URLSearchParams(window.location.search).get('at_rsvp') === 'saved') {
-    try { sessionStorage.removeItem(storageKey); } catch (error) {}
-  }
   restoreDraft();
   updateGroupSignupHint();
 }());
