@@ -209,6 +209,7 @@ test('an RSVP saves and is still present after reload', async ({ page }) => {
   await logIn(page);
   await page.goto('/rsvp/');
 
+  await page.getByLabel('I’m coming').check();
   await page.getByLabel('How many people are coming?').selectOption('2');
   await page.getByLabel('Names', { exact: true }).fill('Two test friends');
   await page.getByLabel('Stuffing — vegetarian').check();
@@ -242,7 +243,7 @@ test('a signed-in RSVP has no login prompt, emails its full payload, and repopul
   await page.getByLabel('Pumpkin pie').check();
   await page.getByLabel('Something else?').fill('Mulled cider');
   await page.getByLabel('Anything else for the hosts? (optional)').fill('Please put us near the window.');
-  await page.locator('.at-rsvp-form button[type="submit"]').click();
+  await page.locator('.at-rsvp-submit-actions button[type="submit"]').click();
   await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
 
   const firstMail = await page.request.get('/wp-admin/admin-ajax.php?action=at_gathering_last_test_mail');
@@ -368,6 +369,16 @@ test('the ordinary RSVP URL is public and explains account access', async ({ pag
 
 test.describe('RSVP sign-in handoff', () => {
   test('the sign-in option comes before registration and keeps the RSVP draft', async ({ page }) => {
+    await logIn(page);
+    await page.goto('/rsvp/');
+    await page.getByLabel('I can’t make it').check();
+    await page.getByLabel('Names', { exact: true }).fill('Saved RSVP baseline');
+    const savedFoods = page.locator('input[name="at_food[]"]:checked');
+    for (let i = await savedFoods.count() - 1; i >= 0; i--) await savedFoods.nth(i).uncheck();
+    await page.locator('.at-rsvp-submit-actions button[type="submit"]').click();
+    await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
+    await page.context().clearCookies();
+
     await page.goto('/rsvp/');
     const note = page.locator('.at-form-login-note-top');
     const account = page.getByRole('group', { name: 'Create your account' });
@@ -384,7 +395,8 @@ test.describe('RSVP sign-in handoff', () => {
     await expect(page.getByLabel('Names', { exact: true })).toHaveValue('Draft guest');
     await expect(page.getByLabel('Stuffing — vegetarian')).toBeChecked();
     await page.reload();
-    await expect(page.getByLabel('Names', { exact: true })).not.toHaveValue('Draft guest');
+    await expect(page.getByLabel('Names', { exact: true })).toHaveValue('Saved RSVP baseline');
+    await expect(page.getByLabel('I can’t make it')).toBeChecked();
     await expect(page.getByLabel('Stuffing — vegetarian')).not.toBeChecked();
   });
 
@@ -428,6 +440,10 @@ test.describe('RSVP sign-in handoff', () => {
   test('pressing Enter in an RSVP field submits the RSVP instead of starting sign-in', async ({ page }, testInfo) => {
     const email = `enter-submit-${testInfo.project.name.replace(/\W/g, '')}-${Date.now()}@example.test`.toLowerCase();
     await page.goto('/rsvp/');
+    const account = page.getByRole('group', { name: 'Create your account' });
+    const saveActions = page.locator('.at-rsvp-submit-actions');
+    expect(await account.evaluate((element, target) => Boolean(element.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING), await saveActions.elementHandle())).toBe(true);
+    await expect(page.locator('.at-default-submit')).toHaveAttribute('tabindex', '-1');
     await page.getByLabel('Names', { exact: true }).fill('Enter key test guest');
     await page.getByLabel('Display name').fill('Enter key test guest');
     await page.getByLabel('Email').fill(email);

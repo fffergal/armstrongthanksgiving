@@ -589,7 +589,7 @@ function at_gathering_rsvp_shortcode() {
 			<?php wp_nonce_field( 'at_save_rsvp', 'at_rsvp_nonce' ); ?>
 			<?php wp_nonce_field( 'at_rsvp_signin', 'at_rsvp_signin_nonce' ); ?>
 			<input type="hidden" name="_at_rsvp_touched" value="0">
-			<p class="at-form-actions at-rsvp-submit-actions"><button class="at-button" type="submit" name="action" value="at_save_rsvp"><?php echo $rsvp ? 'Update my RSVP' : 'Save my RSVP'; ?></button></p>
+			<button class="at-default-submit" type="submit" name="action" value="at_save_rsvp" tabindex="-1" aria-hidden="true">Save RSVP</button>
 			<fieldset>
 				<legend>Attendance</legend>
 				<div class="at-choice-row">
@@ -655,6 +655,7 @@ function at_gathering_rsvp_shortcode() {
 					</div>
 				</fieldset>
 			<?php endif; ?>
+			<p class="at-form-actions at-rsvp-submit-actions"><button class="at-button" type="submit" name="action" value="at_save_rsvp"><?php echo $rsvp ? 'Update my RSVP' : 'Save my RSVP'; ?></button></p>
 		</form>
 	</div>
 	<?php
