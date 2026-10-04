@@ -291,18 +291,30 @@ function at_gathering_rsvp_signin() {
 	if ( ! in_array( $status, array( 'yes', 'maybe', 'no' ), true ) ) {
 		$status = 'yes';
 	}
+	$guest_count = max( 0, min( 12, absint( $_POST['at_guest_count'] ?? 1 ) ) );
+	if ( 'yes' === $status && 0 === $guest_count ) {
+		$guest_count = 1;
+	}
 	$foods = array_map( 'sanitize_text_field', (array) wp_unslash( $_POST['at_food'] ?? array() ) );
 	$foods = array_values( array_intersect( at_gathering_foods(), $foods ) );
+	$guest_names = sanitize_text_field( wp_unslash( $_POST['at_guest_names'] ?? '' ) );
+	$dietary = sanitize_textarea_field( wp_unslash( $_POST['at_dietary'] ?? '' ) );
+	$custom_food = sanitize_text_field( wp_unslash( $_POST['at_custom_food'] ?? '' ) );
+	$notes = sanitize_textarea_field( wp_unslash( $_POST['at_notes'] ?? '' ) );
+	$touched = ! empty( $_POST['_at_rsvp_touched'] );
+	if ( ! $logged_in ) {
+		$touched = $touched || 'yes' !== $status || 1 !== $guest_count || '' !== $guest_names || '' !== $dietary || ! empty( $foods ) || '' !== $custom_food || '' !== $notes;
+	}
 	$values = array(
-		'status'      => $status,
-		'guest_count' => max( 0, min( 12, absint( $_POST['at_guest_count'] ?? 1 ) ) ),
-		'guest_names' => sanitize_text_field( wp_unslash( $_POST['at_guest_names'] ?? '' ) ),
-		'dietary'     => sanitize_textarea_field( wp_unslash( $_POST['at_dietary'] ?? '' ) ),
-		'foods'       => $foods,
-		'custom_food' => sanitize_text_field( wp_unslash( $_POST['at_custom_food'] ?? '' ) ),
-		'notes'       => sanitize_textarea_field( wp_unslash( $_POST['at_notes'] ?? '' ) ),
+		'status'            => $status,
+		'guest_count'       => $guest_count,
+		'guest_names'       => $guest_names,
+		'dietary'           => $dietary,
+		'foods'             => $foods,
+		'custom_food'       => $custom_food,
+		'notes'             => $notes,
 		'_at_rsvp_handoff' => 1,
-		'_at_rsvp_touched' => ! empty( $_POST['_at_rsvp_touched'] ) ? 1 : 0,
+		'_at_rsvp_touched' => $touched ? 1 : 0,
 	);
 
 	$token = strtolower( wp_generate_password( 32, false, false ) );

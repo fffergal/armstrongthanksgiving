@@ -386,6 +386,7 @@ test.describe('RSVP sign-in handoff', () => {
     expect(await note.evaluate((element, target) => Boolean(element.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING), await account.elementHandle())).toBe(true);
     await page.getByLabel('Names', { exact: true }).fill('Draft guest');
     await page.getByLabel('Stuffing — vegetarian').check();
+    await page.locator('[name="_at_rsvp_touched"]').evaluate((element: HTMLInputElement) => { element.value = '0'; });
     await page.getByRole('button', { name: 'Sign in first' }).click();
     await expect(page).toHaveURL(/wp-login\.php/);
     await page.locator('#user_login').fill(process.env.WP_TEST_USER ?? 'guest');
