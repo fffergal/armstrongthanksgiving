@@ -1,10 +1,12 @@
 import crypto from 'node:crypto';
+import dotenv from 'dotenv';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+dotenv.config({ path: path.join(root, '.env') });
 const visualOnly = process.argv.includes('--visual-only');
 const linuxVisualOnly = process.argv.includes('--linux-visual-only');
 const excludeVisual = process.argv.includes('--exclude-visual');
@@ -63,9 +65,14 @@ function updateWordPressUrl(value) {
 }
 
 function runLinuxVisuals({ reset = true, skipForRemoteTarget = false } = {}) {
-  const runtime = worktreeRuntime();
   const localUrl = localBaseUrl();
   const localOrigin = new URL(localUrl).origin;
+  const isLoopback = ['localhost', '127.0.0.1', '[::1]'].includes(new URL(localUrl).hostname);
+  if (skipForRemoteTarget && !isLoopback) {
+    console.log(`Skipping the automatic Linux screenshot pass because BASE_URL targets ${localOrigin}; it only runs against the local worktree WordPress site.`);
+    return 0;
+  }
+  const runtime = worktreeRuntime();
   if (localOrigin !== new URL(runtime.url).origin) {
     if (skipForRemoteTarget) {
       console.log(`Skipping the automatic Linux screenshot pass because BASE_URL targets ${localOrigin}; it only runs against this local worktree at ${runtime.url}.`);
@@ -127,6 +134,7 @@ function runLinuxVisuals({ reset = true, skipForRemoteTarget = false } = {}) {
     '--env', 'BASE_URL=http://wordpress',
     '--env', 'USE_WORKTREE_RUNTIME=0',
     '--env', 'LOCAL_LINUX_QEMU=1',
+    ...(process.env.CI ? ['--env', `CI=${process.env.CI}`] : []),
     localImage,
     'sh', '-lc',
     `if [ ! -x node_modules/.bin/playwright ]; then npm ci; fi && npx playwright test --project=visual --workers=1${updateSnapshots ? ' --update-snapshots' : ''}${forwardedArgs.length ? ` ${forwardedArgs.map(shellQuote).join(' ')}` : ''}`,
