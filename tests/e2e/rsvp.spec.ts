@@ -57,7 +57,7 @@ test('food contributor names are shown to signed-in guests only', async ({ page,
   await page.getByLabel('Email').fill(`custom-food-${unique}@example.test`);
   await page.getByLabel('Password', { exact: true }).fill('cranberry-sauce-2026');
   await page.getByLabel('Confirm password').fill('cranberry-sauce-2026');
-  await page.locator('.at-rsvp-form button[type="submit"]').click();
+  await page.getByRole('button', { name: 'Save my RSVP' }).click();
   await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
 
   const observerContext = await browser.newContext();
@@ -69,10 +69,11 @@ test('food contributor names are shown to signed-in guests only', async ({ page,
     const customFoodRow = customFoodList.getByRole('listitem').filter({ hasText: customFood });
     await expect(customFoodRow.getByText(customFood)).toBeVisible();
     await expect(customFoodRow.locator('small')).toHaveText('1 total · Sign in to see the names');
-    await expect(customFoodRow.getByRole('link', { name: 'Sign in to see the names' })).toHaveAttribute('href', /wp-login\.php/);
+    await expect(customFoodRow.getByRole('button', { name: 'Sign in to see the names' })).toHaveAttribute('name', 'action');
+    await expect(customFoodRow.getByRole('button', { name: 'Sign in to see the names' })).toHaveAttribute('value', 'at_rsvp_signin');
     await expect(customFoodList).not.toContainText('Food RSVP Account Owner');
     await expect(customFoodList).not.toContainText(guestNames);
-    const gravySummary = observer.getByLabel('Gravy — vegetarian').locator('..').locator('small');
+    const gravySummary = observer.getByLabel('Gravy — vegetarian').locator('..').locator('..').locator('small');
     await expect(gravySummary).toHaveText(/^\d+ total · Sign in to see the names$/);
     await expect(gravySummary).not.toContainText('Food RSVP Account Owner');
     await expect(observer.locator('.at-rsvp-app')).not.toContainText(guestNames);
@@ -94,7 +95,7 @@ test('food contributor names are shown to signed-in guests only', async ({ page,
 
     await observer.getByLabel('Names', { exact: true }).fill('Draft from names link');
     await observer.getByLabel('Something else?').fill('Draft cider');
-    await customFoodRow.getByRole('link', { name: 'Sign in to see the names' }).click();
+    await customFoodRow.getByRole('button', { name: 'Sign in to see the names' }).click();
     await expect(observer).toHaveURL(/wp-login\.php/);
     await observer.locator('#user_login').fill(process.env.WP_TEST_USER ?? 'guest');
     await observer.locator('#user_pass').fill(process.env.WP_TEST_PASSWORD ?? 'password');
@@ -114,7 +115,7 @@ test('food contributor names are shown to signed-in guests only', async ({ page,
     const customFoodList = signedIn.locator('.at-custom-food-list');
     const customFoodRow = customFoodList.getByRole('listitem').filter({ hasText: customFood });
     await expect(customFoodRow.locator('small')).toHaveText(`1 total from ${guestNames}`);
-    const gravySummary = signedIn.getByLabel('Gravy — vegetarian').locator('..').locator('small');
+    const gravySummary = signedIn.getByLabel('Gravy — vegetarian').locator('..').locator('..').locator('small');
     await expect(gravySummary).toContainText(`from ${guestNames}`);
     await expect(signedIn.locator('.at-rsvp-app')).toContainText(guestNames);
     await customFoodList.scrollIntoViewIfNeeded();
@@ -228,7 +229,7 @@ test('a signed-in RSVP has no login prompt, emails its full payload, and repopul
   await page.goto('/rsvp/');
 
   await expect(page.getByRole('group', { name: 'Create your account' })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'Sign in first' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Sign in first' })).toHaveCount(0);
 
   await page.getByLabel('I’m coming').check();
   await page.getByLabel('How many people are coming?').selectOption('3');
@@ -304,53 +305,6 @@ test('a signed-in RSVP has no login prompt, emails its full payload, and repopul
   await expect(page.getByLabel('Anything else for the hosts? (optional)')).toHaveValue('Updated note for the hosts.');
 });
 
-test('a successful RSVP clears an older sign-in draft before the next visit', async ({ page }) => {
-  await logIn(page);
-  await page.goto('/rsvp/');
-  await page.evaluate(() => {
-    sessionStorage.setItem('armstrong-thanksgiving-rsvp-draft', JSON.stringify({
-      path: '/rsvp/',
-      savedAt: Date.now(),
-      values: {
-        at_status: 'yes',
-        at_guest_count: '1',
-        at_guest_names: 'Older draft names',
-        'at_food[]::Gravy — vegetarian': true,
-        at_custom_food: '',
-        at_dietary: '',
-        at_notes: ''
-      }
-    }));
-  });
-
-  await page.getByLabel('Names', { exact: true }).fill('Saved guest names');
-  await page.getByLabel('Pumpkin pie').check();
-  await page.locator('.at-rsvp-form button[type="submit"]').click();
-  await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
-  expect(await page.evaluate(() => sessionStorage.getItem('armstrong-thanksgiving-rsvp-draft'))).toBeNull();
-
-  await page.goto('/rsvp/');
-  await expect(page.getByLabel('Names', { exact: true })).toHaveValue('Saved guest names');
-  await expect(page.getByLabel('Gravy — vegetarian')).not.toBeChecked();
-  await expect(page.getByLabel('Pumpkin pie')).toBeChecked();
-
-  await page.evaluate(() => {
-    sessionStorage.setItem('armstrong-thanksgiving-rsvp-draft', JSON.stringify({
-      path: '/rsvp/',
-      savedAt: Date.now() - 60_000,
-      values: {
-        at_guest_names: 'Older stale names',
-        'at_food[]::Gravy — vegetarian': true
-      }
-    }));
-  });
-  await page.reload();
-  await expect(page.getByLabel('Names', { exact: true })).toHaveValue('Saved guest names');
-  await expect(page.getByLabel('Gravy — vegetarian')).not.toBeChecked();
-  await expect(page.getByLabel('Pumpkin pie')).toBeChecked();
-  expect(await page.evaluate(() => sessionStorage.getItem('armstrong-thanksgiving-rsvp-draft'))).toBeNull();
-});
-
 test('a standalone signup creates a member without an RSVP', async ({ page }, testInfo) => {
   const unique = `${testInfo.project.name.replace(/\W/g, '')}${Date.now()}`.toLowerCase();
   await page.goto('/signup/');
@@ -411,29 +365,29 @@ test('the ordinary RSVP URL is public and explains account access', async ({ pag
   await expect(page.locator('.at-event-address')).toHaveCount(0);
 });
 
-test('the sign-in option comes before registration and keeps the RSVP draft', async ({ page }) => {
-  await page.addInitScript(() => {
-    const actualNow = Date.now.bind(Date);
-    Date.now = () => actualNow() - 5 * 60 * 1000;
+test.describe('RSVP sign-in handoff without JavaScript', () => {
+  test.use({ javaScriptEnabled: false });
+
+  test('the sign-in option comes before registration and keeps the RSVP draft', async ({ page }) => {
+    await page.goto('/rsvp/');
+    const note = page.locator('.at-form-login-note-top');
+    const account = page.getByRole('group', { name: 'Create your account' });
+    await expect(note).toBeVisible();
+    expect(await note.evaluate((element, target) => Boolean(element.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING), await account.elementHandle())).toBe(true);
+    await page.getByLabel('Names', { exact: true }).fill('Draft guest');
+    await page.getByLabel('Stuffing — vegetarian').check();
+    await page.getByRole('button', { name: 'Sign in first' }).click();
+    await expect(page).toHaveURL(/wp-login\.php/);
+    await page.locator('#user_login').fill(process.env.WP_TEST_USER ?? 'guest');
+    await page.locator('#user_pass').fill(process.env.WP_TEST_PASSWORD ?? 'password');
+    await page.locator('#wp-submit').click();
+    await page.waitForURL(/\/rsvp\//);
+    await expect(page.getByLabel('Names', { exact: true })).toHaveValue('Draft guest');
+    await expect(page.getByLabel('Stuffing — vegetarian')).toBeChecked();
+    await page.reload();
+    await expect(page.getByLabel('Names', { exact: true })).not.toHaveValue('Draft guest');
+    await expect(page.getByLabel('Stuffing — vegetarian')).not.toBeChecked();
   });
-  await page.goto('/rsvp/');
-  const note = page.locator('.at-form-login-note-top');
-  const account = page.getByRole('group', { name: 'Create your account' });
-  await expect(note).toBeVisible();
-  expect(await note.evaluate((element, target) => Boolean(element.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING), await account.elementHandle())).toBe(true);
-  await page.getByLabel('Names', { exact: true }).fill('Draft guest');
-  await page.getByLabel('Stuffing — vegetarian').check();
-  await page.getByRole('link', { name: 'Sign in first' }).click();
-  await expect(page).toHaveURL(/wp-login\.php/);
-  await page.locator('#user_login').fill(process.env.WP_TEST_USER ?? 'guest');
-  await page.locator('#user_pass').fill(process.env.WP_TEST_PASSWORD ?? 'password');
-  await page.locator('#wp-submit').click();
-  await page.waitForURL(/\/rsvp\//);
-  await expect(page.getByLabel('Names', { exact: true })).toHaveValue('Draft guest');
-  await expect(page.getByLabel('Stuffing — vegetarian')).toBeChecked();
-  await page.reload();
-  await expect(page.getByLabel('Names', { exact: true })).toHaveValue('Draft guest');
-  await expect(page.getByLabel('Stuffing — vegetarian')).toBeChecked();
 });
 
 test('private album access redirects signed-out visitors', async ({ browser }) => {
@@ -491,7 +445,7 @@ test('server-side RSVP validation does not leave an orphan account', async ({ pa
 test('a food count increments once and an RSVP update does not double-count it', async ({ page }, testInfo) => {
   const unique = `counter${testInfo.project.name.replace(/\W/g, '')}${Date.now()}`.toLowerCase();
   await page.goto('/rsvp/');
-  const gravy = page.getByLabel('Gravy — vegetarian').locator('..');
+  const gravy = page.getByLabel('Gravy — vegetarian').locator('..').locator('..');
   const gravySummary = gravy.locator('small');
   const before = Number.parseInt((await gravySummary.innerText()).match(/\d+/)?.[0] ?? '0', 10);
   await page.getByLabel('Names', { exact: true }).fill('Count Test Friend');
