@@ -11,20 +11,26 @@ try {
   // The environment has not started yet; retain the default URL for diagnostics.
 }
 const configuredBaseURL = process.env.BASE_URL?.trim();
-const baseURL = process.env.USE_WORKTREE_RUNTIME === '0'
+const explicitNonDefaultBaseURL = configuredBaseURL && configuredBaseURL !== 'http://localhost:8888';
+const baseURL = process.env.USE_WORKTREE_RUNTIME === '0' || explicitNonDefaultBaseURL
   ? configuredBaseURL || 'http://localhost:8888'
-  : (runtime.url || (configuredBaseURL && configuredBaseURL !== 'http://localhost:8888' ? configuredBaseURL : 'http://localhost:8888'));
+  : runtime.url || 'http://localhost:8888';
 const chromiumLaunchOptions = {
   launchOptions: {
     // The login page is intentionally exercised with known fixture
     // credentials. Prevent Chromium's password manager from carrying a
     // saved value between projects and overwriting the test fields.
-    args: ['--disable-save-password-bubble', '--disable-features=PasswordManagerOnboarding,AutofillServerCommunication']
+    args: [
+      '--disable-save-password-bubble',
+      '--disable-features=PasswordManagerOnboarding,AutofillServerCommunication',
+      ...(process.env.LOCAL_LINUX_QEMU === '1' ? ['--disable-gpu', '--no-zygote'] : [])
+    ]
   }
 };
 
 export default defineConfig({
   testDir: './tests/e2e',
+  timeout: process.env.LOCAL_LINUX_QEMU === '1' ? 60_000 : 30_000,
   globalSetup: './scripts/playwright-global-setup.mjs',
   outputDir: 'test-results',
   fullyParallel: true,

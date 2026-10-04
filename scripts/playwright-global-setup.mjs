@@ -13,9 +13,10 @@ try {
 }
 
 const configuredBaseURL = process.env.BASE_URL?.trim();
-const baseURL = process.env.USE_WORKTREE_RUNTIME === '0'
+const explicitNonDefaultBaseURL = configuredBaseURL && configuredBaseURL !== 'http://localhost:8888';
+const baseURL = process.env.USE_WORKTREE_RUNTIME === '0' || explicitNonDefaultBaseURL
   ? configuredBaseURL || 'http://localhost:8888'
-  : (runtime.url || (configuredBaseURL && configuredBaseURL !== 'http://localhost:8888' ? configuredBaseURL : 'http://localhost:8888'));
+  : runtime.url || 'http://localhost:8888';
 const target = new URL(baseURL);
 const isLoopback = ['localhost', '127.0.0.1', '[::1]', '::1'].includes(target.hostname);
 const isWorktreeRuntime = Boolean(runtime.url) && new URL(runtime.url).origin === target.origin;
