@@ -19,6 +19,19 @@
   var form = document.querySelector('.at-rsvp-form');
   if (!form) return;
 
+  var serverTimeAtLoad = Number(form.getAttribute('data-rsvp-server-now')) || 0;
+  var clientTimeAtLoad = Date.now();
+  var performanceTimeAtLoad = window.performance && typeof window.performance.now === 'function' ? window.performance.now() : 0;
+  var serverClockOffset = serverTimeAtLoad ? serverTimeAtLoad - clientTimeAtLoad : 0;
+
+  function currentServerTime() {
+    if (!serverTimeAtLoad) return Date.now();
+    var elapsed = window.performance && typeof window.performance.now === 'function'
+      ? window.performance.now() - performanceTimeAtLoad
+      : Date.now() - clientTimeAtLoad;
+    return serverTimeAtLoad + elapsed;
+  }
+
   function isDraftField(field) {
     return editableFields.indexOf(field.name) !== -1;
   }
@@ -33,7 +46,7 @@
       values[key] = field.type === 'checkbox' ? field.checked : field.value;
     });
     try {
-      sessionStorage.setItem(storageKey, JSON.stringify({ path: window.location.pathname, savedAt: Date.now(), values: values }));
+      sessionStorage.setItem(storageKey, JSON.stringify({ path: window.location.pathname, savedAt: currentServerTime(), clock: 'server', values: values }));
     } catch (error) {
       // Storage can be unavailable in private browsing; the form still works normally.
     }
@@ -46,14 +59,17 @@
     } catch (error) {
       draft = null;
     }
-    if (!draft || draft.path !== window.location.pathname || Date.now() - draft.savedAt > 15 * 60 * 1000) {
-      if (draft && Date.now() - draft.savedAt > 15 * 60 * 1000) {
+    var draftSavedAt = draft && Number(draft.savedAt);
+    if (draft && draft.clock !== 'server') draftSavedAt += serverClockOffset;
+    var age = currentServerTime() - draftSavedAt;
+    if (!draft || draft.path !== window.location.pathname || age > 15 * 60 * 1000) {
+      if (draft && age > 15 * 60 * 1000) {
         try { sessionStorage.removeItem(storageKey); } catch (error) {}
       }
       return;
     }
     var rsvpUpdatedAt = Number(form.getAttribute('data-rsvp-updated-at')) || 0;
-    if (rsvpUpdatedAt && draft.savedAt < rsvpUpdatedAt) {
+    if (rsvpUpdatedAt && draftSavedAt < rsvpUpdatedAt) {
       try { sessionStorage.removeItem(storageKey); } catch (error) {}
       return;
     }

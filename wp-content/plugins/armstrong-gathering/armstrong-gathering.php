@@ -528,6 +528,8 @@ function at_gathering_rsvp_shortcode() {
 	}
 	$form_status = $values['status'] ?? ( $rsvp ? $rsvp->status : 'yes' );
 	$form_count  = isset( $values['guest_count'] ) ? (int) $values['guest_count'] : ( $rsvp ? (int) $rsvp->guest_count : 1 );
+	$can_view_contributors = $user->exists();
+	$rsvp_server_now       = time() * 1000;
 	$rsvp_updated_at = 0;
 	if ( $rsvp && ! empty( $rsvp->updated_at ) ) {
 		$updated_at = DateTimeImmutable::createFromFormat( 'Y-m-d H:i:s', $rsvp->updated_at, wp_timezone() );
@@ -542,7 +544,7 @@ function at_gathering_rsvp_shortcode() {
 		<?php if ( isset( $_GET['at_rsvp'] ) && 'error' === sanitize_key( $_GET['at_rsvp'] ) ) : ?>
 			<div class="at-success at-error" role="alert"><strong>We could not save that RSVP.</strong><br><?php echo esc_html( sanitize_text_field( wp_unslash( $_GET['at_message'] ?? 'Please check the form and try again.' ) ) ); ?></div>
 		<?php endif; ?>
-		<form class="at-rsvp-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post" data-rsvp-updated-at="<?php echo esc_attr( $rsvp_updated_at ); ?>">
+		<form class="at-rsvp-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post" data-rsvp-updated-at="<?php echo esc_attr( $rsvp_updated_at ); ?>" data-rsvp-server-now="<?php echo esc_attr( $rsvp_server_now ); ?>">
 			<div class="at-rsvp-intro">
 				<h2>Will you join us?</h2>
 				<p>Let us know if you can make it, who’s joining you, and what you might bring.</p>
@@ -576,10 +578,10 @@ function at_gathering_rsvp_shortcode() {
 			</label>
 			<fieldset>
 				<legend>What could you bring?</legend>
-				<p class="at-field-help">Each choice shows the total RSVPs that have claimed it and the names on those RSVPs.</p>
+				<p class="at-field-help"><?php echo $can_view_contributors ? 'Each choice shows the total RSVPs that have claimed it and the names on those RSVPs.' : 'Each choice shows how many RSVPs have claimed it. Sign in to see the names.'; ?></p>
 				<div class="at-food-list">
 					<?php foreach ( $foods as $food ) : ?>
-						<label><input type="checkbox" name="at_food[]" value="<?php echo esc_attr( $food ); ?>" <?php checked( in_array( $food, $chosen, true ) ); ?>><span><?php echo esc_html( $food ); ?></span><small><?php echo esc_html( (int) ( $counts[ $food ] ?? 0 ) ); ?> total<?php if ( ! empty( $food_contributors[ $food ] ) ) : ?> from <?php echo esc_html( implode( ', ', $food_contributors[ $food ] ) ); ?><?php endif; ?></small></label>
+						<label><input type="checkbox" name="at_food[]" value="<?php echo esc_attr( $food ); ?>" <?php checked( in_array( $food, $chosen, true ) ); ?>><span><?php echo esc_html( $food ); ?></span><small><?php echo esc_html( (int) ( $counts[ $food ] ?? 0 ) ); ?> total<?php if ( ! empty( $food_contributors[ $food ] ) ) : ?><?php if ( $can_view_contributors ) : ?> from <?php echo esc_html( implode( ', ', $food_contributors[ $food ] ) ); ?><?php else : ?> · <a href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>">Sign in to see the names</a><?php endif; ?><?php endif; ?></small></label>
 					<?php endforeach; ?>
 				</div>
 				<?php if ( $custom_food_counts ) : ?>
@@ -587,7 +589,7 @@ function at_gathering_rsvp_shortcode() {
 						<p class="at-field-help">Other things people are bringing</p>
 						<ul>
 							<?php foreach ( $custom_food_counts as $item ) : ?>
-								<li><span><?php echo esc_html( $item['label'] ); ?></span><small><?php echo esc_html( (int) $item['count'] ); ?> total from <?php echo esc_html( implode( ', ', $item['names'] ) ); ?></small></li>
+								<li><span><?php echo esc_html( $item['label'] ); ?></span><small><?php echo esc_html( (int) $item['count'] ); ?> total<?php if ( $can_view_contributors ) : ?> from <?php echo esc_html( implode( ', ', $item['names'] ) ); ?><?php else : ?> · <a href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>">Sign in to see the names</a><?php endif; ?></small></li>
 							<?php endforeach; ?>
 						</ul>
 					</div>

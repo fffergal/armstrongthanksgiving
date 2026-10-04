@@ -45,7 +45,7 @@ test('a signed-in friend gets the RSVP and potluck form', async ({ page }) => {
   expect(await foodCheckbox.evaluate((element) => getComputedStyle(element, '::before').transform)).toBe('matrix(1, 0, 0, 1, 0, 0)');
 });
 
-test('food choices name everyone on the RSVP for other guests', async ({ page, browser }, testInfo) => {
+test('food contributor names are shown to signed-in guests only', async ({ page, browser }, testInfo) => {
   const unique = `${testInfo.project.name.replace(/\W/g, '')}${Date.now()}`.toLowerCase();
   const customFood = `Test cider ${unique}`;
   const guestNames = 'Taylor Test Guest, Casey Test Guest';
@@ -68,11 +68,14 @@ test('food choices name everyone on the RSVP for other guests', async ({ page, b
     await expect(customFoodList).toBeVisible();
     const customFoodRow = customFoodList.getByRole('listitem').filter({ hasText: customFood });
     await expect(customFoodRow.getByText(customFood)).toBeVisible();
-    await expect(customFoodRow.locator('small')).toHaveText(`1 total from ${guestNames}`);
+    await expect(customFoodRow.locator('small')).toHaveText('1 total · Sign in to see the names');
+    await expect(customFoodRow.getByRole('link', { name: 'Sign in to see the names' })).toHaveAttribute('href', /wp-login\.php/);
     await expect(customFoodList).not.toContainText('Food RSVP Account Owner');
+    await expect(customFoodList).not.toContainText(guestNames);
     const gravySummary = observer.getByLabel('Gravy — vegetarian').locator('..').locator('small');
-    await expect(gravySummary).toContainText(guestNames);
+    await expect(gravySummary).toHaveText(/^\d+ total · Sign in to see the names$/);
     await expect(gravySummary).not.toContainText('Food RSVP Account Owner');
+    await expect(observer.locator('.at-rsvp-app')).not.toContainText(guestNames);
     const gravyRow = observer.locator('.at-food-list label').filter({ hasText: 'Gravy — vegetarian' });
     await gravyRow.scrollIntoViewIfNeeded();
     await observer.screenshot({ path: testInfo.outputPath('rsvp-listed-food-contributor-desktop.png') });
@@ -90,6 +93,29 @@ test('food choices name everyone on the RSVP for other guests', async ({ page, b
     await observer.screenshot({ path: testInfo.outputPath('rsvp-custom-food-mobile.png') });
   } finally {
     await observerContext.close();
+  }
+
+  const signedInContext = await browser.newContext();
+  try {
+    const signedIn = await signedInContext.newPage();
+    await logIn(signedIn);
+    await signedIn.goto('/rsvp/');
+    const customFoodList = signedIn.locator('.at-custom-food-list');
+    const customFoodRow = customFoodList.getByRole('listitem').filter({ hasText: customFood });
+    await expect(customFoodRow.locator('small')).toHaveText(`1 total from ${guestNames}`);
+    const gravySummary = signedIn.getByLabel('Gravy — vegetarian').locator('..').locator('small');
+    await expect(gravySummary).toContainText(`from ${guestNames}`);
+    await expect(signedIn.locator('.at-rsvp-app')).toContainText(guestNames);
+    await customFoodList.scrollIntoViewIfNeeded();
+    await signedIn.screenshot({ path: testInfo.outputPath('rsvp-signed-in-contributors-desktop.png') });
+    await signedIn.setViewportSize({ width: 768, height: 1024 });
+    await customFoodList.scrollIntoViewIfNeeded();
+    await signedIn.screenshot({ path: testInfo.outputPath('rsvp-signed-in-contributors-tablet.png') });
+    await signedIn.setViewportSize({ width: 390, height: 844 });
+    await customFoodList.scrollIntoViewIfNeeded();
+    await signedIn.screenshot({ path: testInfo.outputPath('rsvp-signed-in-contributors-mobile.png') });
+  } finally {
+    await signedInContext.close();
   }
 });
 
@@ -375,6 +401,10 @@ test('the ordinary RSVP URL is public and explains account access', async ({ pag
 });
 
 test('the sign-in option comes before registration and keeps the RSVP draft', async ({ page }) => {
+  await page.addInitScript(() => {
+    const actualNow = Date.now.bind(Date);
+    Date.now = () => actualNow() - 5 * 60 * 1000;
+  });
   await page.goto('/rsvp/');
   const note = page.locator('.at-form-login-note-top');
   const account = page.getByRole('group', { name: 'Create your account' });
