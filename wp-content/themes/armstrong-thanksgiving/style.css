@@ -385,8 +385,8 @@ body.at-focus-script-ready.at-keyboard-focus #bbpress-forums textarea#bbp_reply_
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.7rem;
-  padding: .65rem 1.1rem;
+  min-height: 2.75rem;
+  padding: .65rem 1.15rem;
   border: 0;
   border-radius: 999px;
   background: var(--at-coral);
@@ -394,7 +394,12 @@ body.at-focus-script-ready.at-keyboard-focus #bbpress-forums textarea#bbp_reply_
   font: inherit;
   font-weight: 800;
   line-height: 1;
+  box-shadow: 0 6px 0 rgba(76, 37, 24, .12);
   cursor: pointer;
+}
+.wppa-container input[id^="wppa-user-upload-"][id$="-display"] {
+  min-height: 2.75rem !important;
+  padding-inline: 1.15rem !important;
 }
 .wppa-container button:hover, .wppa-container input[type="button"]:hover,
 .wppa-container input[type="submit"]:hover, .wppa-container input[id^="wppa-user-upload-"][id$="-display"]:hover,
@@ -404,6 +409,7 @@ body.at-focus-script-ready.at-keyboard-focus #bbpress-forums textarea#bbp_reply_
 .wppa-container .wppa-button:focus-visible, .wppa-container .wppa-upload-button:focus-visible {
   background: var(--at-brown);
   color: #fff;
+  transform: translateY(-1px);
 }
 
 /* A topic is still useful, but the forum should feel like a small gathering

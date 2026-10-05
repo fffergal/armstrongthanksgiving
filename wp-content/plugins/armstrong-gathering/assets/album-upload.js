@@ -5,6 +5,9 @@
 
     fileInput.dataset.atUploadEnhanced = 'true';
     fileInput.setAttribute('aria-label', 'Choose photos to share');
+    const fileButton = form.querySelector('input[id$="-display"]');
+    fileButton?.setAttribute('aria-label', 'Choose photos');
+    if (fileButton) fileButton.value = 'Choose photos';
 
     const title = form.querySelector('input[name="wppa-user-name"]');
     const description = form.querySelector('textarea[name="wppa-user-desc"]');
@@ -18,10 +21,14 @@
         const status = form.querySelector('.at-album-upload-status');
         const progressText = progress.textContent?.trim() ?? '';
         const messageText = uploadMessage.textContent?.trim() ?? '';
-        if (status && /successfully uploaded/i.test(messageText)) {
-          status.textContent = 'Photo uploaded successfully. Refresh to see it in the shared album.';
-        } else if (status && /upload failed|server error/i.test(`${progressText} ${messageText}`)) {
+        const hasSuccess = /successfully uploaded/i.test(messageText);
+        const hasFailure = /uploads? failed|server error/i.test(`${progressText} ${messageText}`);
+        if (status && hasFailure && hasSuccess) {
+          status.textContent = 'Some photos uploaded, but others could not be shared. Please review the upload results.';
+        } else if (status && hasFailure) {
           status.textContent = 'The photo could not be uploaded. Please try again.';
+        } else if (status && hasSuccess) {
+          status.textContent = 'Photo uploaded successfully. Refresh to see it in the shared album.';
         }
       };
       const uploadObserver = new MutationObserver(updateUploadStatus);
@@ -34,6 +41,8 @@
       const files = Array.from(fileInput.files ?? []);
       const submit = form.querySelector('input.wppa-user-submit');
       if (!submit) return;
+
+      if (fileButton) fileButton.value = 'Choose photos';
 
       let status = form.querySelector('.at-album-upload-status');
       if (!status) {
