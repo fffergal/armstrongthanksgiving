@@ -665,11 +665,17 @@ function at_gathering_status_label( $status ) {
 	)[ $status ] ?? 'Coming';
 }
 
-function at_gathering_home_intro_shortcode() {
+function at_gathering_home_intro_shortcode( $atts ) {
+	$atts = shortcode_atts(
+		array(
+			'guest'  => '',
+			'member' => '',
+		),
+		$atts,
+		'at_home_intro'
+	);
 	$user = wp_get_current_user();
-	$copy = $user->exists()
-		? 'RSVP, choose something for the table, and join the conversation.'
-		: 'RSVP, choose something for the table, and join the conversation — or sign up without an RSVP to use the forum and shared photos.';
+	$copy = $user->exists() ? $atts['member'] : $atts['guest'];
 	return '<p class="is-style-lead">' . esc_html( $copy ) . '</p>';
 }
 add_shortcode( 'at_home_intro', 'at_gathering_home_intro_shortcode' );
