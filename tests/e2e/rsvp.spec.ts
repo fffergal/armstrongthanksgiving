@@ -327,6 +327,9 @@ test('an RSVP saves and is still present after reload', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('link', { name: 'Update RSVP', exact: true })).toHaveAttribute('href', /\/rsvp\/$/);
   await expect(page.getByRole('link', { name: 'Sign up without RSVP' })).toHaveAttribute('href', /\/signup\/$/);
+  if (process.env.SIGNED_IN_HOME_WITH_RSVP_SCREENSHOT) {
+    await page.screenshot({ path: process.env.SIGNED_IN_HOME_WITH_RSVP_SCREENSHOT, fullPage: true });
+  }
 });
 
 test('a signed-in RSVP has no login prompt, emails its full payload, and repopulates every field when edited', async ({ page }) => {

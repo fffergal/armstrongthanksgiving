@@ -106,6 +106,9 @@ test('a signed-in friend can use the gathering pages', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'Sign out' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Sign up without RSVP' })).toHaveAttribute('href', /\/signup\/$/);
   await expect(page.locator('#wp--skip-link--target').getByRole('link', { name: 'RSVP', exact: true })).toHaveAttribute('href', /\/rsvp\/$/);
+  if (process.env.SIGNED_IN_HOME_NO_RSVP_SCREENSHOT) {
+    await page.screenshot({ path: process.env.SIGNED_IN_HOME_NO_RSVP_SCREENSHOT, fullPage: true });
+  }
   await expect(page.locator('.at-date-card')).toContainText('12 December 2026');
   await expect(page.locator('.at-date-card')).toContainText('6:42 pm');
   await expect(page.locator('.at-date-card .at-event-address')).toHaveCount(0);
