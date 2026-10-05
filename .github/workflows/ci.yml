@@ -1,4 +1,4 @@
-name: CI
+name: Base-branch CI
 
 on:
   pull_request_target:
@@ -17,7 +17,8 @@ on:
         type: string
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}
+  # Keep the existing key stable when the workflow's display name changes.
+  group: ci-CI-${{ github.event_name }}-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}
   # Let main pushes finish any deployment in progress; the deploy baseline
   # accounts for newer pending pushes replacing one another.
   cancel-in-progress: ${{ github.event_name != 'push' }}
@@ -27,7 +28,7 @@ permissions:
 
 jobs:
   prepare_check:
-    name: Prepare trusted check
+    name: Prepare base-branch check
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -67,7 +68,7 @@ jobs:
             }
 
             if (context.eventName === 'workflow_dispatch' && pullRequest.head.sha !== process.env.INPUT_HEAD_SHA) {
-              core.setFailed('The requested pull request head changed before trusted CI started.');
+              core.setFailed('The requested pull request head changed before base-branch CI started.');
               return;
             }
 
@@ -99,7 +100,7 @@ jobs:
               started_at: new Date().toISOString(),
               details_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
               output: {
-                title: 'Trusted CI is running',
+                title: 'Base-branch CI is running',
                 summary: 'Testing the immutable pull-request merge commit with the workflow definition from main.',
               },
             });
@@ -109,7 +110,7 @@ jobs:
             core.setOutput('head_sha', headSha);
 
   test:
-    name: Run trusted CI
+    name: Run base-branch CI
     needs: prepare_check
     if: needs.prepare_check.result == 'success'
     runs-on: ubuntu-latest
@@ -120,8 +121,8 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v5
         with:
-          # This workflow comes from trusted main; only the source under test
-          # comes from the verified immutable pull-request merge commit.
+          # This workflow comes from the base branch; only the source under
+          # test comes from the verified immutable pull-request merge commit.
           ref: ${{ needs.prepare_check.outputs.test_sha || github.sha }}
           persist-credentials: false
 
@@ -190,8 +191,8 @@ jobs:
               conclusion,
               completed_at: new Date().toISOString(),
               output: {
-                title: `Trusted CI ${conclusion}`,
-                summary: `The trusted CI runner completed with conclusion: ${conclusion}.`,
+                title: `Base-branch CI ${conclusion}`,
+                summary: `The base-branch CI runner completed with conclusion: ${conclusion}.`,
               },
             });
 

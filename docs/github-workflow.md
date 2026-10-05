@@ -12,15 +12,16 @@ requests into `main`:
    `npm run test:update-snapshots` locally, review the changed images, and
    commit them with the code change before pushing.
 3. Push the branch and open a pull request into `main`.
-4. The trusted CI workflow starts WordPress, seeds the fixture data, runs the
+4. The base-branch CI workflow starts WordPress, seeds the fixture data, runs the
    browser acceptance suite and Lighthouse budgets on an x64 Ubuntu runner,
    and runs visual contracts in the same x64 Playwright container used by local
    snapshot checks. The shared container includes DejaVu Sans for the Ubuntu
    system-font fallback. Reports are retained as workflow artifacts. The
    workflow definition comes from `main`, while the source under test comes
    from the pull request, so a PR cannot replace the required check by editing
-   its own CI YAML. The test runner has only `contents: read`, does not use
-   production secrets, and disables checkout credentials. Separate trusted
+   its own CI YAML. This separation lets the check be created with
+   `checks: write` while the test runner has only `contents: read`, does not use
+   production secrets, and disables checkout credentials. Separate
    jobs create and complete `CI / test` with `checks: write`, including when a
    token-created automation PR cannot start a normal pull-request workflow.
 5. Codex review is enabled. Review any feedback it provides and address useful
@@ -78,7 +79,8 @@ The PR receives the same CI checks as every other change. Codex review may
 provide feedback, but no reviewer approval is required. Once merged, the
 deployment workflow publishes the checked-in block
 document back to production. Since the sync workflow writes with
-`GITHUB_TOKEN`, it explicitly dispatches the trusted CI workflow from `main`
+`GITHUB_TOKEN`, it explicitly dispatches the base-branch CI workflow from `main`
 with the PR number and head SHA; that workflow reports the required
-`CI / test` check on the PR commit. Codex review feedback can be addressed as
+`CI / test` check on the PR commit. The workflow runs from `main` while it
+tests the PR's immutable merge commit. Codex review feedback can be addressed as
 part of the ordinary PR conversation; it does not create an approval gate.
