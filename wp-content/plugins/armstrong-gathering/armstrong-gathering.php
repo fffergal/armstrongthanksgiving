@@ -501,6 +501,17 @@ function at_gathering_trim_album_assets() {
 }
 add_action( 'wp_enqueue_scripts', 'at_gathering_trim_album_assets', 100 );
 
+function at_gathering_enqueue_album_upload_assets() {
+	if ( ! is_page( 'albums' ) ) {
+		return;
+	}
+
+	$script_path = AT_GATHERING_DIR . 'assets/album-upload.js';
+	$script_version = file_exists( $script_path ) ? filemtime( $script_path ) : AT_GATHERING_VERSION;
+	wp_enqueue_script( 'armstrong-gathering-album-upload', AT_GATHERING_URL . 'assets/album-upload.js', array(), $script_version, true );
+}
+add_action( 'wp_enqueue_scripts', 'at_gathering_enqueue_album_upload_assets', 20 );
+
 function at_gathering_body_class( $classes ) {
 	if ( is_page( 'rsvp' ) ) {
 		$classes[] = 'at-rsvp-page';
