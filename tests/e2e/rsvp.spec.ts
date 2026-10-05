@@ -191,16 +191,23 @@ test('food contributor names are shown to signed-in guests only', async ({ page,
     await signedIn.goto('/rsvp/');
     const customFoodList = signedIn.locator('.at-custom-food-list');
     const customFoodRow = customFoodList.getByRole('listitem').filter({ hasText: customFood });
-    await expect(customFoodRow.locator('small')).toHaveText(`3 from ${guestNames} × 3`);
+    await expect(customFoodRow.locator('small')).toHaveText(`3 from ${guestNames}`);
     const gravySummary = signedIn.getByLabel('Gravy — vegetarian', { exact: true }).locator('..').locator('..').locator('small');
     await expect(gravySummary).toContainText(`Bringing: ${guestNames}`);
+    await expect(gravySummary).not.toContainText('×');
     await expect(signedIn.locator('.at-rsvp-app')).toContainText(guestNames);
+    await gravySummary.scrollIntoViewIfNeeded();
+    await signedIn.screenshot({ path: testInfo.outputPath('rsvp-listed-food-contributors-desktop.png') });
     await customFoodList.scrollIntoViewIfNeeded();
     await signedIn.screenshot({ path: testInfo.outputPath('rsvp-signed-in-contributors-desktop.png') });
     await signedIn.setViewportSize({ width: 768, height: 1024 });
+    await gravySummary.scrollIntoViewIfNeeded();
+    await signedIn.screenshot({ path: testInfo.outputPath('rsvp-listed-food-contributors-tablet.png') });
     await customFoodList.scrollIntoViewIfNeeded();
     await signedIn.screenshot({ path: testInfo.outputPath('rsvp-signed-in-contributors-tablet.png') });
     await signedIn.setViewportSize({ width: 390, height: 844 });
+    await gravySummary.scrollIntoViewIfNeeded();
+    await signedIn.screenshot({ path: testInfo.outputPath('rsvp-listed-food-contributors-mobile.png') });
     await customFoodList.scrollIntoViewIfNeeded();
     await signedIn.screenshot({ path: testInfo.outputPath('rsvp-signed-in-contributors-mobile.png') });
   } finally {
@@ -388,7 +395,7 @@ test('a signed-in RSVP has no login prompt, emails its full payload, and repopul
   runWpEval("global $wpdb; $rows = $wpdb->update(at_gathering_table(), array('foods' => wp_json_encode(array('Cranberry sauce', 'Sparkling cider')), 'food_amounts' => '{}'), array('custom_food' => 'Sparkling cider')); if ( false === $rows || 0 === $rows ) { WP_CLI::error('Could not create the legacy RSVP test fixture.'); }");
   await page.reload();
   await expect(page.getByLabel('Amount of something else')).toHaveValue('1');
-  await expect(page.locator('.at-custom-food-list').getByRole('listitem').filter({ hasText: 'Sparkling cider' }).locator('small')).toHaveText('1 from Signed-in Friend × 1');
+  await expect(page.locator('.at-custom-food-list').getByRole('listitem').filter({ hasText: 'Sparkling cider' }).locator('small')).toHaveText('1 from Signed-in Friend');
 
   await page.getByLabel('Amount of something else').fill('0');
   await page.getByRole('button', { name: 'Update my RSVP' }).click();
