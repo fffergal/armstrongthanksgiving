@@ -1,5 +1,30 @@
 import { expect, test } from '@playwright/test';
+import path from 'node:path';
 import { logIn } from './helpers/auth';
+
+test('a signed-in friend can select and confirm a shared photo', async ({ page }) => {
+  await logIn(page);
+  await page.goto('/albums/');
+
+  // Open the album's upload form without activating its file-picker button.
+  await page.locator('.wppa-upload-cover').filter({ hasText: 'Upload photo' }).first().click();
+  const photoInput = page.locator('.wppa-container input[type="file"]');
+  await photoInput.setInputFiles(path.resolve('wp-content/plugins/armstrong-gathering/assets/avatars/turkey-24.png'));
+
+  const confirmUpload = page.locator('.wppa-container input.wppa-user-submit');
+  await expect(confirmUpload).toBeVisible();
+  await expect(confirmUpload).toHaveValue('Share photo');
+  await expect(page.getByRole('status')).toContainText('1 photo selected: turkey-24.png');
+  if (process.env.ALBUM_UPLOAD_SCREENSHOT) {
+    await page.screenshot({ path: process.env.ALBUM_UPLOAD_SCREENSHOT, fullPage: true });
+  }
+
+  await confirmUpload.click();
+  await expect(page.locator('.wppa-container .wppa-percent')).toHaveText('Done!');
+  await expect(page.locator('.wppa-container .wppa-message')).not.toContainText('Upload failed');
+  await expect(page.locator('.wppa-container .wppa-message')).toContainText('1 photo successfully uploaded');
+  await expect(page.getByRole('status')).toHaveText('Photo uploaded successfully. Refresh to see it in the shared album.');
+});
 
 test('a signed-in friend can use the gathering pages', async ({ page }) => {
   await logIn(page);

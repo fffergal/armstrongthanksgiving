@@ -347,6 +347,8 @@ body.at-focus-script-ready.at-keyboard-focus #bbpress-forums textarea#bbp_reply_
 .wppa-container .wppa-title { color: var(--at-orange) !important; }
 .wppa-container .wppa-cover-box * { max-width: 100%; overflow-wrap: break-word; word-break: normal; }
 .wppa-container .wppa-box-text-desc { display: none !important; }
+.wppa-container .at-album-upload-status { margin: .75rem 0 .35rem; color: var(--at-brown); font-weight: 700; text-align: left; }
+.wppa-container input.wppa-user-submit { float: none !important; margin-inline-start: auto !important; }
 .wppa-container .wppa-nav, .wppa-container .wppa-bc, .wppa-container .wppa-metadata,
 .wppa-container .wppa-owner, .wppa-container .wppa-help, .wppa-container .wppa-comment-count { display: none !important; }
 .wppa-container .wppa-thumb, .wppa-container .wppa-cover-box { background: #fffaf4 !important; }
