@@ -6,6 +6,10 @@ test('a signed-in friend can select and confirm a shared photo', async ({ page }
   await logIn(page);
   await page.goto('/albums/');
 
+  const albumPhotoCount = page.getByText(/View\s+\d+\s+photos?/i).first();
+  const albumLabel = await albumPhotoCount.textContent();
+  const photosBefore = Number(albumLabel?.match(/\d+/)?.[0] ?? 0);
+
   // Open the album's upload form without activating its file-picker button.
   await page.locator('.wppa-upload-cover').filter({ hasText: 'Upload photo' }).first().click();
   const photoInput = page.locator('.wppa-container input[type="file"]');
@@ -15,15 +19,36 @@ test('a signed-in friend can select and confirm a shared photo', async ({ page }
   await expect(confirmUpload).toBeVisible();
   await expect(confirmUpload).toHaveValue('Share photo');
   await expect(page.getByRole('status')).toContainText('1 photo selected: turkey-24.png');
-  if (process.env.ALBUM_UPLOAD_SCREENSHOT) {
-    await page.screenshot({ path: process.env.ALBUM_UPLOAD_SCREENSHOT, fullPage: true });
+
+  const progress = page.locator('.wppa-container .wppa-percent');
+  const originalViewport = page.viewportSize();
+  const screenshots = [
+    ['desktop', process.env.ALBUM_UPLOAD_SCREENSHOT_DESKTOP, { width: 1280, height: 900 }],
+    ['tablet', process.env.ALBUM_UPLOAD_SCREENSHOT_TABLET, { width: 768, height: 1024 }],
+    ['mobile', process.env.ALBUM_UPLOAD_SCREENSHOT_MOBILE, { width: 390, height: 844 }]
+  ] as const;
+  for (const [, screenshotPath, viewport] of screenshots) {
+    if (!screenshotPath) continue;
+    await page.setViewportSize(viewport);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+    await page.screenshot({ path: screenshotPath, fullPage: true });
   }
+  if (originalViewport) await page.setViewportSize(originalViewport);
+
+  // WPPA briefly says "Done!" before its response callback confirms success.
+  // That progress label alone must never announce a completed upload.
+  await progress.evaluate(element => { element.textContent = 'Done!'; });
+  await expect(page.getByRole('status')).toContainText('1 photo selected: turkey-24.png');
+  await progress.evaluate(element => { element.textContent = ''; });
 
   await confirmUpload.click();
-  await expect(page.locator('.wppa-container .wppa-percent')).toHaveText('Done!');
+  await expect(progress).toHaveText('Done!');
   await expect(page.locator('.wppa-container .wppa-message')).not.toContainText('Upload failed');
   await expect(page.locator('.wppa-container .wppa-message')).toContainText('1 photo successfully uploaded');
   await expect(page.getByRole('status')).toHaveText('Photo uploaded successfully. Refresh to see it in the shared album.');
+
+  await page.reload();
+  await expect(page.getByText(new RegExp(`View\\s+${photosBefore + 1}\\s+photos?`, 'i')).first()).toBeVisible();
 });
 
 test('a signed-in friend can use the gathering pages', async ({ page }) => {

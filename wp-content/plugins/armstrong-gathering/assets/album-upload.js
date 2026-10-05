@@ -8,17 +8,26 @@
 
     const title = form.querySelector('input[name="wppa-user-name"]');
     const description = form.querySelector('textarea[name="wppa-user-desc"]');
-    title?.setAttribute('aria-label', 'Photo title (optional)');
-    description?.setAttribute('aria-label', 'Photo description (optional)');
+    title?.setAttribute('aria-label', 'Image name (optional)');
+    description?.setAttribute('aria-label', 'Image description (optional)');
 
     const progress = form.querySelector('.wppa-percent');
-    if (progress) {
-      new MutationObserver(() => {
+    const uploadMessage = form.querySelector('.wppa-message');
+    if (progress && uploadMessage) {
+      const updateUploadStatus = () => {
         const status = form.querySelector('.at-album-upload-status');
-        if (progress.textContent?.trim() === 'Done!' && status) {
+        const progressText = progress.textContent?.trim() ?? '';
+        const messageText = uploadMessage.textContent?.trim() ?? '';
+        if (status && /successfully uploaded/i.test(messageText)) {
           status.textContent = 'Photo uploaded successfully. Refresh to see it in the shared album.';
+        } else if (status && /upload failed|server error/i.test(`${progressText} ${messageText}`)) {
+          status.textContent = 'The photo could not be uploaded. Please try again.';
         }
-      }).observe(progress, { childList: true, characterData: true, subtree: true });
+      };
+      const uploadObserver = new MutationObserver(updateUploadStatus);
+      const observerOptions = { childList: true, characterData: true, subtree: true };
+      uploadObserver.observe(progress, observerOptions);
+      uploadObserver.observe(uploadMessage, observerOptions);
     }
 
     fileInput.addEventListener('change', () => {
