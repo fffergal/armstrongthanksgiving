@@ -326,7 +326,7 @@ test('an RSVP saves and is still present after reload', async ({ page }) => {
   await expect(page.getByLabel('Stuffing — vegetarian', { exact: true })).toHaveValue('1');
   await page.goto('/');
   await expect(page.getByRole('link', { name: 'Update RSVP', exact: true })).toHaveAttribute('href', /\/rsvp\/$/);
-  await expect(page.getByRole('link', { name: 'Sign up without RSVP' })).toHaveAttribute('href', /\/signup\/$/);
+  await expect(page.getByRole('link', { name: 'Sign up without RSVP' })).toHaveCount(0);
   if (process.env.SIGNED_IN_HOME_WITH_RSVP_SCREENSHOT) {
     await page.screenshot({ path: process.env.SIGNED_IN_HOME_WITH_RSVP_SCREENSHOT, fullPage: true });
   }

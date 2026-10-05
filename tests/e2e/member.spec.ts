@@ -104,8 +104,9 @@ test('a signed-in friend can use the gathering pages', async ({ page }) => {
 
   await page.goto('/');
   await expect(page.getByRole('link', { name: 'Sign out' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Sign up without RSVP' })).toHaveAttribute('href', /\/signup\/$/);
+  await expect(page.getByRole('link', { name: 'Sign up without RSVP' })).toHaveCount(0);
   await expect(page.locator('#wp--skip-link--target').getByRole('link', { name: 'RSVP', exact: true })).toHaveAttribute('href', /\/rsvp\/$/);
+  await expect(page.locator('.at-hero .is-style-lead')).not.toContainText('sign up without an RSVP');
   if (process.env.SIGNED_IN_HOME_NO_RSVP_SCREENSHOT) {
     await page.screenshot({ path: process.env.SIGNED_IN_HOME_NO_RSVP_SCREENSHOT, fullPage: true });
   }

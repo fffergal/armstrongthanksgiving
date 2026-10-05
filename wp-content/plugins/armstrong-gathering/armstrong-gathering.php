@@ -665,12 +665,31 @@ function at_gathering_status_label( $status ) {
 	)[ $status ] ?? 'Coming';
 }
 
+function at_gathering_home_intro_shortcode() {
+	$user = wp_get_current_user();
+	$copy = $user->exists()
+		? 'RSVP, choose something for the table, and join the conversation.'
+		: 'RSVP, choose something for the table, and join the conversation — or sign up without an RSVP to use the forum and shared photos.';
+	return '<p class="is-style-lead">' . esc_html( $copy ) . '</p>';
+}
+add_shortcode( 'at_home_intro', 'at_gathering_home_intro_shortcode' );
+
 function at_gathering_home_rsvp_action_shortcode() {
 	$user = wp_get_current_user();
 	$label = $user->exists() && at_gathering_get_rsvp( $user->ID ) ? 'Update RSVP' : 'RSVP';
 	return '<div class="wp-block-button at-button"><a class="wp-block-button__link wp-element-button" href="' . esc_url( home_url( '/rsvp/' ) ) . '">' . esc_html( $label ) . '</a></div>';
 }
 add_shortcode( 'at_home_rsvp_action', 'at_gathering_home_rsvp_action_shortcode' );
+
+function at_gathering_home_signup_action_shortcode() {
+	$user = wp_get_current_user();
+	if ( $user->exists() ) {
+		return '';
+	}
+
+	return '<div class="wp-block-button at-button is-style-secondary"><a class="wp-block-button__link wp-element-button" href="' . esc_url( home_url( '/signup/' ) ) . '">Sign up without RSVP</a></div>';
+}
+add_shortcode( 'at_home_signup_action', 'at_gathering_home_signup_action_shortcode' );
 
 function at_gathering_rsvp_shortcode() {
 	$user    = wp_get_current_user();
