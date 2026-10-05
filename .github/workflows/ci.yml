@@ -17,7 +17,8 @@ on:
         type: string
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}
+  # Keep the existing key stable when the workflow's display name changes.
+  group: ci-CI-${{ github.event_name }}-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}
   # Let main pushes finish any deployment in progress; the deploy baseline
   # accounts for newer pending pushes replacing one another.
   cancel-in-progress: ${{ github.event_name != 'push' }}
