@@ -556,10 +556,28 @@ function at_gathering_food_contributors() {
 
 		foreach ( $foods as $food ) {
 			if ( $food ) {
-				$contributors[ $food ][] = $name . ' × ' . max( 1, absint( $amounts[ $food ] ?? 1 ) );
+				$contributors[ $food ][] = array(
+					'name'   => $name,
+					'amount' => max( 1, absint( $amounts[ $food ] ?? 1 ) ),
+				);
 			}
 		}
 	}
+
+	foreach ( $contributors as &$food_contributors ) {
+		if ( 1 === count( $food_contributors ) ) {
+			$food_contributors[0] = $food_contributors[0]['name'];
+			continue;
+		}
+
+		$food_contributors = array_map(
+			static function ( $contributor ) {
+				return $contributor['name'] . ' × ' . $contributor['amount'];
+			},
+			$food_contributors
+		);
+	}
+	unset( $food_contributors );
 
 	return $contributors;
 }
@@ -597,8 +615,26 @@ function at_gathering_custom_food_counts( $listed_foods = null ) {
 		}
 		$counts[ $key ]['count'] += $amount;
 		$name = trim( (string) $row->guest_names );
-		$counts[ $key ]['names'][] = ( $name ? $name : ( trim( (string) $row->display_name ) ?: 'Unknown friend' ) ) . ' × ' . $amount;
+		$counts[ $key ]['names'][] = array(
+			'name'   => $name ? $name : ( trim( (string) $row->display_name ) ?: 'Unknown friend' ),
+			'amount' => $amount,
+		);
 	}
+
+	foreach ( $counts as &$item ) {
+		if ( 1 === count( $item['names'] ) ) {
+			$item['names'][0] = $item['names'][0]['name'];
+			continue;
+		}
+
+		$item['names'] = array_map(
+			static function ( $contributor ) {
+				return $contributor['name'] . ' × ' . $contributor['amount'];
+			},
+			$item['names']
+		);
+	}
+	unset( $item );
 
 	uasort(
 		$counts,
