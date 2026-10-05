@@ -146,7 +146,7 @@ jobs:
           EXISTING_PR_NUMBER: ${{ steps.branch.outputs.pr_number }}
         run: |
           pr_number="$EXISTING_PR_NUMBER"
-          pr_body=$'This PR was created by the **Sync block editor content** workflow.\n\nIt imports the published WordPress Home page into `content/pages/home.html`. Trusted CI is dispatched from `main` and reports the required `CI / test` check on this PR commit. Codex review may provide feedback, but no reviewer approval is required.'
+          pr_body=$'This PR was created by the **Sync block editor content** workflow.\n\nIt imports the published WordPress Home page into `content/pages/home.html`. Base-branch CI is dispatched from `main` and reports the required `CI / test` check on this PR commit. Codex review may provide feedback, but no reviewer approval is required.'
           if [ -z "$pr_number" ]; then
             pr_url="$(gh pr create \
               --base main \
@@ -161,7 +161,7 @@ jobs:
           echo "number=$pr_number" >> "$GITHUB_OUTPUT"
           echo "head_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Dispatch trusted CI for the sync PR
+      - name: Dispatch base-branch CI for the sync PR
         if: steps.diff.outputs.changed == 'true' || steps.branch.outputs.branch_updated == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -173,8 +173,8 @@ jobs:
             if gh workflow run ci.yml --ref main -f "pr_number=$PR_NUMBER" -f "head_sha=$HEAD_SHA"; then
               exit 0
             fi
-            echo "Trusted CI dispatch attempt $attempt failed; retrying."
+            echo "Base-branch CI dispatch attempt $attempt failed; retrying."
             sleep 10
           done
-          echo 'Could not dispatch trusted CI for the sync PR.' >&2
+          echo 'Could not dispatch base-branch CI for the sync PR.' >&2
           exit 1
