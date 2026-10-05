@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Armstrong Gathering
  * Description: The small, first-party RSVP and potluck layer for Armstrong Thanksgiving.
- * Version: 0.5.5
+ * Version: 0.5.6
  * Requires at least: 6.8
  * Requires PHP: 8.1
  * Author: Armstrong Thanksgiving
@@ -11,7 +11,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'AT_GATHERING_VERSION', '0.5.5' );
+define( 'AT_GATHERING_VERSION', '0.5.6' );
 define( 'AT_GATHERING_FILE', __FILE__ );
 define( 'AT_GATHERING_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AT_GATHERING_URL', plugin_dir_url( __FILE__ ) );
@@ -1096,6 +1096,7 @@ function at_gathering_admin_page() {
 	<div class="wrap at-gathering-admin">
 		<h1>Gathering RSVPs</h1>
 		<p>Host view: attendance, notes, and what is coming to the table.</p>
+		<?php if ( 'removed' === ( $_GET['at_rsvp'] ?? '' ) ) : ?><div class="notice notice-success is-dismissible"><p>RSVP removed.</p></div><?php elseif ( 'not_found' === ( $_GET['at_rsvp'] ?? '' ) ) : ?><div class="notice notice-warning is-dismissible"><p>That RSVP was already removed.</p></div><?php endif; ?>
 		<h2>Event details</h2>
 		<p>These details appear on the homepage for signed-in members and in RSVP confirmation emails.</p>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="at-event-details-form">
@@ -1124,10 +1125,10 @@ function at_gathering_admin_page() {
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="at-add-food">
 			<input type="hidden" name="action" value="at_add_food"><input type="text" name="at_food" placeholder="Add another food"><button class="button button-primary">Add food</button><?php wp_nonce_field( 'at_add_food', 'at_food_nonce' ); ?>
 		</form>
-		<table class="widefat striped"><thead><tr><th>Friend</th><th>Status</th><th>People</th><th>Food</th><th>Dietary</th><th>Note for hosts</th><th>Updated</th></tr></thead><tbody>
-		<?php if ( ! $rows ) : ?><tr><td colspan="7">No RSVPs yet.</td></tr><?php endif; ?>
+		<table class="widefat striped"><thead><tr><th>Friend</th><th>Status</th><th>People</th><th>Food</th><th>Dietary</th><th>Note for hosts</th><th>Updated</th><th>Actions</th></tr></thead><tbody>
+		<?php if ( ! $rows ) : ?><tr><td colspan="8">No RSVPs yet.</td></tr><?php endif; ?>
 		<?php foreach ( $rows as $row ) : $user = get_user_by( 'id', $row->user_id ); $row_foods = (array) json_decode( $row->foods, true ); $row_food_amounts = at_gathering_rsvp_food_amounts( $row ); ?>
-			<tr><td><strong><?php echo esc_html( $user ? $user->display_name : 'Unknown friend' ); ?></strong><br><small><?php echo esc_html( $user ? $user->user_email : '' ); ?></small></td><td><?php echo esc_html( at_gathering_status_label( $row->status ) ); ?></td><td><?php echo esc_html( $row->guest_count ); ?><?php echo $row->guest_names ? '<br><small>' . esc_html( $row->guest_names ) . '</small>' : ''; ?></td><td><?php echo esc_html( at_gathering_food_amounts_text( $row_foods, $row_food_amounts ) ?: '—' ); ?></td><td><?php echo esc_html( $row->dietary ?: '—' ); ?></td><td><?php echo esc_html( $row->notes ?: '—' ); ?></td><td><?php echo esc_html( mysql2date( 'j M, H:i', $row->updated_at ) ); ?></td></tr>
+			<tr><td><strong><?php echo esc_html( $user ? $user->display_name : 'Unknown friend' ); ?></strong><br><small><?php echo esc_html( $user ? $user->user_email : '' ); ?></small></td><td><?php echo esc_html( at_gathering_status_label( $row->status ) ); ?></td><td><?php echo esc_html( $row->guest_count ); ?><?php echo $row->guest_names ? '<br><small>' . esc_html( $row->guest_names ) . '</small>' : ''; ?></td><td><?php echo esc_html( at_gathering_food_amounts_text( $row_foods, $row_food_amounts ) ?: '—' ); ?></td><td><?php echo esc_html( $row->dietary ?: '—' ); ?></td><td><?php echo esc_html( $row->notes ?: '—' ); ?></td><td><?php echo esc_html( mysql2date( 'j M, H:i', $row->updated_at ) ); ?></td><td><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="at-remove-rsvp-form"><input type="hidden" name="action" value="at_remove_rsvp"><input type="hidden" name="at_rsvp_user_id" value="<?php echo esc_attr( $row->user_id ); ?>"><?php wp_nonce_field( 'at_remove_rsvp_' . absint( $row->user_id ), 'at_remove_rsvp_nonce' ); ?><button class="button button-secondary" type="submit" onclick="return confirm('Remove this RSVP? The member account will remain.');">Remove RSVP</button></form></td></tr>
 		<?php endforeach; ?></tbody></table>
 		<?php if ( $admins ) : ?>
 			<hr>
@@ -1148,6 +1149,28 @@ function at_gathering_admin_page() {
 	</div>
 	<?php
 }
+
+function at_gathering_remove_rsvp() {
+	$user_id = absint( $_POST['at_rsvp_user_id'] ?? 0 );
+	$nonce   = sanitize_text_field( wp_unslash( $_POST['at_remove_rsvp_nonce'] ?? '' ) );
+	if ( ! current_user_can( 'manage_options' ) || ! $user_id || ! wp_verify_nonce( $nonce, 'at_remove_rsvp_' . $user_id ) ) {
+		wp_die( 'Sorry, that RSVP could not be removed.' );
+	}
+
+	global $wpdb;
+	$deleted = $wpdb->delete( at_gathering_table(), array( 'user_id' => $user_id ), array( '%d' ) );
+	if ( false === $deleted ) {
+		wp_die( 'Sorry, that RSVP could not be removed.' );
+	}
+	if ( $deleted && function_exists( 'wp_cache_clear_cache' ) ) {
+		wp_cache_clear_cache();
+	}
+
+	$result = $deleted ? 'removed' : 'not_found';
+	wp_safe_redirect( admin_url( 'admin.php?page=at-gathering&at_rsvp=' . $result ) );
+	exit;
+}
+add_action( 'admin_post_at_remove_rsvp', 'at_gathering_remove_rsvp' );
 
 function at_gathering_save_food_goals() {
 	if ( ! current_user_can( 'manage_options' ) || ! isset( $_POST['at_food_goals_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['at_food_goals_nonce'] ) ), 'at_save_food_goals' ) ) {
