@@ -24,7 +24,7 @@ test('a signed-in friend can select and confirm a shared photo', async ({ page }
   await page.goto('/albums/');
 
   const albumPhotoCount = page.getByText(/View\s+\d+\s+photos?/i).first();
-  const albumLabel = await albumPhotoCount.textContent();
+  const albumLabel = await albumPhotoCount.count() ? await albumPhotoCount.textContent() : null;
   const photosBefore = Number(albumLabel?.match(/\d+/)?.[0] ?? 0);
 
   // Open the album's upload form without activating its file-picker button.
