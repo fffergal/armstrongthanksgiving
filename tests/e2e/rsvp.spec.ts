@@ -324,6 +324,9 @@ test('an RSVP saves and is still present after reload', async ({ page }) => {
 
   await expect(page.getByLabel('How many people are coming?')).toHaveValue('2');
   await expect(page.getByLabel('Stuffing — vegetarian', { exact: true })).toHaveValue('1');
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: 'Update RSVP', exact: true })).toHaveAttribute('href', /\/rsvp\/$/);
+  await expect(page.getByRole('link', { name: 'Sign up without RSVP' })).toHaveAttribute('href', /\/signup\/$/);
 });
 
 test('a signed-in RSVP has no login prompt, emails its full payload, and repopulates every field when edited', async ({ page }) => {

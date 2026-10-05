@@ -665,6 +665,13 @@ function at_gathering_status_label( $status ) {
 	)[ $status ] ?? 'Coming';
 }
 
+function at_gathering_home_rsvp_action_shortcode() {
+	$user = wp_get_current_user();
+	$label = $user->exists() && at_gathering_get_rsvp( $user->ID ) ? 'Update RSVP' : 'RSVP';
+	return '<div class="wp-block-button at-button"><a class="wp-block-button__link wp-element-button" href="' . esc_url( home_url( '/rsvp/' ) ) . '">' . esc_html( $label ) . '</a></div>';
+}
+add_shortcode( 'at_home_rsvp_action', 'at_gathering_home_rsvp_action_shortcode' );
+
 function at_gathering_rsvp_shortcode() {
 	$user    = wp_get_current_user();
 	$rsvp    = $user->exists() ? at_gathering_get_rsvp( $user->ID ) : null;
