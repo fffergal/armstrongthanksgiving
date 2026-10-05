@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { logIn } from './helpers/auth';
+import { logIn, logInAsAdmin } from './helpers/auth';
 
 const root = path.resolve(__dirname, '../..');
 
@@ -80,10 +80,7 @@ test('a signed-in friend gets the RSVP and potluck form', async ({ page }) => {
 test('a host can set a food goal and guests see offered amount over goal', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'rsvp', 'Run the admin workflow once in the desktop RSVP project.');
 
-  await page.goto('/wp-login.php');
-  await page.locator('#user_login').fill('admin');
-  await page.locator('#user_pass').fill('password');
-  await page.locator('#wp-submit').click();
+  await logInAsAdmin(page);
   await page.goto('/wp-admin/admin.php?page=at-gathering');
 
   const goal = page.getByLabel('Goal for Mashed potato');
@@ -102,6 +99,26 @@ test('a host can set a food goal and guests see offered amount over goal', async
     await page.getByLabel('Goal for Mashed potato').fill(originalGoal);
     await page.getByRole('button', { name: 'Save food goals' }).click();
   }
+});
+
+test('a host can remove an RSVP without deleting the member account', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'rsvp', 'Run the admin workflow once in the desktop RSVP project.');
+
+  runWpEval("global $wpdb; $user = get_user_by('login', 'guest'); if (! $user) { WP_CLI::error('The seeded guest account is missing.'); } $now = current_time('mysql'); $saved = $wpdb->replace(at_gathering_table(), array('user_id' => $user->ID, 'status' => 'yes', 'guest_count' => 1, 'guest_names' => 'Beta cleanup test RSVP', 'dietary' => '', 'foods' => '[]', 'food_amounts' => '{}', 'custom_food' => '', 'notes' => '', 'created_at' => $now, 'updated_at' => $now)); if (! $saved) { WP_CLI::error('Could not create the RSVP removal fixture.'); }");
+
+  await logInAsAdmin(page);
+  await page.goto('/wp-admin/admin.php?page=at-gathering');
+
+  const rsvpRow = page.getByRole('row').filter({ hasText: 'Beta cleanup test RSVP' });
+  await expect(rsvpRow).toBeVisible();
+  await rsvpRow.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('admin-rsvp-removal.png') });
+  page.once('dialog', (dialog) => dialog.accept());
+  await rsvpRow.getByRole('button', { name: 'Remove RSVP' }).click();
+
+  await expect(page.getByText('RSVP removed.')).toBeVisible();
+  await expect(page.getByText('Beta cleanup test RSVP')).toHaveCount(0);
+  runWpEval("if (! get_user_by('login', 'guest')) { WP_CLI::error('Removing an RSVP also removed the member account.'); }");
 });
 
 test('food contributor names are shown to signed-in guests only', async ({ page, browser }, testInfo) => {
