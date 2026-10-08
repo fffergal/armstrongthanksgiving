@@ -104,7 +104,11 @@ Treat these as the implementation contract unless the owner changes them:
   party-assignment replacement must be atomic. A simultaneous claim or
   assignment request must have only one winner.
 - RSVP guest selectors return display names and stable IDs only. Do not expose
-  invitee email addresses to other guests.
+  invitee email addresses to other guests. Render roster choices only for a
+  signed-in account linked to a claimed guest record (and host administrators);
+  anonymous and unclaimed visitors must not receive the roster through page
+  markup or an endpoint. Enforce the same authorization on every selector and
+  save request.
 - Do not silently guess which roster guests correspond to legacy free-text
   names. Preserve the old names/count for host reconciliation during rollout.
 
@@ -118,7 +122,10 @@ relationships and invariants:
   timestamps, hashed token and expiry while a claim is pending.
 - **RSVP:** existing owner account and attendance/details, plus
   `children_count`. Derive total attendees from the owner, assigned adult
-  guests, and children rather than trusting a user-entered total.
+  guests, and children rather than trusting a user-entered total. Count `yes`
+  parties in the expected attendee total; report `maybe` parties separately
+  as provisional, and count `no` parties as zero expected attendees. Retain
+  adult assignments on `no` responses until an adult is explicitly removed.
 - **Party assignment:** RSVP owner/account ID plus invited adult ID, with a
   unique constraint on adult ID. Include the owner in this relation so an
   RSVP owner cannot also be assigned to another party.
@@ -260,7 +267,10 @@ rows are reconciled. Do not send real email.
 > API with the RSVP draft preserved. Include RSVP owners in the unique adult
 > assignment relation. Keep assignments reserved for every saved status;
 > release only when removed, and set children to zero for `no`. Reject the
-> entire save on conflict. Preserve and reconcile legacy RSVP data before
+> entire save on conflict. Only expose roster choices to claimed signed-in
+> guests or host administrators, and enforce this on endpoints. Count yes
+> parties in expected totals, report maybe separately, and count no as zero
+> expected attendees while retaining assignments. Preserve and reconcile legacy RSVP data before
 > accepting new party RSVPs. Run focused checks and report shared-contract
 > needs for the integration owner. Do not send real email.
 
@@ -334,11 +344,15 @@ Run after 1A and 1B are integrated; include 1C/1D/1E before final review.
   expired, reused, resent, and invalid tokens behave safely.
 - Verify a guest can claim an account while assigned to a party, access member
   pages, and cannot save another RSVP until unassigned.
+- Verify anonymous and unclaimed users cannot see roster names/IDs in page
+  markup or selector endpoints; signed-in claimed guests and administrators
+  can access only the intended choices.
 - Verify adult assignments remain unique on create, edit, removal, and
   concurrent/duplicate submissions; host correction releases the old
   assignment.
 - Verify child counts and derived totals in the RSVP list and confirmation
-  email.
+  email: yes is included in expected totals, maybe is reported separately,
+  and no contributes zero expected attendees while retaining assignments.
 - Reconcile legacy free-text party names with the host; retain them until that
   review is complete.
 - Confirm the app blocks new party submissions until existing owner/party
@@ -360,9 +374,10 @@ Run after 1A and 1B are integrated; include 1C/1D/1E before final review.
 > shared fixtures for the removed open-signup/free-text flows; resolve
 > integration conflicts; and run focused and broader repository checks using
 > scoped WordPress wrappers. Include repeatable upgrade/reconciliation
-> coverage and genuinely overlapping assignment submissions. Capture fresh
-> desktop, tablet, and phone screenshots of the local result. Do not send real
-> email. Report results, migration needs, and any remaining product decision.
+> coverage, genuinely overlapping assignment submissions, roster privacy
+> authorization, and yes/maybe/no headcount behavior. Capture fresh desktop,
+> tablet, and phone screenshots of the local result. Do not send real email.
+> Report results, migration needs, and any remaining product decision.
 
 ## Suggested session order at a glance
 
