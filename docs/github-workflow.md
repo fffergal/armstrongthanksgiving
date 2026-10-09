@@ -90,3 +90,5 @@ with the PR number and head SHA; that workflow reports the required
 `CI / test` check on the PR commit. The workflow runs from `main` while it
 tests the PR's immutable merge commit. Codex review feedback can be addressed as
 part of the ordinary PR conversation; it does not create an approval gate.
+
+Temporary CI cache verification probe. This paragraph is not intended to merge.
