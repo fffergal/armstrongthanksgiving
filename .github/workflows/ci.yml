@@ -131,6 +131,23 @@ jobs:
         with:
           node-version: 22
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Restore Playwright image layer cache
+        id: playwright-build-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/armstrong-thanksgiving-playwright-cache
+          key: playwright-linux-amd64-${{ hashFiles('scripts/playwright.Dockerfile', 'package-lock.json') }}
+          restore-keys: |
+            playwright-linux-amd64-
+
+      - name: Configure Playwright image cache paths
+        run: |
+          echo "PLAYWRIGHT_DOCKER_CACHE_FROM=/tmp/armstrong-thanksgiving-playwright-cache" >> "$GITHUB_ENV"
+          echo "PLAYWRIGHT_DOCKER_CACHE_TO=/tmp/armstrong-thanksgiving-playwright-cache-next" >> "$GITHUB_ENV"
+
       - name: Install dependencies
         run: npm ci
 
@@ -145,6 +162,21 @@ jobs:
 
       - name: Run browser and Lighthouse tests
         run: npm run test:all
+
+      - name: Check for exported Playwright image cache
+        id: playwright-cache-export
+        if: always()
+        run: |
+          if [ -d /tmp/armstrong-thanksgiving-playwright-cache-next ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Save Playwright image layer cache
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && always() && steps.playwright-build-cache.outputs.cache-hit != 'true' && steps.playwright-cache-export.outputs.available == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/armstrong-thanksgiving-playwright-cache-next
+          key: playwright-linux-amd64-${{ hashFiles('scripts/playwright.Dockerfile', 'package-lock.json') }}
 
       - name: Upload browser reports
         if: always()

@@ -110,14 +110,23 @@ function runLinuxVisuals({ reset = true, skipForRemoteTarget = false, args = [] 
     stdio: 'ignore',
   }).status === 0;
   if (!imageExists) {
-    const buildStatus = run('docker', [
-      'build', '--platform=linux/amd64',
+    const buildArgs = [
+      'buildx', 'build', '--load', '--platform=linux/amd64',
       '--build-arg', `NODE_VERSION=${nodeVersion}`,
       '--build-arg', `PLAYWRIGHT_VERSION=${playwrightVersion}`,
       '--tag', localImage,
       '--file', path.join(root, 'scripts/playwright.Dockerfile'),
       path.join(root, 'scripts'),
-    ]);
+    ];
+    const cacheFrom = process.env.PLAYWRIGHT_DOCKER_CACHE_FROM;
+    const cacheTo = process.env.PLAYWRIGHT_DOCKER_CACHE_TO;
+    if (cacheFrom && fs.existsSync(cacheFrom)) {
+      buildArgs.push('--cache-from', `type=local,src=${cacheFrom}`);
+    }
+    if (cacheTo) {
+      buildArgs.push('--cache-to', `type=local,dest=${cacheTo},mode=max`);
+    }
+    const buildStatus = run('docker', buildArgs);
     if (buildStatus !== 0) return buildStatus;
   }
 
