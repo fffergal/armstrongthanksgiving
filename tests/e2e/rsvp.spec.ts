@@ -25,6 +25,12 @@ test.afterEach(() => {
   }
 });
 
+test('schema upgrades preserve legacy RSVPs and link an owner only after host email confirmation', async ({}, testInfo) => {
+  test.skip(testInfo.project.name !== 'rsvp', 'Run database upgrade coverage in the desktop RSVP project.');
+
+  runWpEval("global $wpdb; $user = get_user_by('login', 'guest'); $admin = get_user_by('login', 'admin'); if (! $user || ! $admin) { WP_CLI::error('The account upgrade fixture is missing.'); } delete_option('at_gathering_party_reconciliation_complete'); delete_option('at_gathering_party_reconciliation_reviewed_at'); $table = at_gathering_table(); if ($wpdb->get_var(\"SHOW COLUMNS FROM {$table} LIKE 'children_count'\")) { $wpdb->query(\"ALTER TABLE {$table} DROP COLUMN children_count\"); } $now = current_time('mysql'); $saved = $wpdb->replace($table, array('user_id' => $user->ID, 'status' => 'maybe', 'guest_count' => 3, 'guest_names' => 'Legacy Casey and Morgan', 'dietary' => 'Legacy dietary note', 'foods' => '[]', 'food_amounts' => '{}', 'custom_food' => '', 'notes' => 'Legacy host note', 'created_at' => $now, 'updated_at' => $now)); if (! $saved) { WP_CLI::error('Could not create the legacy RSVP fixture.'); } $roster = at_gathering_roster_table(); $assignments = at_gathering_assignments_table(); $wpdb->delete($roster, array('email_normalized' => 'guest@example.test')); $wpdb->delete($assignments, array('rsvp_user_id' => $user->ID)); $wpdb->insert($roster, array('email_normalized' => 'guest@example.test', 'display_name' => 'Legacy RSVP owner', 'claim_state' => 'invited', 'created_at' => $now, 'updated_at' => $now)); $guest_id = (int) $wpdb->insert_id; at_gathering_ensure_schema(); at_gathering_ensure_schema(); $row = at_gathering_get_rsvp($user->ID); if (! $row || (int) $row->guest_count !== 3 || $row->guest_names !== 'Legacy Casey and Morgan' || $row->dietary !== 'Legacy dietary note' || (int) $row->children_count !== 0) { WP_CLI::error('Repeatable upgrade did not preserve the RSVP or add the child count.'); } if (at_gathering_party_rsvps_enabled()) { WP_CLI::error('Legacy party names did not close the reconciliation gate.'); } wp_set_current_user($admin->ID); $before = $user->user_pass; $roles = (array) $user->roles; $mismatch = at_gathering_link_legacy_rsvp_owner($user->ID, $guest_id, 'other@example.test'); if (! is_wp_error($mismatch) || 'at_owner_email_mismatch' !== $mismatch->get_error_code()) { WP_CLI::error('The host owner-link API accepted a non-matching email.'); } $linked = at_gathering_link_legacy_rsvp_owner($user->ID, $guest_id, ' Guest@Example.Test '); if (is_wp_error($linked)) { WP_CLI::error($linked->get_error_message()); } $user = get_user_by('id', $user->ID); $owner = at_gathering_roster_guest_by_user($user->ID); $assignment = at_gathering_party_assignment_for_guest($guest_id); if (! $owner || (int) $owner->id !== $guest_id || ! $assignment || ! (int) $assignment->is_owner || $before !== $user->user_pass || $roles !== (array) $user->roles) { WP_CLI::error('Host owner linking changed account state or did not create the owner assignment.'); } echo 'repeatable upgrade and host owner-link checks passed';");
+});
+
 test('a signed-in friend gets the RSVP and potluck form', async ({ page }) => {
   await logIn(page);
   await page.goto('/rsvp/');
@@ -109,7 +115,7 @@ test('a host can remove an RSVP without deleting the member account', async ({ p
   await logInAsAdmin(page);
   await page.goto('/wp-admin/admin.php?page=at-gathering');
 
-  const rsvpRow = page.getByRole('row').filter({ hasText: 'Beta cleanup test RSVP' });
+  const rsvpRow = page.locator('.at-rsvp-admin-list').getByRole('row').filter({ hasText: 'Beta cleanup test RSVP' });
   await expect(rsvpRow).toBeVisible();
   await rsvpRow.scrollIntoViewIfNeeded();
   await page.screenshot({ path: testInfo.outputPath('admin-rsvp-removal.png') });
