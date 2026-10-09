@@ -161,21 +161,24 @@ jobs:
         run: npm run wp:setup
 
       - name: Run browser and Lighthouse tests
+        id: browser-tests
         run: npm run test:all
 
-      - name: Check for exported Playwright image cache
+      - name: Prepare Playwright image cache for saving
         id: playwright-cache-export
         if: always()
         run: |
           if [ -d /tmp/armstrong-thanksgiving-playwright-cache-next ]; then
+            rm -rf /tmp/armstrong-thanksgiving-playwright-cache
+            mv /tmp/armstrong-thanksgiving-playwright-cache-next /tmp/armstrong-thanksgiving-playwright-cache
             echo "available=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Save Playwright image layer cache
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && always() && steps.playwright-build-cache.outputs.cache-hit != 'true' && steps.playwright-cache-export.outputs.available == 'true'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && always() && steps.browser-tests.conclusion == 'success' && steps.playwright-build-cache.outputs.cache-hit != 'true' && steps.playwright-cache-export.outputs.available == 'true'
         uses: actions/cache/save@v4
         with:
-          path: /tmp/armstrong-thanksgiving-playwright-cache-next
+          path: /tmp/armstrong-thanksgiving-playwright-cache
           key: playwright-linux-amd64-${{ hashFiles('scripts/playwright.Dockerfile', 'package-lock.json') }}
 
       - name: Upload browser reports
