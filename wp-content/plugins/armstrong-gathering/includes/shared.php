@@ -537,4 +537,3 @@ function at_gathering_add_food() {
 	exit;
 }
 add_action( 'admin_post_at_add_food', 'at_gathering_add_food' );
-
