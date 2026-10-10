@@ -118,9 +118,14 @@ finish, finish up, complete, call it done, tidy up, clean up, tear down, archive
 remove, or delete a worktree, branch, task, or associated work as a request to
 run this full integration workflow through a PR. Apply the PR route regardless
 of which of these phrases the user chooses. Run or confirm the relevant checks,
-create a PR, review any Codex reviewer feedback and address useful findings,
-then squash-merge after the required checks pass. No reviewer approval is
-required. If the merge triggers a production deployment, wait for it to
+create a PR, review any available GitHub Codex reviewer feedback and address
+useful findings, then squash-merge after the required checks pass. The GitHub
+Codex reviewer is optional and may not be enabled for every PR. No reviewer
+approval is required; do not trigger a review manually or wait indefinitely
+for feedback. If no review arrives, proceed once the documented merge gates
+pass. If you decide not to take the reviewer's advice, resolve the corresponding
+review conversation anyway; unresolved conversations block merging. If the
+merge triggers a production deployment, wait for it to
 succeed. If the deployment workflow skips because no production components
 changed, confirm that the skip was expected. After a successful deployment or
 a confirmed expected skip, tear down the local
