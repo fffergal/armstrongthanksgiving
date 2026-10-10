@@ -71,6 +71,14 @@ the running implementation rather than mockups. Keep screenshot files outside
 the repository or in ignored output directories; upload or attach them so they
 render in the PR description.
 
+## Tests for new functionality
+
+New functionality must include automated tests that cover its expected behavior.
+Extend the relevant existing tests or add focused tests alongside the change,
+then run the appropriate test suite and fix failures before considering the work
+complete. If a behavior cannot be tested automatically, document why and verify
+it with the most relevant available check.
+
 ## Sandbox troubleshooting
 
 When Docker commands, internal browser automation, or the `gh` CLI fail,
