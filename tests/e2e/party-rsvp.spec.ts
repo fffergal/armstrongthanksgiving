@@ -141,6 +141,7 @@ test.describe('party RSVP assignments', () => {
     runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $owner->user_email, 'display_name' => 'RSVP owner', 'user_id' => $owner->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
     await logIn(page);
     await page.goto('/rsvp/');
+    await page.getByLabel('Children (ages 0–17)').selectOption('4');
     await page.getByRole('radio', { name: 'I can’t make it' }).check();
     await page.getByRole('button', { name: 'Save my RSVP' }).click();
     await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
