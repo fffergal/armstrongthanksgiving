@@ -202,7 +202,7 @@ function at_gathering_signup_shortcode() {
 				<?php wp_nonce_field( 'at_claim_invitation_' . hash( 'sha256', $token ), 'at_claim_nonce' ); ?>
 				<fieldset class="at-account-fields"><legend>Your details</legend><div class="at-rsvp-grid">
 					<label>Display name<input type="text" name="at_display_name" value="<?php echo esc_attr( $guest->display_name ); ?>" autocomplete="name" required></label>
-					<?php if ( $existing ) : ?><p>This address already has an account. Claiming the invitation will link it without changing its password. <a href="<?php echo esc_url( wp_login_url() ); ?>">Use your existing password to sign in</a>.</p>
+					<?php if ( $existing ) : ?><p>This address already has an account. Claiming the invitation will link it without changing its password. <a href="<?php echo esc_url( $draft_return ? wp_login_url( $draft_return ) : wp_login_url() ); ?>">Use your existing password to sign in</a>.</p>
 					<?php else : ?><label>Password<input type="password" name="at_password" autocomplete="new-password" minlength="10" required></label><label>Confirm password<input type="password" name="at_password_confirm" autocomplete="new-password" minlength="10" required></label><?php endif; ?>
 				</div></fieldset><p class="at-form-actions"><button class="at-button" type="submit">Set up account</button></p>
 			</form>
@@ -211,7 +211,7 @@ function at_gathering_signup_shortcode() {
 			<form class="at-signup-form at-rsvp-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post">
 				<div class="at-rsvp-intro"><h2>Set up your gathering account</h2><p>Enter your email address and we’ll send a setup link if an invitation is available.</p></div>
 				<input type="hidden" name="action" value="at_request_invitation"><input type="hidden" name="at_return_url" value="<?php echo esc_url( home_url( '/signup/' ) ); ?>"><input type="hidden" name="at_rsvp_draft" value="<?php echo esc_attr( $draft_token ); ?>"><?php wp_nonce_field( 'at_request_invitation', 'at_request_nonce' ); ?>
-				<p class="at-form-login-note">Already have an account? <a href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>">Sign in</a>.</p>
+				<p class="at-form-login-note">Already have an account? <a href="<?php echo esc_url( wp_login_url( $draft_return ? $draft_return : get_permalink() ) ); ?>">Sign in</a>.</p>
 				<label>Email<input type="email" name="at_email" autocomplete="email" required></label><p class="at-form-actions"><button class="at-button" type="submit">Request setup link</button></p>
 			</form>
 		<?php endif; ?>
@@ -249,7 +249,14 @@ function at_gathering_claim_invitation_post() {
 	$user = at_gathering_claim_guest( $token, wp_unslash( $_POST['at_display_name'] ?? '' ), wp_unslash( $_POST['at_password'] ?? '' ), wp_unslash( $_POST['at_password_confirm'] ?? '' ) );
 	remove_action( 'user_register', $record_new_account, PHP_INT_MAX );
 	if ( is_wp_error( $user ) ) {
-		wp_safe_redirect( add_query_arg( array( 'at_setup' => rawurlencode( $token ), 'at_setup_result' => 'error' ), home_url( '/signup/' ) ) );
+		$args = array(
+			'at_setup'        => rawurlencode( $token ),
+			'at_setup_result' => 'error',
+		);
+		if ( $draft_token ) {
+			$args['at_rsvp_draft'] = $draft_token;
+		}
+		wp_safe_redirect( add_query_arg( $args, home_url( '/signup/' ) ) );
 		exit;
 	}
 	$draft_return = at_gathering_rsvp_draft_return_url( $draft_token );

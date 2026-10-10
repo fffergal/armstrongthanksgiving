@@ -61,7 +61,8 @@ test('setup token creates one password account, is consumed once, and leaves exi
   const existingEmail = `existing-${suffix}@example.test`;
   const newToken = `${'a'.repeat(55)}${Date.now().toString(16)}`.padEnd(64, 'a').slice(0, 64);
   const existingToken = `${'b'.repeat(55)}${(Date.now() + 1).toString(16)}`.padEnd(64, 'b').slice(0, 64);
-  runWpEval(`global $wpdb; $now = current_time('mysql', true); $expires = gmdate('Y-m-d H:i:s', time() + DAY_IN_SECONDS); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => ${php(newEmail)}, 'display_name' => 'New Guest', 'claim_state' => 'invited', 'token_hash' => hash('sha256', ${php(newToken)}), 'token_expires' => $expires, 'created_at' => $now, 'updated_at' => $now)); $id = wp_insert_user(array('user_login' => at_gathering_unique_login(${php(existingEmail)}), 'user_pass' => 'existing-password-2026', 'user_email' => ${php(existingEmail)}, 'display_name' => 'Existing account', 'role' => 'editor')); if (is_wp_error($id)) { WP_CLI::error($id->get_error_message()); } $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => ${php(existingEmail)}, 'display_name' => 'Existing Guest', 'claim_state' => 'invited', 'token_hash' => hash('sha256', ${php(existingToken)}), 'token_expires' => $expires, 'created_at' => $now, 'updated_at' => $now));`);
+  const existingDraftToken = 'f'.repeat(32);
+  runWpEval(`global $wpdb; $now = current_time('mysql', true); $expires = gmdate('Y-m-d H:i:s', time() + DAY_IN_SECONDS); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => ${php(newEmail)}, 'display_name' => 'New Guest', 'claim_state' => 'invited', 'token_hash' => hash('sha256', ${php(newToken)}), 'token_expires' => $expires, 'created_at' => $now, 'updated_at' => $now)); $id = wp_insert_user(array('user_login' => at_gathering_unique_login(${php(existingEmail)}), 'user_pass' => 'existing-password-2026', 'user_email' => ${php(existingEmail)}, 'display_name' => 'Existing account', 'role' => 'editor')); if (is_wp_error($id)) { WP_CLI::error($id->get_error_message()); } $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => ${php(existingEmail)}, 'display_name' => 'Existing Guest', 'claim_state' => 'invited', 'token_hash' => hash('sha256', ${php(existingToken)}), 'token_expires' => $expires, 'created_at' => $now, 'updated_at' => $now)); set_transient('at_gathering_rsvp_draft_' . ${php(existingDraftToken)}, array('status' => 'yes', 'guest_count' => 1), 30 * MINUTE_IN_SECONDS);`);
 
   const missingPassword = runWpEval(`$result = at_gathering_claim_guest(${php(newToken)}, 'New Guest', '', ''); echo is_wp_error($result) && 'at_claim_password_invalid' === $result->get_error_code() ? 'rejected' : 'accepted';`).trim();
   expect(missingPassword).toBe('rejected');
@@ -78,15 +79,17 @@ test('setup token creates one password account, is consumed once, and leaves exi
   const secondClaim = runWpEval(`$result = at_gathering_claim_guest(${php(newToken)}, 'Again', 'cranberry-sauce-2026', 'cranberry-sauce-2026'); echo is_wp_error($result) && 'at_claim_invalid' === $result->get_error_code() ? 'rejected' : 'accepted';`).trim();
   expect(secondClaim).toBe('rejected');
 
-  await page.goto(`/signup/?at_setup=${existingToken}`);
+  await page.goto(`/signup/?at_setup=${existingToken}&at_rsvp_draft=${existingDraftToken}`);
   await expect(page.getByText('Claiming the invitation will link it without changing its password.')).toBeVisible();
+  const existingLoginHref = await page.getByRole('link', { name: 'Use your existing password to sign in' }).getAttribute('href');
+  expect(decodeURIComponent(existingLoginHref || '')).toContain(`/rsvp/?at_rsvp_draft=${existingDraftToken}`);
   await page.getByLabel('Display name').fill('Existing Guest');
   await page.getByRole('button', { name: 'Set up account' }).click();
   await expect(page.getByRole('status')).toContainText('Your account is ready');
   const preserved = runWpEval(`$user = get_user_by('email', ${php(existingEmail)}); $guest = at_gathering_roster_guest_by_email(${php(existingEmail)}); echo $user && $guest && (int) $guest->user_id === (int) $user->ID && 'editor' === $user->roles[0] && wp_check_password('existing-password-2026', $user->user_pass, $user->ID) ? 'preserved' : 'changed';`).trim();
   expect(preserved).toBe('preserved');
 
-  runWpEval(`global $wpdb; $guest = at_gathering_roster_guest_by_email(${php(newEmail)}); if ($guest && $guest->user_id) { require_once ABSPATH . 'wp-admin/includes/user.php'; wp_delete_user((int) $guest->user_id); } $guest = at_gathering_roster_guest_by_email(${php(existingEmail)}); if ($guest && $guest->user_id) { require_once ABSPATH . 'wp-admin/includes/user.php'; wp_delete_user((int) $guest->user_id); } $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(newEmail)})); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(existingEmail)}));`);
+  runWpEval(`global $wpdb; $guest = at_gathering_roster_guest_by_email(${php(newEmail)}); if ($guest && $guest->user_id) { require_once ABSPATH . 'wp-admin/includes/user.php'; wp_delete_user((int) $guest->user_id); } $guest = at_gathering_roster_guest_by_email(${php(existingEmail)}); if ($guest && $guest->user_id) { require_once ABSPATH . 'wp-admin/includes/user.php'; wp_delete_user((int) $guest->user_id); } $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(newEmail)})); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(existingEmail)})); delete_transient('at_gathering_rsvp_draft_' . ${php(existingDraftToken)});`);
 });
 
 test('RSVP draft survives invitation request and new-account setup', async ({ page }, testInfo) => {
@@ -97,6 +100,8 @@ test('RSVP draft survives invitation request and new-account setup', async ({ pa
   runWpEval(`global $wpdb; $now = current_time('mysql', true); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => ${php(email)}, 'display_name' => 'RSVP Handoff Guest', 'claim_state' => 'invited', 'created_at' => $now, 'updated_at' => $now)); set_transient('at_gathering_rsvp_draft_' . ${php(draftToken)}, array('status' => 'yes', 'guest_count' => 1, 'guest_names' => ''), 30 * MINUTE_IN_SECONDS);`);
 
   await page.goto(`/signup/?at_rsvp_draft=${draftToken}`);
+  const requestLoginHref = await page.getByRole('link', { name: 'Sign in' }).getAttribute('href');
+  expect(decodeURIComponent(requestLoginHref || '')).toContain(`/rsvp/?at_rsvp_draft=${draftToken}`);
   await page.getByLabel('Email').fill(email);
   await page.getByRole('button', { name: 'Request setup link' }).click();
   await expect(page.getByRole('status')).toContainText('If an invitation can be set up for that address');
@@ -108,6 +113,12 @@ test('RSVP draft survives invitation request and new-account setup', async ({ pa
 
   await page.goto(`/signup/?at_setup=${setupToken}&at_rsvp_draft=${draftToken}`);
   await page.getByLabel('Display name').fill('RSVP Handoff Guest');
+  await page.getByLabel('Password', { exact: true }).fill('first-password-attempt');
+  await page.getByLabel('Confirm password').fill('different-password-attempt');
+  await page.getByRole('button', { name: 'Set up account' }).click();
+  await expect(page).toHaveURL(new RegExp(`/signup/\\?at_setup=${setupToken}.*at_rsvp_draft=${draftToken}`));
+  await expect(page.getByRole('alert')).toContainText('We could not finish setting up your account');
+
   await page.getByLabel('Password', { exact: true }).fill('cranberry-sauce-2026');
   await page.getByLabel('Confirm password').fill('cranberry-sauce-2026');
   await page.getByRole('button', { name: 'Set up account' }).click();
