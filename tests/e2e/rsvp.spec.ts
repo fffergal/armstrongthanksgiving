@@ -202,44 +202,35 @@ test('food contributor names are shown to signed-in guests only', async ({ page,
     await observer.screenshot({ path: testInfo.outputPath('rsvp-listed-food-contributor-mobile.png') });
     await customFoodList.scrollIntoViewIfNeeded();
     await observer.screenshot({ path: testInfo.outputPath('rsvp-custom-food-mobile.png') });
-
-    await logIn(observer);
-    await observer.goto('/rsvp/');
-    await expect(customFoodRow.locator('small')).toHaveText(`3 from ${guestNames}`);
-    await expect(observer.locator('.at-rsvp-app')).toContainText(guestNames);
   } finally {
     await observerContext.close();
   }
 
-  const signedInContext = await browser.newContext();
-  try {
-    const signedIn = await signedInContext.newPage();
-    await logIn(signedIn);
-    await signedIn.goto('/rsvp/');
-    const customFoodList = signedIn.locator('.at-custom-food-list');
-    const customFoodRow = customFoodList.getByRole('listitem').filter({ hasText: customFood });
-    await expect(customFoodRow.locator('small')).toHaveText(`3 from ${guestNames}`);
-    const gravySummary = signedIn.getByLabel('Gravy — vegetarian', { exact: true }).locator('..').locator('..').locator('small');
-    await expect(gravySummary).toContainText(`Bringing: ${guestNames}`);
-    await expect(gravySummary).not.toContainText('×');
-    await expect(signedIn.locator('.at-rsvp-app')).toContainText(guestNames);
-    await gravySummary.scrollIntoViewIfNeeded();
-    await signedIn.screenshot({ path: testInfo.outputPath('rsvp-listed-food-contributors-desktop.png') });
-    await customFoodList.scrollIntoViewIfNeeded();
-    await signedIn.screenshot({ path: testInfo.outputPath('rsvp-signed-in-contributors-desktop.png') });
-    await signedIn.setViewportSize({ width: 768, height: 1024 });
-    await gravySummary.scrollIntoViewIfNeeded();
-    await signedIn.screenshot({ path: testInfo.outputPath('rsvp-listed-food-contributors-tablet.png') });
-    await customFoodList.scrollIntoViewIfNeeded();
-    await signedIn.screenshot({ path: testInfo.outputPath('rsvp-signed-in-contributors-tablet.png') });
-    await signedIn.setViewportSize({ width: 390, height: 844 });
-    await gravySummary.scrollIntoViewIfNeeded();
-    await signedIn.screenshot({ path: testInfo.outputPath('rsvp-listed-food-contributors-mobile.png') });
-    await customFoodList.scrollIntoViewIfNeeded();
-    await signedIn.screenshot({ path: testInfo.outputPath('rsvp-signed-in-contributors-mobile.png') });
-  } finally {
-    await signedInContext.close();
-  }
+  // The RSVP submission above creates and signs in the account under test.
+  // Reuse that authenticated session to verify contributor names rather than
+  // creating a second account through the now invitation-only signup form.
+  await page.goto('/rsvp/');
+  const customFoodList = page.locator('.at-custom-food-list');
+  const customFoodRow = customFoodList.getByRole('listitem').filter({ hasText: customFood });
+  await expect(customFoodRow.locator('small')).toHaveText(`3 from ${guestNames}`);
+  const gravySummary = page.getByLabel('Gravy — vegetarian', { exact: true }).locator('..').locator('..').locator('small');
+  await expect(gravySummary).toContainText(`Bringing: ${guestNames}`);
+  await expect(gravySummary).not.toContainText('×');
+  await expect(page.locator('.at-rsvp-app')).toContainText(guestNames);
+  await gravySummary.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('rsvp-listed-food-contributors-desktop.png') });
+  await customFoodList.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('rsvp-signed-in-contributors-desktop.png') });
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await gravySummary.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('rsvp-listed-food-contributors-tablet.png') });
+  await customFoodList.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('rsvp-signed-in-contributors-tablet.png') });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await gravySummary.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('rsvp-listed-food-contributors-mobile.png') });
+  await customFoodList.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('rsvp-signed-in-contributors-mobile.png') });
 });
 
 test('the RSVP form remains usable on a phone', async ({ page }) => {
