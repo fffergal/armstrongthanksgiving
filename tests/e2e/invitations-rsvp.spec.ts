@@ -91,6 +91,7 @@ test('setup token creates one password account, is consumed once, and leaves exi
   expect(secondClaim).toBe('rejected');
 
   await page.goto(`/signup/?at_setup=${existingToken}&at_rsvp_draft=${existingDraftToken}`);
+  await expect(page.getByText('Confirm your details to link your existing account to the invitation.')).toBeVisible();
   await expect(page.getByText('Set up the invitation to link it without changing your password or access.')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Use your existing password to sign in' })).toHaveCount(0);
   await page.getByLabel('Display name').fill('Existing Guest');

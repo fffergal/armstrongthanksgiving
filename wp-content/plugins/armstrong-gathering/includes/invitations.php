@@ -219,7 +219,7 @@ function at_gathering_signup_shortcode() {
 		<?php elseif ( $guest ) : ?>
 			<?php if ( 'error' === $notice ) : ?><div class="at-success at-error" role="alert">We could not finish setting up your account. Check the details and try again.</div><?php endif; ?>
 			<form class="at-signup-form at-rsvp-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post">
-				<div class="at-rsvp-intro"><h2>Set up your account</h2><p>Choose a password for your gathering account.</p></div>
+				<div class="at-rsvp-intro"><h2>Set up your account</h2><p><?php echo $existing ? 'Confirm your details to link your existing account to the invitation.' : 'Choose a password for your gathering account.'; ?></p></div>
 				<input type="hidden" name="action" value="at_claim_invitation"><input type="hidden" name="at_setup_token" value="<?php echo esc_attr( $token ); ?>"><input type="hidden" name="at_rsvp_draft" value="<?php echo esc_attr( $draft_token ); ?>">
 				<?php wp_nonce_field( 'at_claim_invitation_' . hash( 'sha256', $token ), 'at_claim_nonce' ); ?>
 				<fieldset class="at-account-fields"><legend>Your details</legend><div class="at-rsvp-grid">
