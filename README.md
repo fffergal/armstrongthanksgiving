@@ -99,22 +99,25 @@ As the suite grows, production checks should cover account and access behavior,
 forum posting and subscriptions, album creation/upload, responsive rendering,
 keyboard navigation, RSVP handling, direct media access, caching headers, and
 plugin-update compatibility. Invitation claiming and roster-based adult-party
-assignments remain rollout checks; verify them after plan sections 1A and 1B
-are integrated. Routine sign-in is password-based, with WordPress password
-recovery for forgotten passwords.
+assignments are implemented; verify them on production after deployment and
+complete the host legacy-party reconciliation before guests save party RSVPs.
+Routine sign-in is password-based, with WordPress password recovery for
+forgotten passwords.
 
 See [plugin evaluation](docs/plugin-evaluation.md) for the theming and acceptance gates.
 
-See [email and friend onboarding](docs/email-onboarding.md) for the specified
-invitation/password flow, party RSVP rules, legacy reconciliation, production
-mail procedure, and current rollout status.
+See [email and friend onboarding](docs/email-onboarding.md) for the invitation
+and password flow, party RSVP rules, legacy reconciliation gate, production
+mail procedure, and rollout status.
 
 ## Production updates
 
 The GitHub workflow for multiple concurrent worktrees is documented in
 [GitHub workflow](docs/github-workflow.md). Pull requests into `main` run the
-complete browser and Lighthouse suite. The GitHub Codex reviewer is optional
-and may not be enabled for every PR; reviewer approval is not required.
+required CI check; source changes run the complete browser and Lighthouse
+suite, while documentation-only changes skip that long suite. The GitHub Codex
+reviewer is optional and may not be enabled for every PR; reviewer approval is
+not required.
 Address useful feedback when it arrives; there is no need to trigger a review
 manually or wait indefinitely for one before merging once the merge gates pass.
 If you decide not to take the reviewer's advice, resolve the corresponding
@@ -161,6 +164,7 @@ The **Gathering RSVPs** admin page includes **Send a sample confirmation**. It
 sends the normal RSVP confirmation through WordPress mail without creating or
 changing an RSVP. This sends a real email and should only be used when that
 send has been requested. A successful WordPress handoff still needs to be
-checked in the recipient inbox. The invitation and party workflow described in
-[email and friend onboarding](docs/email-onboarding.md) is not live until
-sections 1A and 1B have been integrated and verified.
+checked in the recipient inbox. Invitation claiming and roster-based party
+RSVPs are integrated on `main`; production use also requires deployment and
+host confirmation of the legacy-party reconciliation described in [email and
+friend onboarding](docs/email-onboarding.md).
