@@ -79,4 +79,5 @@ host-resolution message without exposing invitee email addresses.
 
 The existing open-signup and legacy RSVP behavior is kept in its extracted
 module during this foundation step. Later feature work replaces those paths;
-this foundation does not send invitation or RSVP email.
+this foundation adds no new email sends, and existing RSVP confirmation
+behavior remains.

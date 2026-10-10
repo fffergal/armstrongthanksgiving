@@ -269,6 +269,10 @@ function at_gathering_link_legacy_rsvp_owner( $user_id, $guest_id, $confirmed_em
 			if ( $wpdb->last_error ) {
 				return new WP_Error( 'at_owner_link_conflict', 'This roster guest is already linked to another account.' );
 			}
+			$linked_guest = at_gathering_roster_guest( $guest_id );
+			if ( ! $linked_guest || (int) $linked_guest->user_id !== $user_id || $linked_guest->email_normalized !== $guest->email_normalized ) {
+				return new WP_Error( 'at_owner_link_conflict', 'This roster guest changed while the owner link was being saved.' );
+			}
 			$inserted = $wpdb->insert( at_gathering_assignments_table(), array( 'rsvp_user_id' => $user_id, 'guest_id' => $guest_id, 'is_owner' => 1, 'created_at' => current_time( 'mysql', true ) ), array( '%d', '%d', '%d', '%s' ) );
 			if ( false === $inserted ) {
 				return new WP_Error( 'at_owner_link_conflict', 'This guest already has a party assignment that needs host resolution.' );
