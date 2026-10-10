@@ -101,9 +101,11 @@ jobs:
             });
             const isDocumentation = filename =>
               filename.startsWith('docs/') || filename.toLowerCase().endsWith('.md');
-            const docsOnly = changedFiles.length > 0 && changedFiles.every(({ filename, previous_filename }) =>
-              isDocumentation(filename) && (!previous_filename || isDocumentation(previous_filename))
-            );
+            const docsOnly = changedFiles.length > 0
+              && changedFiles.length === pullRequest.changed_files
+              && changedFiles.every(({ filename, previous_filename }) =>
+                isDocumentation(filename) && (!previous_filename || isDocumentation(previous_filename))
+              );
 
             if (docsOnly) {
               const now = new Date().toISOString();
