@@ -62,6 +62,15 @@ different interface states, include the images needed to show those states. If
 the feature has no visible interface, or the local site cannot be brought up,
 explain that in the completion message.
 
+When a pull request includes a meaningful visible interface change, include
+fresh screenshots of the integrated implementation directly in the PR
+description using inline Markdown images or the platform's image attachments.
+Show the surrounding page and relevant details, and include desktop, tablet,
+and mobile views when responsive behavior changes. Use real screenshots from
+the running implementation rather than mockups. Keep screenshot files outside
+the repository or in ignored output directories; upload or attach them so they
+render in the PR description.
+
 ## Sandbox troubleshooting
 
 When Docker commands, internal browser automation, or the `gh` CLI fail,
