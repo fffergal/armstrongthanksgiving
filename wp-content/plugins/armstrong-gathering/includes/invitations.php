@@ -168,14 +168,35 @@ function at_gathering_claim_guest( $token, $display_name, $password = '', $passw
 }
 
 function at_gathering_invitation_rate_limited( $email ) {
+	global $wpdb;
 	$ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? 'unknown' ) );
 	$email_key = 'at_invite_rate_email_' . hash( 'sha256', at_gathering_normalize_email( $email ) );
 	$ip_key = 'at_invite_rate_ip_' . hash( 'sha256', $ip );
-	$email_count = (int) get_transient( $email_key );
-	$ip_count = (int) get_transient( $ip_key );
-	set_transient( $email_key, $email_count + 1, HOUR_IN_SECONDS );
-	set_transient( $ip_key, $ip_count + 1, HOUR_IN_SECONDS );
-	return $email_count >= 3 || $ip_count >= 20;
+	$window = (int) floor( time() / HOUR_IN_SECONDS );
+	$wpdb->query(
+		$wpdb->prepare(
+			"DELETE FROM {$wpdb->options} WHERE option_name LIKE 'at_invite_rate_%' AND CAST(SUBSTRING_INDEX(option_value, ':', 1) AS UNSIGNED) < %d",
+			$window
+		)
+	);
+	$increment = static function ( $key ) use ( $wpdb, $window ) {
+		$initial = $window . ':1';
+		$wpdb->query(
+			$wpdb->prepare(
+				"INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no') ON DUPLICATE KEY UPDATE option_value = IF(CAST(SUBSTRING_INDEX(option_value, ':', 1) AS UNSIGNED) = %d, CONCAT(%d, ':', CAST(SUBSTRING_INDEX(option_value, ':', -1) AS UNSIGNED) + 1), %s)",
+				$key,
+				$initial,
+				$window,
+				$window,
+				$initial
+			)
+		);
+		wp_cache_delete( $key, 'options' );
+		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT SUBSTRING_INDEX(option_value, ':', -1) FROM {$wpdb->options} WHERE option_name = %s LIMIT 1", $key ) );
+	};
+	$email_count = $increment( $email_key );
+	$ip_count = $increment( $ip_key );
+	return $email_count > 3 || $ip_count > 20;
 }
 
 function at_gathering_signup_shortcode() {
@@ -187,13 +208,14 @@ function at_gathering_signup_shortcode() {
 		: null;
 	$existing = $guest ? get_user_by( 'email', $guest->email_normalized ) : false;
 	$notice = sanitize_key( wp_unslash( $_GET['at_setup_result'] ?? '' ) );
+	$login_return = $draft_return ? $draft_return : home_url( '/' );
 	ob_start();
 	?>
 	<div class="at-signup-app">
 		<?php if ( 'requested' === $notice ) : ?>
 			<div class="at-success" role="status">If an invitation can be set up for that address, we’ll email a link shortly. Check your inbox.</div>
 		<?php elseif ( 'claimed' === $notice ) : ?>
-			<div class="at-success" role="status"><strong>Your account is ready.</strong><br><a href="<?php echo esc_url( wp_login_url( $draft_return ) ); ?>">Sign in with your password</a><?php echo $draft_return ? ' to continue your RSVP.' : ' to visit the gathering site.'; ?></div>
+			<div class="at-success" role="status"><strong>Your account is ready.</strong><br><a href="<?php echo esc_url( wp_login_url( $login_return ) ); ?>">Sign in with your password</a><?php echo $draft_return ? ' to continue your RSVP.' : ' to visit the gathering site.'; ?></div>
 		<?php elseif ( $guest ) : ?>
 			<?php if ( 'error' === $notice ) : ?><div class="at-success at-error" role="alert">We could not finish setting up your account. Check the details and try again.</div><?php endif; ?>
 			<form class="at-signup-form at-rsvp-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post">
@@ -202,7 +224,7 @@ function at_gathering_signup_shortcode() {
 				<?php wp_nonce_field( 'at_claim_invitation_' . hash( 'sha256', $token ), 'at_claim_nonce' ); ?>
 				<fieldset class="at-account-fields"><legend>Your details</legend><div class="at-rsvp-grid">
 					<label>Display name<input type="text" name="at_display_name" value="<?php echo esc_attr( $guest->display_name ); ?>" autocomplete="name" required></label>
-					<?php if ( $existing ) : ?><p>This address already has an account. Claiming the invitation will link it without changing its password. <a href="<?php echo esc_url( $draft_return ? wp_login_url( $draft_return ) : wp_login_url() ); ?>">Use your existing password to sign in</a>.</p>
+					<?php if ( $existing ) : ?><p>This address already has an account. Set up the invitation to link it without changing your password or access. You can sign in with your existing password afterward.</p>
 					<?php else : ?><label>Password<input type="password" name="at_password" autocomplete="new-password" minlength="10" required></label><label>Confirm password<input type="password" name="at_password_confirm" autocomplete="new-password" minlength="10" required></label><?php endif; ?>
 				</div></fieldset><p class="at-form-actions"><button class="at-button" type="submit">Set up account</button></p>
 			</form>

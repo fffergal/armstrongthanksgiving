@@ -54,6 +54,14 @@ test('signup requests use the same public response and direct legacy posts canno
   runWpEval(`global $wpdb; $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(invitedEmail)}));`);
 });
 
+test('invitation rate limits enforce the per-email boundary', async ({}, testInfo) => {
+  test.skip(testInfo.project.name !== 'rsvp', 'Run invitation coverage in the desktop RSVP project.');
+  const email = `rate-limit-${Date.now()}@example.test`;
+  const ip = '198.51.100.42';
+  const results = runWpEval(`global $wpdb; $_SERVER['REMOTE_ADDR'] = ${php(ip)}; $email_key = 'at_invite_rate_email_' . hash('sha256', at_gathering_normalize_email(${php(email)})); $ip_key = 'at_invite_rate_ip_' . hash('sha256', ${php(ip)}); $results = array(); for ($i = 0; $i < 4; $i++) { $results[] = at_gathering_invitation_rate_limited(${php(email)}) ? 'limited' : 'allowed'; } $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->options} WHERE option_name IN (%s, %s)", $email_key, $ip_key)); echo implode(',', $results);`).trim();
+  expect(results).toBe('allowed,allowed,allowed,limited');
+});
+
 test('setup token creates one password account, is consumed once, and leaves existing accounts unchanged', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'rsvp', 'Run invitation coverage in the desktop RSVP project.');
   const suffix = `${testInfo.project.name.replace(/\W/g, '')}${Date.now()}`.toLowerCase();
@@ -76,16 +84,20 @@ test('setup token creates one password account, is consumed once, and leaves exi
   await expect(page.getByRole('status')).toContainText('Your account is ready');
   const created = runWpEval(`$user = get_user_by('email', ${php(newEmail)}); $guest = at_gathering_roster_guest_by_email(${php(newEmail)}); echo $user && $guest && (int) $guest->user_id === (int) $user->ID && 'claimed' === $guest->claim_state && '' === $guest->token_hash ? 'claimed' : 'failed';`).trim();
   expect(created).toBe('claimed');
+  const claimedLoginHref = await page.getByRole('link', { name: 'Sign in with your password' }).getAttribute('href');
+  expect(decodeURIComponent(claimedLoginHref || '')).toContain('redirect_to=');
+  expect(decodeURIComponent(claimedLoginHref || '')).not.toContain('redirect_to=/wp-admin');
   const secondClaim = runWpEval(`$result = at_gathering_claim_guest(${php(newToken)}, 'Again', 'cranberry-sauce-2026', 'cranberry-sauce-2026'); echo is_wp_error($result) && 'at_claim_invalid' === $result->get_error_code() ? 'rejected' : 'accepted';`).trim();
   expect(secondClaim).toBe('rejected');
 
   await page.goto(`/signup/?at_setup=${existingToken}&at_rsvp_draft=${existingDraftToken}`);
-  await expect(page.getByText('Claiming the invitation will link it without changing its password.')).toBeVisible();
-  const existingLoginHref = await page.getByRole('link', { name: 'Use your existing password to sign in' }).getAttribute('href');
-  expect(decodeURIComponent(existingLoginHref || '')).toContain(`/rsvp/?at_rsvp_draft=${existingDraftToken}`);
+  await expect(page.getByText('Set up the invitation to link it without changing your password or access.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Use your existing password to sign in' })).toHaveCount(0);
   await page.getByLabel('Display name').fill('Existing Guest');
   await page.getByRole('button', { name: 'Set up account' }).click();
   await expect(page.getByRole('status')).toContainText('Your account is ready');
+  const existingClaimLoginHref = await page.getByRole('link', { name: 'Sign in with your password' }).getAttribute('href');
+  expect(decodeURIComponent(existingClaimLoginHref || '')).toContain(`/rsvp/?at_rsvp_draft=${existingDraftToken}`);
   const preserved = runWpEval(`$user = get_user_by('email', ${php(existingEmail)}); $guest = at_gathering_roster_guest_by_email(${php(existingEmail)}); echo $user && $guest && (int) $guest->user_id === (int) $user->ID && 'editor' === $user->roles[0] && wp_check_password('existing-password-2026', $user->user_pass, $user->ID) ? 'preserved' : 'changed';`).trim();
   expect(preserved).toBe('preserved');
 
@@ -97,7 +109,7 @@ test('RSVP draft survives invitation request and new-account setup', async ({ pa
   const suffix = `${testInfo.project.name.replace(/\W/g, '')}${Date.now()}`.toLowerCase();
   const email = `handoff-${suffix}@example.test`;
   const draftToken = `${Date.now().toString(36)}${'c'.repeat(32)}`.slice(0, 32);
-  runWpEval(`global $wpdb; $now = current_time('mysql', true); delete_transient('at_gathering_last_test_mail'); $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_at_invite_rate_%' OR option_name LIKE '_transient_timeout_at_invite_rate_%'"); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => ${php(email)}, 'display_name' => 'RSVP Handoff Guest', 'claim_state' => 'invited', 'created_at' => $now, 'updated_at' => $now)); set_transient('at_gathering_rsvp_draft_' . ${php(draftToken)}, array('status' => 'yes', 'guest_count' => 2, 'guest_names' => 'Handoff Guest, Plus One', 'dietary' => 'No walnuts', 'food_amounts' => array('Cranberry sauce' => 1), 'custom_food' => 'Handoff mulled cider', 'custom_food_amount' => 1, 'notes' => 'Saved host note'), 30 * MINUTE_IN_SECONDS);`);
+  runWpEval(`global $wpdb; $now = current_time('mysql', true); delete_transient('at_gathering_last_test_mail'); $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE 'at_invite_rate_%' OR option_name LIKE '_transient_at_invite_rate_%' OR option_name LIKE '_transient_timeout_at_invite_rate_%'"); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => ${php(email)}, 'display_name' => 'RSVP Handoff Guest', 'claim_state' => 'invited', 'created_at' => $now, 'updated_at' => $now)); set_transient('at_gathering_rsvp_draft_' . ${php(draftToken)}, array('status' => 'yes', 'guest_count' => 2, 'guest_names' => 'Handoff Guest, Plus One', 'dietary' => 'No walnuts', 'food_amounts' => array('Cranberry sauce' => 1), 'custom_food' => 'Handoff mulled cider', 'custom_food_amount' => 1, 'notes' => 'Saved host note'), 30 * MINUTE_IN_SECONDS);`);
 
   await page.goto(`/signup/?at_rsvp_draft=${draftToken}`);
   const requestLoginHref = await page.getByRole('link', { name: 'Sign in' }).getAttribute('href');
