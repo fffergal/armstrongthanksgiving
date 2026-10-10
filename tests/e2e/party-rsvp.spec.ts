@@ -5,13 +5,14 @@ import { logIn, logInAsAdmin } from './helpers/auth';
 
 const root = path.resolve(__dirname, '../..');
 
-function runWpEval(code: string): void {
+function runWpEval(code: string): string {
   const result = spawnSync(process.execPath, [path.join(root, 'scripts/wp-env.mjs'), 'run', 'cli', 'wp', 'eval', code], {
     cwd: root,
     encoding: 'utf8',
     stdio: 'pipe',
   });
   if (result.status !== 0) throw new Error(result.stderr || result.stdout || 'Could not prepare the party RSVP fixture.');
+  return result.stdout;
 }
 
 test.describe('party RSVP assignments', () => {
@@ -57,7 +58,14 @@ test.describe('party RSVP assignments', () => {
     await page.getByRole('radio', { name: 'Maybe' }).check();
     await page.getByRole('button', { name: 'Save my RSVP' }).click();
     await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
+    await expect(page.getByRole('status')).toContainText('Attendance: Maybe');
+    await expect(page.getByRole('status')).toContainText('Adults reserved: RSVP owner, Party friend');
+    await expect(page.getByRole('status')).toContainText('Children: 2');
     runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $rsvp = at_gathering_get_rsvp($owner->ID); $assignments = $wpdb->get_results($wpdb->prepare('SELECT * FROM ' . at_gathering_assignments_table() . ' WHERE rsvp_user_id = %d', $owner->ID)); if (!$rsvp || $rsvp->status !== 'maybe' || (int) $rsvp->children_count !== 2 || count($assignments) !== 2) { WP_CLI::error('The saved party did not retain status, children, and both adult reservations.'); } $owner_assignment = array_filter($assignments, function($row) { return (int) $row->is_owner === 1; }); if (count($owner_assignment) !== 1) { WP_CLI::error('The RSVP owner is missing from the unique assignment relation.'); }");
+    await page.goto('/rsvp/');
+    await expect(page.getByRole('radio', { name: 'Maybe' })).toBeChecked();
+    await expect(page.getByLabel('Party friend')).toBeChecked();
+    await expect(page.getByLabel('Children (ages 0–17)')).toHaveValue('2');
   });
 
   test('an unchanged host party save keeps the selected adults reserved', async ({ page }) => {
@@ -73,7 +81,8 @@ test.describe('party RSVP assignments', () => {
   });
 
   test('an unclaimed signed-in guest is handed to setup with the RSVP draft intact', async ({ page }) => {
-    runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $wpdb->delete(at_gathering_roster_table(), array('user_id' => $owner->ID)); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
+    test.setTimeout(90000);
+    runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => $owner->user_email)); $now = current_time('mysql', true); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $owner->user_email, 'display_name' => 'RSVP owner', 'claim_state' => 'invited', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
     await logIn(page);
     await page.goto('/rsvp/');
     await expect(page.locator('.at-party-roster')).toHaveCount(0);
@@ -82,9 +91,22 @@ test.describe('party RSVP assignments', () => {
     expect(rosterResponse.status()).toBe(403);
     await page.getByLabel('Children (ages 0–17)').selectOption('3');
     await page.getByRole('button', { name: 'Save my RSVP' }).click();
-    await page.waitForURL(/\/signup\/\?at_rsvp_draft=[a-z0-9]+/);
+    await page.waitForURL(/\/signup\/\?.*at_setup_result=requested.*at_rsvp_draft=[a-z0-9]+/);
     const draft = new URL(page.url()).searchParams.get('at_rsvp_draft');
     expect(draft).toMatch(/^[a-z0-9]+$/);
+    const capturedMail = JSON.parse(runWpEval('echo wp_json_encode(get_transient("at_gathering_last_test_mail"));')) as { to: string; message: string };
+    expect(capturedMail.to).toBe('guest@example.test');
+    const setupToken = capturedMail.message.match(/at_setup=([a-f0-9]{64})/)?.[1];
+    expect(setupToken).toBeTruthy();
+
+    await page.goto(`/signup/?at_setup=${setupToken}&at_rsvp_draft=${draft}`);
+    await expect(page.getByText('Confirm your details to link your existing account to the invitation.')).toBeVisible();
+    await page.getByLabel('Display name').fill('RSVP owner');
+    await page.getByRole('button', { name: 'Set up account' }).click();
+    await expect(page.getByRole('status')).toContainText('Your account is ready');
+    const claimed = runWpEval("$owner = get_user_by('login', 'guest'); $guest = at_gathering_roster_guest_by_user($owner->ID); echo $guest && 'claimed' === $guest->claim_state ? 'claimed' : 'unclaimed';").trim();
+    expect(claimed).toBe('claimed');
+
     await page.goto(`/rsvp/?at_rsvp_draft=${draft}`);
     await expect(page.getByLabel('Children (ages 0–17)')).toHaveValue('3');
   });
@@ -114,6 +136,7 @@ test.describe('party RSVP assignments', () => {
   });
 
   test('no responses keep adult reservations and save zero children', async ({ page }) => {
+    test.setTimeout(90000);
     runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $owner->user_email, 'display_name' => 'RSVP owner', 'user_id' => $owner->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
     await logIn(page);
     await page.goto('/rsvp/');

@@ -430,6 +430,20 @@ function at_gathering_save_rsvp() {
 		set_transient( 'at_gathering_rsvp_draft_' . $token, $form_values, 30 * MINUTE_IN_SECONDS );
 		$return_with_draft = add_query_arg( 'at_rsvp_draft', $token, $return );
 		$claim_url = apply_filters( 'at_gathering_rsvp_claim_setup_url', add_query_arg( 'at_rsvp_draft', $token, home_url( '/signup/' ) ), $return_with_draft, $token );
+		$pending_guest = $user->exists() ? at_gathering_roster_guest_by_email( $user->user_email ) : null;
+		if ( $user->exists() && $pending_guest && 'invited' === $pending_guest->claim_state && function_exists( 'at_gathering_send_claim_link' ) ) {
+			$rate_limited = function_exists( 'at_gathering_invitation_rate_limited' ) && at_gathering_invitation_rate_limited( $user->user_email );
+			if ( ! $rate_limited ) {
+				at_gathering_send_claim_link( $user->user_email, $token );
+			}
+			$claim_url = add_query_arg(
+				array(
+					'at_setup_result' => 'requested',
+					'at_rsvp_draft'   => $token,
+				),
+				home_url( '/signup/' )
+			);
+		}
 		wp_safe_redirect( $user->exists() ? $claim_url : wp_login_url( $claim_url ) );
 		exit;
 	}
