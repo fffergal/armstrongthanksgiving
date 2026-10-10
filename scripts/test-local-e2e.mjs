@@ -159,9 +159,12 @@ function runLinuxVisuals({ reset = true, skipForRemoteTarget = false, args = [] 
     '--env', 'USE_WORKTREE_RUNTIME=0',
     '--env', 'LOCAL_LINUX_QEMU=1',
     ...(process.env.CI ? ['--env', `CI=${process.env.CI}`] : []),
+    ...(process.platform === 'linux'
+      ? ['--env', `HOST_UID=${process.getuid()}`, '--env', `HOST_GID=${process.getgid()}`]
+      : []),
     localImage,
     'sh', '-lc',
-    `if [ ! -x node_modules/.bin/playwright ]; then npm ci; fi && npx playwright test --project=visual --workers=1${updateSnapshots ? ' --update-snapshots' : ''}${args.length ? ` ${args.map(shellQuote).join(' ')}` : ''}`,
+    `${process.platform === 'linux' ? `trap 'status=$?; for path in playwright-report test-results; do if [ -e "$path" ]; then chown -R "$HOST_UID:$HOST_GID" "$path" 2>/dev/null || true; fi; done; exit "$status"' EXIT; ` : ''}if [ ! -x node_modules/.bin/playwright ]; then npm ci; fi && npx playwright test --project=visual --workers=1${updateSnapshots ? ' --update-snapshots' : ''}${args.length ? ` ${args.map(shellQuote).join(' ')}` : ''}`,
   ];
   let status = updateWordPressUrl('http://wordpress');
   let restoreStatus = 0;
