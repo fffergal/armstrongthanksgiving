@@ -582,12 +582,13 @@ function at_gathering_admin_page() {
 		<?php
 		$attendance = array( 'yes' => 0, 'maybe' => 0, 'no' => 0 );
 		$expected_people = 0;
+		$party_assignments_authoritative = at_gathering_party_rsvps_enabled();
 		foreach ( $rows as $attendance_row ) {
 			$attendance[ $attendance_row->status ] = ( $attendance[ $attendance_row->status ] ?? 0 ) + 1;
 			if ( 'yes' === $attendance_row->status ) {
 				$assigned_adults = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . at_gathering_assignments_table() . ' WHERE rsvp_user_id = %d', $attendance_row->user_id ) );
-				// Preserve pre-reconciliation totals until this legacy party has explicit assignments.
-				$adults = $assigned_adults ?: (int) $attendance_row->guest_count;
+				// Partial host mappings do not replace legacy totals until reconciliation is confirmed.
+				$adults = $party_assignments_authoritative && $assigned_adults ? $assigned_adults : (int) $attendance_row->guest_count;
 				$expected_people += $adults + (int) ( $attendance_row->children_count ?? 0 );
 			}
 		}
