@@ -45,10 +45,19 @@ jobs:
         uses: actions/checkout@v5
         with:
           ref: main
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Test CI change-scope helper
         run: node --test tests/ci-change-scope.test.cjs
+
+      - name: Determine push change scope
+        id: push-change-scope
+        if: github.event_name == 'push'
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: node scripts/ci-change-scope.cjs "$BEFORE_SHA" "$AFTER_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Verify pull request and create check
         id: context
@@ -56,10 +65,11 @@ jobs:
         env:
           INPUT_HEAD_SHA: ${{ inputs.head_sha }}
           INPUT_PR_NUMBER: ${{ inputs.pr_number }}
+          PUSH_RUN_TESTS: ${{ steps.push-change-scope.outputs.run_tests }}
         with:
           script: |
             const { isDocsOnlyPullRequestFiles } = require('./scripts/ci-change-scope.cjs');
-            core.setOutput('run_tests', 'true');
+            core.setOutput('run_tests', process.env.PUSH_RUN_TESTS || 'true');
             const requestedNumber = Number(process.env.INPUT_PR_NUMBER || 0);
             const prNumber = context.payload.pull_request?.number || requestedNumber;
 
@@ -152,10 +162,74 @@ jobs:
             core.setOutput('test_sha', testSha);
             core.setOutput('head_sha', headSha);
 
-  test:
-    name: Run base-branch CI
+  build_playwright_image:
+    name: Build Linux Playwright image
     needs: prepare_check
     if: needs.prepare_check.result == 'success' && needs.prepare_check.outputs.run_tests == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      image: ${{ steps.image.outputs.tag }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare_check.outputs.test_sha || github.sha }}
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Expose GitHub Actions cache runtime
+        uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Configure Playwright image cache
+        env:
+          CACHE_TO: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,scope=playwright-image,mode=max' || '' }}
+        run: |
+          echo 'PLAYWRIGHT_DOCKER_CACHE_FROM=type=gha,scope=playwright-image' >> "$GITHUB_ENV"
+          if [ -n "$CACHE_TO" ]; then
+            echo "PLAYWRIGHT_DOCKER_CACHE_TO=$CACHE_TO" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build Linux Playwright image
+        id: image
+        run: |
+          playwright_version="$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")"
+          dockerfile_key="$(sha256sum scripts/playwright.Dockerfile | cut -c1-8)"
+          image="armstrong-thanksgiving-playwright:ubuntu-24.04-node-22.23.2-pw-${playwright_version}-${dockerfile_key}"
+          args=(buildx build --load --platform=linux/amd64)
+          args+=(--build-arg NODE_VERSION=22.23.2)
+          args+=(--build-arg "PLAYWRIGHT_VERSION=$playwright_version")
+          args+=(--tag "$image" --file scripts/playwright.Dockerfile)
+          args+=(--cache-from "$PLAYWRIGHT_DOCKER_CACHE_FROM")
+          if [ -n "${PLAYWRIGHT_DOCKER_CACHE_TO:-}" ]; then
+            args+=(--cache-to "$PLAYWRIGHT_DOCKER_CACHE_TO")
+          fi
+          docker "${args[@]}" scripts
+          echo "tag=$image" >> "$GITHUB_OUTPUT"
+
+      - name: Package Playwright image for test job
+        run: docker save '${{ steps.image.outputs.tag }}' | gzip -1 > "$RUNNER_TEMP/playwright-image.tar.gz"
+
+      - name: Upload Playwright image
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-image-${{ github.run_id }}
+          path: ${{ runner.temp }}/playwright-image.tar.gz
+          compression-level: 0
+          retention-days: 1
+
+  test:
+    name: Run base-branch CI
+    needs: [prepare_check, build_playwright_image]
+    if: >-
+      always() &&
+      needs.prepare_check.result == 'success' &&
+      (needs.build_playwright_image.result == 'success' ||
+      (github.event_name == 'push' && needs.prepare_check.outputs.run_tests == 'false'))
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
@@ -179,40 +253,11 @@ jobs:
 
       - name: Check whether the push changes only documentation
         id: change-scope
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BEFORE_SHA: ${{ github.event.before }}
-          AFTER_SHA: ${{ github.sha }}
         run: |
-          if [ "$EVENT_NAME" != 'push' ]; then
-            echo 'run_tests=true' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          node scripts/ci-change-scope.cjs "$BEFORE_SHA" "$AFTER_SHA" >> "$GITHUB_OUTPUT"
+          echo "run_tests=${{ needs.prepare_check.outputs.run_tests }}" >> "$GITHUB_OUTPUT"
           if grep -Fqx 'run_tests=false' "$GITHUB_OUTPUT"; then
-            echo 'Docs-only push; browser and Lighthouse tests are skipped.'
+            echo 'Docs-only change; browser and Lighthouse tests are skipped.'
           fi
-
-      - name: Set up Docker Buildx
-        if: steps.change-scope.outputs.run_tests == 'true'
-        uses: docker/setup-buildx-action@v3
-
-      - name: Restore Playwright image layer cache
-        id: playwright-build-cache
-        if: steps.change-scope.outputs.run_tests == 'true'
-        uses: actions/cache/restore@v4
-        with:
-          path: /tmp/armstrong-thanksgiving-playwright-cache
-          key: playwright-linux-amd64-${{ hashFiles('scripts/playwright.Dockerfile', 'package-lock.json') }}
-          restore-keys: |
-            playwright-linux-amd64-
-
-      - name: Configure Playwright image cache paths
-        if: steps.change-scope.outputs.run_tests == 'true'
-        run: |
-          echo "PLAYWRIGHT_DOCKER_CACHE_FROM=/tmp/armstrong-thanksgiving-playwright-cache" >> "$GITHUB_ENV"
-          echo "PLAYWRIGHT_DOCKER_CACHE_TO=/tmp/armstrong-thanksgiving-playwright-cache-next" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         if: steps.change-scope.outputs.run_tests == 'true'
@@ -248,27 +293,21 @@ jobs:
         if: steps.change-scope.outputs.run_tests == 'true'
         run: npm run wp:setup
 
+      - name: Download Playwright image
+        if: steps.change-scope.outputs.run_tests == 'true'
+        uses: actions/download-artifact@v6
+        with:
+          name: playwright-image-${{ github.run_id }}
+          path: ${{ runner.temp }}
+
+      - name: Load Playwright image
+        if: steps.change-scope.outputs.run_tests == 'true'
+        run: gzip -dc "$RUNNER_TEMP/playwright-image.tar.gz" | docker load
+
       - name: Run browser and Lighthouse tests
         id: browser-tests
         if: steps.change-scope.outputs.run_tests == 'true'
         run: npm run test:all
-
-      - name: Prepare Playwright image cache for saving
-        id: playwright-cache-export
-        if: always() && steps.change-scope.outputs.run_tests == 'true'
-        run: |
-          if [ -d /tmp/armstrong-thanksgiving-playwright-cache-next ]; then
-            rm -rf /tmp/armstrong-thanksgiving-playwright-cache
-            mv /tmp/armstrong-thanksgiving-playwright-cache-next /tmp/armstrong-thanksgiving-playwright-cache
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Save Playwright image layer cache
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && always() && steps.change-scope.outputs.run_tests == 'true' && steps.browser-tests.conclusion == 'success' && steps.playwright-build-cache.outputs.cache-hit != 'true' && steps.playwright-cache-export.outputs.available == 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: /tmp/armstrong-thanksgiving-playwright-cache
-          key: playwright-linux-amd64-${{ hashFiles('scripts/playwright.Dockerfile', 'package-lock.json') }}
 
       - name: Upload browser reports
         if: always() && steps.change-scope.outputs.run_tests == 'true'

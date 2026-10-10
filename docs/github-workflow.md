@@ -16,12 +16,12 @@ requests into `main`:
    browser acceptance suite and Lighthouse budgets on an x64 Ubuntu runner,
    and runs visual contracts in the same x64 Playwright container used by local
    snapshot checks. Docker Buildx imports and exports the container's layer
-   cache through Actions cache, keyed by the Playwright Dockerfile and lockfile.
-   Trusted pushes to `main` save cache versions; `pull_request_target` runs can
-   restore the default-branch cache but cannot write to it. This lets separate
-   PRs and main builds reuse the same image layers without a registry or
-   persistent runner, while keeping PR-controlled Dockerfile content out of
-   the shared cache. The shared container includes DejaVu Sans for the Ubuntu
+   cache through GitHub's Actions cache backend. Trusted pushes to `main` write
+   the cache; `pull_request_target` runs can restore the default-branch cache
+   but cannot write to it. This lets separate PRs and main builds reuse the same
+   image layers without a registry or persistent runner, while keeping
+   PR-controlled Dockerfile content out of the shared cache. The shared
+   container includes DejaVu Sans for the Ubuntu
    system-font fallback. Reports are retained as workflow artifacts. The
    workflow definition comes from `main`, while the source under test comes
    from the pull request, so a PR cannot replace the required check by editing

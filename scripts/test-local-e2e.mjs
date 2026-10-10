@@ -125,11 +125,11 @@ function runLinuxVisuals({ reset = true, skipForRemoteTarget = false, args = [] 
     ];
     const cacheFrom = process.env.PLAYWRIGHT_DOCKER_CACHE_FROM;
     const cacheTo = process.env.PLAYWRIGHT_DOCKER_CACHE_TO;
-    if (cacheFrom && fs.existsSync(cacheFrom)) {
-      buildArgs.push('--cache-from', `type=local,src=${cacheFrom}`);
+    if (cacheFrom && (cacheFrom.startsWith('type=') || fs.existsSync(cacheFrom))) {
+      buildArgs.push('--cache-from', cacheFrom.startsWith('type=') ? cacheFrom : `type=local,src=${cacheFrom}`);
     }
     if (cacheTo) {
-      buildArgs.push('--cache-to', `type=local,dest=${cacheTo},mode=max`);
+      buildArgs.push('--cache-to', cacheTo.startsWith('type=') ? cacheTo : `type=local,dest=${cacheTo},mode=max`);
     }
     const buildStatus = run('docker', buildArgs);
     if (buildStatus !== 0) return buildStatus;

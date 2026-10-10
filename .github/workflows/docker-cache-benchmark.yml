@@ -1,0 +1,86 @@
+name: Playwright Docker cache benchmark
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/docker-cache-benchmark.yml
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    name: Compare ${{ matrix.backend }} cache
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        backend: [actions-cache, gha]
+    steps:
+      - name: Check out pull request
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Start total cache timing
+        run: echo "PLAYWRIGHT_CACHE_BENCHMARK_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Expose GitHub Actions cache runtime
+        if: matrix.backend == 'gha'
+        uses: crazy-max/ghaction-github-runtime@v4
+
+      - name: Restore tarball cache
+        if: matrix.backend == 'actions-cache'
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/armstrong-thanksgiving-playwright-cache
+          key: playwright-linux-amd64-${{ hashFiles('scripts/playwright.Dockerfile', 'package-lock.json') }}
+          restore-keys: playwright-linux-amd64-
+
+      - name: Build Playwright image with cache
+        env:
+          BACKEND: ${{ matrix.backend }}
+        run: |
+          playwright_version="$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")"
+          started_at=$(date +%s)
+          args=(
+            buildx build --progress=plain --load --platform=linux/amd64
+            --build-arg NODE_VERSION=22.23.2
+            --build-arg "PLAYWRIGHT_VERSION=$playwright_version"
+            --tag cache-benchmark:playwright
+            --file scripts/playwright.Dockerfile
+          )
+
+          if [ "$BACKEND" = gha ]; then
+            args+=(--cache-from type=gha,scope=playwright-image --cache-to type=gha,scope=playwright-image,mode=max)
+          else
+            if [ -d /tmp/armstrong-thanksgiving-playwright-cache ]; then
+              args+=(--cache-from type=local,src=/tmp/armstrong-thanksgiving-playwright-cache)
+            fi
+            args+=(--cache-to type=local,dest=/tmp/armstrong-thanksgiving-playwright-cache-next,mode=max)
+          fi
+
+          docker "${args[@]}" scripts
+          echo "${BACKEND} cached image build took $(( $(date +%s) - started_at )) seconds."
+
+          if [ "$BACKEND" = actions-cache ] && [ -d /tmp/armstrong-thanksgiving-playwright-cache-next ]; then
+            rm -rf /tmp/armstrong-thanksgiving-playwright-cache
+            mv /tmp/armstrong-thanksgiving-playwright-cache-next /tmp/armstrong-thanksgiving-playwright-cache
+          fi
+
+      - name: Save tarball cache
+        if: matrix.backend == 'actions-cache'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/armstrong-thanksgiving-playwright-cache
+          key: playwright-linux-amd64-${{ hashFiles('scripts/playwright.Dockerfile', 'package-lock.json') }}
+
+      - name: Report total cache timing
+        if: always()
+        env:
+          BACKEND: ${{ matrix.backend }}
+        run: echo "${BACKEND} total restore/build/save took $(( $(date +%s) - PLAYWRIGHT_CACHE_BENCHMARK_STARTED_AT )) seconds."
