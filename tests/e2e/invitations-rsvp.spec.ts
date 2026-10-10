@@ -110,7 +110,7 @@ test('RSVP draft survives invitation request and new-account setup', async ({ pa
   const suffix = `${testInfo.project.name.replace(/\W/g, '')}${Date.now()}`.toLowerCase();
   const email = `handoff-${suffix}@example.test`;
   const draftToken = `${Date.now().toString(36)}${'c'.repeat(32)}`.slice(0, 32);
-  runWpEval(`global $wpdb; $now = current_time('mysql', true); delete_transient('at_gathering_last_test_mail'); $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE 'at_invite_rate_%' OR option_name LIKE '_transient_at_invite_rate_%' OR option_name LIKE '_transient_timeout_at_invite_rate_%'"); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => ${php(email)}, 'display_name' => 'RSVP Handoff Guest', 'claim_state' => 'invited', 'created_at' => $now, 'updated_at' => $now)); set_transient('at_gathering_rsvp_draft_' . ${php(draftToken)}, array('status' => 'yes', 'guest_count' => 2, 'guest_names' => 'Handoff Guest, Plus One', 'dietary' => 'No walnuts', 'food_amounts' => array('Cranberry sauce' => 1), 'custom_food' => 'Handoff mulled cider', 'custom_food_amount' => 1, 'notes' => 'Saved host note'), 30 * MINUTE_IN_SECONDS);`);
+  runWpEval(`global $wpdb; $now = current_time('mysql', true); delete_transient('at_gathering_last_test_mail'); $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE 'at_invite_rate_%' OR option_name LIKE '_transient_at_invite_rate_%' OR option_name LIKE '_transient_timeout_at_invite_rate_%'"); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => ${php(email)}, 'display_name' => 'RSVP Handoff Guest', 'claim_state' => 'invited', 'created_at' => $now, 'updated_at' => $now)); set_transient('at_gathering_rsvp_draft_' . ${php(draftToken)}, array('status' => 'yes', 'children_count' => 2, 'party_guest_ids' => array(), 'dietary' => 'No walnuts', 'food_amounts' => array('Cranberry sauce' => 1), 'custom_food' => 'Handoff mulled cider', 'custom_food_amount' => 1, 'notes' => 'Saved host note'), 30 * MINUTE_IN_SECONDS);`);
 
   await page.goto(`/signup/?at_rsvp_draft=${draftToken}`);
   const requestLoginHref = await page.getByRole('link', { name: 'Sign in' }).getAttribute('href');
@@ -138,8 +138,7 @@ test('RSVP draft survives invitation request and new-account setup', async ({ pa
   await expect(page).toHaveURL(new RegExp(`/rsvp/\\?at_rsvp_draft=${draftToken}`));
   await expect(page.getByRole('heading', { name: 'Will you join us?' })).toBeVisible();
   await expect(page.getByLabel('I’m coming')).toBeChecked();
-  await expect(page.getByLabel('How many people are coming?')).toHaveValue('2');
-  await expect(page.getByLabel('Names', { exact: true })).toHaveValue('Handoff Guest, Plus One');
+  await expect(page.getByLabel('Children (ages 0–17)')).toHaveValue('2');
   await expect(page.getByLabel('Dietary notes (optional)')).toHaveValue('No walnuts');
   await expect(page.getByLabel('Cranberry sauce', { exact: true })).toHaveValue('1');
   await expect(page.getByLabel('Something else?')).toHaveValue('Handoff mulled cider');
@@ -148,8 +147,7 @@ test('RSVP draft survives invitation request and new-account setup', async ({ pa
 
   await page.reload();
   await expect(page.getByLabel('I’m coming')).toBeChecked();
-  await expect(page.getByLabel('How many people are coming?')).toHaveValue('1');
-  await expect(page.getByLabel('Names', { exact: true })).toHaveValue('');
+  await expect(page.getByLabel('Children (ages 0–17)')).toHaveValue('0');
   await expect(page.getByLabel('Dietary notes (optional)')).toHaveValue('');
   await expect(page.getByLabel('Cranberry sauce', { exact: true })).toHaveValue('0');
   await expect(page.getByLabel('Something else?')).toHaveValue('');

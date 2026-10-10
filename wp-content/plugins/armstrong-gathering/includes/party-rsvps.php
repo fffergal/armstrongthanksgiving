@@ -8,12 +8,121 @@ function at_gathering_form_values() {
 	}
 
 	$draft_token = sanitize_key( wp_unslash( $_GET['at_rsvp_draft'] ?? '' ) );
-	if ( ! $draft_token || ! is_user_logged_in() ) {
+	if ( ! $draft_token ) {
 		return array();
 	}
 	$values = get_transient( 'at_gathering_rsvp_draft_' . $draft_token );
-	delete_transient( 'at_gathering_rsvp_draft_' . $draft_token );
+	if ( is_user_logged_in() && $values ) {
+		delete_transient( 'at_gathering_rsvp_draft_' . $draft_token );
+	}
 	return is_array( $values ) ? $values : array();
+}
+
+function at_gathering_party_choices_authorized() {
+	if ( current_user_can( 'manage_options' ) ) {
+		return true;
+	}
+	$user = wp_get_current_user();
+	$guest = $user->exists() ? at_gathering_roster_guest_by_user( $user->ID ) : null;
+	return $guest && 'claimed' === $guest->claim_state;
+}
+
+function at_gathering_party_roster_choices() {
+	if ( ! at_gathering_party_choices_authorized() ) {
+		return array();
+	}
+	return at_gathering_roster_choices();
+}
+
+function at_gathering_party_roster_choices_endpoint() {
+	if ( ! is_user_logged_in() || ! at_gathering_party_choices_authorized() || ! check_ajax_referer( 'at_party_roster_choices', 'nonce', false ) ) {
+		wp_send_json_error( array( 'message' => 'Sign in with a claimed guest account to view party choices.' ), 403 );
+	}
+	$choices = array_map(
+		static function ( $guest ) {
+			return array( 'id' => (int) $guest->id, 'display_name' => (string) $guest->display_name );
+		},
+		at_gathering_party_roster_choices()
+	);
+	wp_send_json_success( $choices );
+}
+
+function at_gathering_admin_update_party() {
+	$user_id = absint( $_POST['at_rsvp_user_id'] ?? 0 );
+	if ( ! current_user_can( 'manage_options' ) || ! $user_id || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['at_party_update_nonce'] ?? '' ) ), 'at_party_update_' . $user_id ) ) {
+		wp_die( 'Sorry, that party could not be updated.' );
+	}
+	$owner = at_gathering_roster_guest_by_user( $user_id );
+	if ( ! $owner ) {
+		wp_die( 'That RSVP owner is not linked to a guest roster entry.' );
+	}
+	$guest_ids = array_values( array_unique( array_map( 'absint', (array) wp_unslash( $_POST['at_party_guest_ids'] ?? array() ) ) ) );
+	$guest_ids[] = (int) $owner->id;
+	$result = at_gathering_host_move_party_assignments( $user_id, $guest_ids );
+	$state = is_wp_error( $result ) ? 'error' : 'updated';
+	wp_safe_redirect( admin_url( 'admin.php?page=at-gathering&at_party=' . $state ) );
+	exit;
+}
+
+function at_gathering_admin_link_legacy_owner() {
+	$user_id = absint( $_POST['at_legacy_user_id'] ?? 0 );
+	$guest_id = absint( $_POST['at_legacy_guest_id'] ?? 0 );
+	$email = sanitize_email( wp_unslash( $_POST['at_legacy_confirmed_email'] ?? '' ) );
+	if ( ! current_user_can( 'manage_options' ) || ! $user_id || ! $guest_id || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['at_legacy_owner_nonce'] ?? '' ) ), 'at_legacy_owner_' . $user_id ) ) {
+		wp_die( 'Sorry, that legacy RSVP owner could not be linked.' );
+	}
+	$result = at_gathering_link_legacy_rsvp_owner( $user_id, $guest_id, $email );
+	$state = is_wp_error( $result ) ? 'error' : 'saved';
+	wp_safe_redirect( admin_url( 'admin.php?page=at-gathering&at_legacy_owner=' . $state ) );
+	exit;
+}
+
+/** Host-only atomic correction: move unowned adults from their current party. */
+function at_gathering_host_move_party_assignments( $target_user_id, $guest_ids ) {
+	global $wpdb;
+	$target_user_id = absint( $target_user_id );
+	$guest_ids = array_values( array_unique( array_filter( array_map( 'absint', (array) $guest_ids ) ) ) );
+	$owner = at_gathering_roster_guest_by_user( $target_user_id );
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return new WP_Error( 'at_host_required', 'A host must correct party assignments.' );
+	}
+	if ( ! $owner || ! in_array( (int) $owner->id, $guest_ids, true ) ) {
+		return new WP_Error( 'at_party_owner_required', 'The target RSVP owner must remain assigned to their own party.' );
+	}
+	return at_gathering_transaction(
+		function () use ( $wpdb, $target_user_id, $guest_ids ) {
+			$table = at_gathering_assignments_table();
+			$conflicts = array();
+			foreach ( $guest_ids as $guest_id ) {
+				$guest = at_gathering_roster_guest( $guest_id );
+				if ( ! $guest || 'claimed' !== $guest->claim_state ) {
+					return new WP_Error( 'at_roster_guest_not_found', 'A selected adult is no longer available.' );
+				}
+				$assignment = at_gathering_party_assignment_for_guest( $guest_id );
+				if ( $assignment && (int) $assignment->rsvp_user_id !== $target_user_id ) {
+					if ( (int) $assignment->is_owner ) {
+						return new WP_Error( 'at_party_assignment_conflict', 'An RSVP owner must have their own RSVP removed before they can be assigned to another party.', array( 'guest_id' => $guest_id ) );
+					}
+					$conflicts[] = $guest_id;
+				}
+			}
+			foreach ( $conflicts as $guest_id ) {
+				if ( false === $wpdb->delete( $table, array( 'guest_id' => $guest_id ), array( '%d' ) ) ) {
+					return new WP_Error( 'at_party_assignment_write_failed', 'An adult could not be moved from the previous party.' );
+				}
+			}
+			if ( false === $wpdb->delete( $table, array( 'rsvp_user_id' => $target_user_id ), array( '%d' ) ) ) {
+				return new WP_Error( 'at_party_assignment_write_failed', 'The current party assignments could not be replaced.' );
+			}
+			foreach ( $guest_ids as $guest_id ) {
+				$inserted = $wpdb->insert( $table, array( 'rsvp_user_id' => $target_user_id, 'guest_id' => $guest_id, 'is_owner' => (int) at_gathering_roster_guest_by_user( $target_user_id )->id === $guest_id ? 1 : 0, 'created_at' => current_time( 'mysql', true ) ), array( '%d', '%d', '%d', '%s' ) );
+				if ( false === $inserted ) {
+					return new WP_Error( 'at_party_assignment_conflict', 'The host correction conflicted with another party update.', array( 'guest_id' => $guest_id ) );
+				}
+			}
+			return true;
+		}
+	);
 }
 
 function at_gathering_redirect_error( $return, $message, $values = array() ) {
@@ -38,10 +147,7 @@ function at_gathering_rsvp_signin() {
 	if ( ! in_array( $status, array( 'yes', 'maybe', 'no' ), true ) ) {
 		$status = 'yes';
 	}
-	$guest_count = max( 0, min( 12, absint( $_POST['at_guest_count'] ?? 1 ) ) );
-	if ( 'yes' === $status && 0 === $guest_count ) {
-		$guest_count = 1;
-	}
+	$children_count = 'no' === $status ? 0 : max( 0, min( 12, absint( $_POST['at_children_count'] ?? 0 ) ) );
 	$submitted_amounts = (array) wp_unslash( $_POST['at_food_amounts'] ?? array() );
 	$submitted_offers  = (array) wp_unslash( $_POST['at_food_offers'] ?? array() );
 	$food_amounts = array();
@@ -54,16 +160,16 @@ function at_gathering_rsvp_signin() {
 			$food_amounts[ $food ] = $amount;
 		}
 	}
-	$guest_names = sanitize_text_field( wp_unslash( $_POST['at_guest_names'] ?? '' ) );
 	$dietary = sanitize_textarea_field( wp_unslash( $_POST['at_dietary'] ?? '' ) );
 	$custom_food = sanitize_text_field( wp_unslash( $_POST['at_custom_food'] ?? '' ) );
 	$custom_food_amount = min( 9999, absint( $_POST['at_custom_food_amount'] ?? 0 ) );
 	$notes = sanitize_textarea_field( wp_unslash( $_POST['at_notes'] ?? '' ) );
-	$touched = ! empty( $_POST['_at_rsvp_touched'] ) || 'yes' !== $status || 1 !== $guest_count || '' !== $guest_names || '' !== $dietary || ! empty( $food_amounts ) || '' !== $custom_food || 0 < $custom_food_amount || '' !== $notes;
+	$party_guest_ids = array_values( array_unique( array_map( 'absint', (array) wp_unslash( $_POST['at_party_guest_ids'] ?? array() ) ) ) );
+	$touched = ! empty( $_POST['_at_rsvp_touched'] ) || 'yes' !== $status || 0 !== $children_count || ! empty( $party_guest_ids ) || '' !== $dietary || ! empty( $food_amounts ) || '' !== $custom_food || 0 < $custom_food_amount || '' !== $notes;
 	$values = array(
 		'status'            => $status,
-		'guest_count'       => $guest_count,
-		'guest_names'       => $guest_names,
+		'children_count'    => $children_count,
+		'party_guest_ids'   => $party_guest_ids,
 		'dietary'           => $dietary,
 		'food_amounts'      => $food_amounts,
 		'custom_food'       => $custom_food,
@@ -113,7 +219,20 @@ function at_gathering_rsvp_shortcode() {
 		}
 	}
 	$form_status = $values['status'] ?? ( $rsvp ? $rsvp->status : 'yes' );
-	$form_count  = isset( $values['guest_count'] ) ? (int) $values['guest_count'] : ( $rsvp ? (int) $rsvp->guest_count : 1 );
+	$form_count  = isset( $values['children_count'] ) ? (int) $values['children_count'] : ( $rsvp && isset( $rsvp->children_count ) ? (int) $rsvp->children_count : 0 );
+	$party_choices = at_gathering_party_roster_choices();
+	$linked_guest = $user->exists() ? at_gathering_roster_guest_by_user( $user->ID ) : null;
+	$assigned_ids = array();
+	if ( ! array_key_exists( 'party_guest_ids', $values ) && $rsvp && at_gathering_party_choices_authorized() ) {
+		global $wpdb;
+		$assigned_ids = array_map( 'intval', $wpdb->get_col( $wpdb->prepare( 'SELECT guest_id FROM ' . at_gathering_assignments_table() . ' WHERE rsvp_user_id = %d', $user->ID ) ) );
+	}
+	if ( array_key_exists( 'party_guest_ids', $values ) ) {
+		$assigned_ids = array_map( 'intval', (array) $values['party_guest_ids'] );
+	}
+	if ( $linked_guest ) {
+		$assigned_ids[] = (int) $linked_guest->id;
+	}
 	$can_view_contributors = $user->exists();
 
 	ob_start();
@@ -122,7 +241,7 @@ function at_gathering_rsvp_shortcode() {
 		<?php if ( isset( $_GET['at_rsvp'] ) && 'error' === sanitize_key( $_GET['at_rsvp'] ) ) : ?>
 			<div class="at-success at-error" role="alert"><strong>We could not save that RSVP.</strong><br><?php echo esc_html( sanitize_text_field( wp_unslash( $_GET['at_message'] ?? 'Please check the form and try again.' ) ) ); ?></div>
 		<?php endif; ?>
-		<form id="at-rsvp-form" class="at-rsvp-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post">
+		<form id="at-rsvp-form" class="at-rsvp-form" data-party-roster-nonce="<?php echo esc_attr( wp_create_nonce( 'at_party_roster_choices' ) ); ?>" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post">
 			<div class="at-rsvp-intro">
 				<h2>Will you join us?</h2>
 				<p>Let us know if you can make it, who’s joining you, and what you might bring.</p>
@@ -140,19 +259,18 @@ function at_gathering_rsvp_shortcode() {
 					<label><input type="radio" name="at_status" value="no" <?php checked( $form_status, 'no' ); ?>> I can’t make it</label>
 				</div>
 			</fieldset>
-			<div class="at-rsvp-grid">
-				<label>How many people are coming?
-					<select name="at_guest_count">
-						<?php for ( $i = 0; $i <= 12; $i++ ) : ?>
-							<option value="<?php echo esc_attr( $i ); ?>" <?php selected( $form_count, $i ); ?>><?php echo esc_html( $i ); ?></option>
-						<?php endfor; ?>
-					</select>
-				</label>
-				<label>Names
-					<input type="text" name="at_guest_names" value="<?php echo esc_attr( $values['guest_names'] ?? ( $rsvp ? $rsvp->guest_names : '' ) ); ?>" placeholder="Everyone in your RSVP">
-				</label>
-			</div>
-			<p class="at-field-help at-rsvp-group-signup-hint" data-at-rsvp-group-hint hidden>If this RSVP is for more than one person, the others can still <a href="<?php echo esc_url( home_url( '/signup/' ) ); ?>">sign up</a> separately for the forum and shared photos. If they RSVP too, make sure nobody double-counts what they’re bringing.</p>
+			<?php if ( $party_choices ) : ?>
+				<fieldset class="at-party-roster"><legend>Adults in your party</legend><p class="at-field-help">Your RSVP reserves each selected adult, including you, for this party.</p>
+					<?php foreach ( $party_choices as $choice ) : ?>
+						<label><input type="checkbox" name="at_party_guest_ids[]" value="<?php echo esc_attr( $choice->id ); ?>" <?php checked( in_array( (int) $choice->id, $assigned_ids, true ) ); ?> <?php disabled( $linked_guest && (int) $linked_guest->id === (int) $choice->id ); ?>> <?php echo esc_html( $choice->display_name ); ?><?php echo $linked_guest && (int) $linked_guest->id === (int) $choice->id ? ' (you)' : ''; ?></label>
+					<?php endforeach; ?>
+				</fieldset>
+			<?php elseif ( is_user_logged_in() && ! at_gathering_party_choices_authorized() ) : ?>
+				<p class="at-field-help">To RSVP, first claim your invitation from the <a href="<?php echo esc_url( home_url( '/signup/' ) ); ?>">guest setup page</a>.</p>
+			<?php endif; ?>
+			<label>Children (ages 0–17)
+				<select name="at_children_count"><?php for ( $i = 0; $i <= 12; $i++ ) : ?><option value="<?php echo esc_attr( $i ); ?>" <?php selected( $form_count, $i ); ?>><?php echo esc_html( $i ); ?></option><?php endfor; ?></select>
+			</label>
 			<label>Dietary notes (optional)
 				<textarea name="at_dietary" rows="3" placeholder="Any allergies or dietary needs?"><?php echo esc_textarea( $values['dietary'] ?? ( $rsvp ? $rsvp->dietary : '' ) ); ?></textarea>
 			</label>
@@ -197,19 +315,7 @@ function at_gathering_rsvp_shortcode() {
 			<label>Anything else for the hosts? (optional)
 				<textarea name="at_notes" rows="3" placeholder="Add a note for the hosts"><?php echo esc_textarea( $values['notes'] ?? ( $rsvp ? $rsvp->notes : '' ) ); ?></textarea>
 			</label>
-			<?php if ( ! $user->exists() ) : ?>
-				<p class="at-form-login-note at-form-login-note-top">Already have an account? <button class="at-link-button" type="submit" name="action" value="at_rsvp_signin" formnovalidate>Sign in first</button>. We’ll keep what you’ve entered here while you sign in.</p>
-				<fieldset class="at-account-fields">
-					<legend>Create your account</legend>
-					<p class="at-field-help">Create an account to RSVP. It will also give you access to the gathering forum and shared photos.</p>
-					<div class="at-rsvp-grid">
-						<label>Display name<input type="text" name="at_display_name" value="<?php echo esc_attr( $values['display_name'] ?? '' ); ?>" autocomplete="name" required></label>
-						<label>Email<input type="email" name="at_email" value="<?php echo esc_attr( $values['email'] ?? '' ); ?>" autocomplete="email" required></label>
-						<label>Password<input type="password" name="at_password" autocomplete="new-password" minlength="10" required></label>
-						<label>Confirm password<input type="password" name="at_password_confirm" autocomplete="new-password" minlength="10" required></label>
-					</div>
-				</fieldset>
-			<?php endif; ?>
+			<?php if ( ! $user->exists() ) : ?><p class="at-form-login-note at-form-login-note-top">Already claimed your invitation? <button class="at-link-button" type="submit" name="action" value="at_rsvp_signin" formnovalidate>Sign in first</button>. Your RSVP draft will be kept.</p><?php endif; ?>
 			<p class="at-form-actions at-rsvp-submit-actions"><button class="at-button" type="submit" name="action" value="at_save_rsvp"><?php echo $rsvp ? 'Update my RSVP' : 'Save my RSVP'; ?></button></p>
 		</form>
 	</div>
@@ -220,6 +326,12 @@ function at_gathering_rsvp_confirmation_shortcode() {
 	$user = wp_get_current_user();
 	$saved = isset( $_GET['at_rsvp'] ) && 'saved' === sanitize_key( $_GET['at_rsvp'] );
 	$mail_failed = 'failed' === ( $_GET['at_mail'] ?? '' );
+	$rsvp = $user->exists() ? at_gathering_get_rsvp( $user->ID ) : null;
+	$party_names = array();
+	if ( $saved && $rsvp ) {
+		global $wpdb;
+		$party_names = $wpdb->get_col( $wpdb->prepare( 'SELECT g.display_name FROM ' . at_gathering_assignments_table() . ' a JOIN ' . at_gathering_roster_table() . ' g ON g.id = a.guest_id WHERE a.rsvp_user_id = %d ORDER BY a.is_owner DESC, g.display_name ASC', $user->ID ) );
+	}
 
 	ob_start();
 	?>
@@ -232,6 +344,7 @@ function at_gathering_rsvp_confirmation_shortcode() {
 				<?php else : ?>
 					<p>We sent a copy of your RSVP to <?php echo esc_html( $user->user_email ); ?>.</p>
 				<?php endif; ?>
+				<?php if ( $rsvp ) : ?><p><strong>Attendance:</strong> <?php echo esc_html( at_gathering_status_label( $rsvp->status ) ); ?></p><p><strong>Adults reserved:</strong> <?php echo esc_html( implode( ', ', $party_names ) ?: 'Your RSVP owner' ); ?></p><p><strong>Children:</strong> <?php echo esc_html( (int) ( $rsvp->children_count ?? 0 ) ); ?></p><?php endif; ?>
 			</div>
 			<div class="at-confirmation-next-steps">
 				<p>You can update your RSVP any time, or visit the gathering spaces to say hello and share photos.</p>
@@ -262,9 +375,7 @@ function at_gathering_confirmation_message( $user, $status, $guest_count, $guest
 	);
 	$food_text = $foods ? at_gathering_food_amounts_text( $foods, (array) $food_amounts ) : 'Nothing chosen yet';
 	$greeting_name = $greeting_name ?: ( $user->display_name ?: $user->user_login );
-	$group_signup = at_gathering_rsvp_has_other_people( $guest_count, $guest_names )
-		? "\n\nPeople joining you can sign up separately for the forum and shared photos here:\n" . home_url( '/signup/' )
-		: '';
+	$group_signup = '';
 
 	return sprintf(
 		"Hi %s,\n\nThanks for letting us know about Thanksgiving.\n\nAttendance: %s\nPeople: %d\nNames: %s\nFood: %s\nDietary notes: %s\nNote for the hosts: %s\n\n%s\n\nYou can update your RSVP any time from the site. Your account also gives you access to the forum and shared photos.%s\n\nSee you there!",
@@ -284,17 +395,10 @@ function at_gathering_save_rsvp() {
 	if ( ! isset( $_POST['at_rsvp_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['at_rsvp_nonce'] ) ), 'at_save_rsvp' ) ) {
 		wp_die( 'Sorry, we could not save that RSVP.' );
 	}
-	$return      = esc_url_raw( wp_unslash( $_POST['at_return_url'] ?? home_url( '/rsvp/' ) ) );
-	$status      = sanitize_key( wp_unslash( $_POST['at_status'] ?? 'yes' ) );
-	$status     = in_array( $status, array( 'yes', 'maybe', 'no' ), true ) ? $status : 'yes';
-	$guest_count = max( 0, min( 12, absint( $_POST['at_guest_count'] ?? 0 ) ) );
-	if ( 'yes' === $status && 0 === $guest_count ) {
-		$guest_count = 1;
-	}
-	if ( 'no' === $status ) {
-		$guest_count = 0;
-	}
-	$guest_names = sanitize_text_field( wp_unslash( $_POST['at_guest_names'] ?? '' ) );
+	$return = esc_url_raw( wp_unslash( $_POST['at_return_url'] ?? home_url( '/rsvp/' ) ) );
+	$status = sanitize_key( wp_unslash( $_POST['at_status'] ?? 'yes' ) );
+	$status = in_array( $status, array( 'yes', 'maybe', 'no' ), true ) ? $status : 'yes';
+	$children_count = 'no' === $status ? 0 : max( 0, min( 12, absint( $_POST['at_children_count'] ?? 0 ) ) );
 	$submitted_amounts = (array) wp_unslash( $_POST['at_food_amounts'] ?? array() );
 	$submitted_offers  = (array) wp_unslash( $_POST['at_food_offers'] ?? array() );
 	$food_amounts      = array();
@@ -317,43 +421,51 @@ function at_gathering_save_rsvp() {
 		$foods[] = $custom_food;
 		$food_amounts[ $custom_food ] = $custom_food_amount;
 	}
-	$form_values = compact( 'status', 'guest_count', 'guest_names', 'dietary', 'foods', 'food_amounts', 'custom_food', 'custom_food_amount', 'notes' );
-	if ( 'no' !== $status && ! $guest_names ) {
-		at_gathering_redirect_error( $return, 'Please add the names of everyone in your RSVP.', $form_values );
-	}
-
-	$created_user_id = 0;
-	if ( ! is_user_logged_in() ) {
-		$name     = sanitize_text_field( wp_unslash( $_POST['at_display_name'] ?? '' ) );
-		$email    = sanitize_email( wp_unslash( $_POST['at_email'] ?? '' ) );
-		$password = (string) wp_unslash( $_POST['at_password'] ?? '' );
-		$password_confirm = (string) wp_unslash( $_POST['at_password_confirm'] ?? '' );
-		$form_values = array_merge( $form_values, array( 'display_name' => $name, 'email' => $email ) );
-		if ( ! $name || ! is_email( $email ) || strlen( $password ) < 10 || $password !== $password_confirm ) {
-			at_gathering_redirect_error( $return, 'Please complete your account details. Passwords need at least 10 characters and must match.', $form_values );
-		}
-		if ( email_exists( $email ) ) {
-			at_gathering_redirect_error( $return, 'There is already an account for that email. Please sign in instead.', $form_values );
-		}
-		$username = at_gathering_unique_login( $email );
-		$user_id = wp_insert_user( array( 'user_login' => $username, 'user_pass' => $password, 'user_email' => $email, 'display_name' => $name, 'role' => 'subscriber' ) );
-		if ( is_wp_error( $user_id ) ) {
-			at_gathering_redirect_error( $return, $user_id->get_error_message(), $form_values );
-		}
-		$created_user_id = (int) $user_id;
-		if ( function_exists( 'bbp_set_user_role' ) && function_exists( 'bbp_get_participant_role' ) ) {
-			bbp_set_user_role( $user_id, bbp_get_participant_role() );
-		}
-		wp_set_current_user( $user_id );
-		wp_set_auth_cookie( $user_id, true );
-	}
+	$party_guest_ids = array_values( array_unique( array_filter( array_map( 'absint', (array) wp_unslash( $_POST['at_party_guest_ids'] ?? array() ) ) ) ) );
+	$form_values = compact( 'status', 'children_count', 'party_guest_ids', 'dietary', 'foods', 'food_amounts', 'custom_food', 'custom_food_amount', 'notes' );
 	$user = wp_get_current_user();
+	$owner_guest = $user->exists() ? at_gathering_roster_guest_by_user( $user->ID ) : null;
+	if ( ! $user->exists() || ! $owner_guest || 'claimed' !== $owner_guest->claim_state ) {
+		$token = strtolower( wp_generate_password( 32, false, false ) );
+		set_transient( 'at_gathering_rsvp_draft_' . $token, $form_values, 30 * MINUTE_IN_SECONDS );
+		$return_with_draft = add_query_arg( 'at_rsvp_draft', $token, $return );
+		$claim_url = apply_filters( 'at_gathering_rsvp_claim_setup_url', add_query_arg( 'at_rsvp_draft', $token, home_url( '/signup/' ) ), $return_with_draft, $token );
+		$pending_guest = $user->exists() ? at_gathering_roster_guest_by_email( $user->user_email ) : null;
+		if ( $user->exists() && $pending_guest && 'invited' === $pending_guest->claim_state && function_exists( 'at_gathering_send_claim_link' ) ) {
+			$rate_limited = function_exists( 'at_gathering_invitation_rate_limited' ) && at_gathering_invitation_rate_limited( $user->user_email );
+			if ( ! $rate_limited ) {
+				at_gathering_send_claim_link( $user->user_email, $token );
+			}
+			$claim_url = add_query_arg(
+				array(
+					'at_setup_result' => 'requested',
+					'at_rsvp_draft'   => $token,
+				),
+				home_url( '/signup/' )
+			);
+		}
+		wp_safe_redirect( $claim_url );
+		exit;
+	}
+	if ( ! at_gathering_party_choices_authorized() ) {
+		at_gathering_redirect_error( $return, 'Claim your invitation before saving a party RSVP.', $form_values );
+	}
+	$party_guest_ids[] = (int) $owner_guest->id;
+	$party_guest_ids = array_values( array_unique( array_filter( array_map( 'absint', $party_guest_ids ) ) ) );
+	foreach ( $party_guest_ids as $guest_id ) {
+		$choice = at_gathering_roster_guest( $guest_id );
+		if ( ! $choice || 'claimed' !== $choice->claim_state ) {
+			at_gathering_redirect_error( $return, 'One selected adult is no longer available. Please review the party choices.', $form_values );
+		}
+	}
 
 	$data = array(
 		'user_id'     => $user->ID,
 		'status'      => $status,
-		'guest_count' => $guest_count,
-		'guest_names' => $guest_names,
+		// Keep the legacy fields for host reconciliation; never infer guests from them.
+		'guest_count' => (int) ( ( at_gathering_get_rsvp( $user->ID )->guest_count ?? 1 ) ),
+		'guest_names' => (string) ( ( at_gathering_get_rsvp( $user->ID )->guest_names ?? '' ) ),
+		'children_count' => $children_count,
 		'dietary'     => $dietary,
 		'foods'       => wp_json_encode( $foods ),
 		'food_amounts' => wp_json_encode( $food_amounts ),
@@ -364,27 +476,24 @@ function at_gathering_save_rsvp() {
 
 	global $wpdb;
 	$existing = at_gathering_get_rsvp( $user->ID );
-	$db_ok = false;
-	if ( $existing ) {
-		$db_ok = false !== $wpdb->update( at_gathering_table(), $data, array( 'user_id' => $user->ID ) );
-	} else {
-		$data['created_at'] = current_time( 'mysql' );
-		$db_ok = false !== $wpdb->insert( at_gathering_table(), $data );
-	}
-
-	if ( ! $db_ok ) {
-		if ( $created_user_id ) {
-			require_once ABSPATH . 'wp-admin/includes/user.php';
-			wp_clear_auth_cookie();
-			wp_delete_user( $created_user_id );
-		}
-		at_gathering_redirect_error( $return, 'Please try again. Your account was not created.', $form_values );
+	$data['created_at'] = $existing ? $existing->created_at : current_time( 'mysql' );
+	$write_rsvp = static function () use ( $wpdb, $data, $user ) {
+		$updated = $wpdb->replace( at_gathering_table(), $data, array( '%d', '%s', '%d', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ) );
+		return false === $updated ? new WP_Error( 'at_party_write_failed', 'The RSVP details could not be saved.' ) : true;
+	};
+	$saved = at_gathering_replace_party_assignments( $user->ID, $party_guest_ids, $write_rsvp );
+	if ( is_wp_error( $saved ) ) {
+		$message = 'at_party_assignment_conflict' === $saved->get_error_code() ? $saved->get_error_message() . ' Please contact the hosts.' : $saved->get_error_message();
+		at_gathering_redirect_error( $return, $message, $form_values );
 	}
 	if ( function_exists( 'wp_cache_clear_cache' ) ) {
 		wp_cache_clear_cache();
 	}
 
-	$message = at_gathering_confirmation_message( $user, $status, $guest_count, $guest_names, $foods, $data['dietary'], $data['notes'], '', $food_amounts );
+	$party_names = array();
+	foreach ( $party_guest_ids as $guest_id ) { $guest = at_gathering_roster_guest( $guest_id ); if ( $guest ) { $party_names[] = $guest->display_name; } }
+	$total_people = 'no' === $status ? 0 : count( $party_guest_ids ) + $children_count;
+	$message = at_gathering_confirmation_message( $user, $status, $total_people, implode( ', ', $party_names ) . ( $children_count ? ' · ' . $children_count . ' children' : '' ), $foods, $data['dietary'], $data['notes'], '', $food_amounts );
 	$mail_ok = wp_mail( $user->user_email, 'Your Armstrong Thanksgiving RSVP', $message );
 	wp_safe_redirect( add_query_arg( array( 'at_rsvp' => 'saved', 'at_mail' => $mail_ok ? 'sent' : 'failed' ), home_url( '/rsvp-confirmation/' ) ) );
 	exit;
@@ -470,30 +579,50 @@ function at_gathering_admin_page() {
 		<h1>Gathering RSVPs</h1>
 		<p>Host view: attendance, notes, and what is coming to the table.</p>
 		<?php if ( 'removed' === ( $_GET['at_rsvp'] ?? '' ) ) : ?><div class="notice notice-success is-dismissible"><p>RSVP removed.</p></div><?php elseif ( 'not_found' === ( $_GET['at_rsvp'] ?? '' ) ) : ?><div class="notice notice-warning is-dismissible"><p>That RSVP was already removed.</p></div><?php endif; ?>
+		<?php
+		$attendance = array( 'yes' => 0, 'maybe' => 0, 'no' => 0 );
+		$expected_people = 0;
+		$party_assignments_authoritative = at_gathering_party_rsvps_enabled();
+		foreach ( $rows as $attendance_row ) {
+			$attendance[ $attendance_row->status ] = ( $attendance[ $attendance_row->status ] ?? 0 ) + 1;
+			if ( 'yes' === $attendance_row->status ) {
+				$assigned_adults = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . at_gathering_assignments_table() . ' WHERE rsvp_user_id = %d', $attendance_row->user_id ) );
+				// Partial host mappings do not replace legacy totals until reconciliation is confirmed.
+				$adults = $party_assignments_authoritative && $assigned_adults ? $assigned_adults : (int) $attendance_row->guest_count;
+				$expected_people += $adults + (int) ( $attendance_row->children_count ?? 0 );
+			}
+		}
+		?>
+		<p class="at-party-totals"><strong><?php echo esc_html( $expected_people ); ?></strong> expected attendees · <strong><?php echo esc_html( $attendance['maybe'] ); ?></strong> maybe parties · <strong><?php echo esc_html( $attendance['no'] ); ?></strong> no parties</p>
+		<?php if ( 'updated' === ( $_GET['at_party'] ?? '' ) ) : ?><div class="notice notice-success is-dismissible"><p>Party assignments updated.</p></div><?php elseif ( 'error' === ( $_GET['at_party'] ?? '' ) ) : ?><div class="notice notice-error is-dismissible"><p>The party assignments could not be updated because of a conflict. Review the current assignments and try again.</p></div><?php endif; ?>
 		<h2>Legacy party reconciliation</h2>
 		<?php if ( 'changed' === ( $_GET['at_party_reconcile'] ?? '' ) ) : ?><div class="notice notice-error inline"><p>The legacy party list changed while you were reviewing it. Please review the current names and confirm again.</p></div><?php endif; ?>
+		<?php if ( 'error' === ( $_GET['at_legacy_owner'] ?? '' ) ) : ?><div class="notice notice-error inline"><p>The legacy owner could not be linked. Confirm the account email and roster selection, then resolve any existing link or assignment conflict.</p></div><?php elseif ( 'saved' === ( $_GET['at_legacy_owner'] ?? '' ) ) : ?><div class="notice notice-success inline"><p>Legacy RSVP owner linked. Review and assign the legacy party adults below before confirming reconciliation.</p></div><?php endif; ?>
 		<?php if ( at_gathering_party_rsvps_enabled() ) : ?>
 			<div class="notice notice-success inline"><p>Legacy party names have been reviewed. Roster based party saves are enabled.</p></div>
 		<?php else : ?>
-			<div class="notice notice-warning inline"><p>Roster based party saves are locked until a host reviews the legacy party names below and records any needed roster assignments. Names are preserved as entered and are never matched automatically.</p></div>
-			<table class="widefat striped"><thead><tr><th>RSVP owner</th><th>Legacy party names</th><th>Updated</th></tr></thead><tbody>
+			<div class="notice notice-warning inline"><p>Guest party saves are locked until a host links legacy owners and assigns known adults explicitly. Names are preserved as entered and are never matched automatically. Use each RSVP’s party editor below, then confirm this snapshot.</p></div>
+			<div class="at-gathering-responsive-table" role="region" aria-label="Legacy party reconciliation" tabindex="0" style="max-width:100%; overflow-x:auto;">
+			<table class="widefat striped"><thead><tr><th>RSVP owner</th><th>Legacy party names</th><th>Owner roster link</th><th>Updated</th></tr></thead><tbody>
 			<?php
-			$legacy_rows = $wpdb->get_results( 'SELECT r.user_id, r.guest_names, r.updated_at, u.display_name FROM ' . at_gathering_table() . ' r LEFT JOIN ' . $wpdb->users . ' u ON u.ID = r.user_id WHERE r.guest_names <> \'\' ORDER BY r.updated_at DESC' );
+			$legacy_rows = $wpdb->get_results( 'SELECT r.user_id, r.guest_names, r.updated_at, u.display_name, u.user_email FROM ' . at_gathering_table() . ' r LEFT JOIN ' . $wpdb->users . ' u ON u.ID = r.user_id WHERE r.guest_names <> \'\' ORDER BY r.updated_at DESC' );
 			$legacy_hash = at_gathering_party_legacy_names_fingerprint( $legacy_rows );
 			if ( ! $legacy_rows ) :
-				?><tr><td colspan="3">No legacy party names are waiting for review.</td></tr><?php
+				?><tr><td colspan="4">No legacy party names are waiting for review.</td></tr><?php
 			else :
 				foreach ( $legacy_rows as $legacy_row ) :
-					?><tr><td><?php echo esc_html( $legacy_row->display_name ?: 'Unknown account #' . absint( $legacy_row->user_id ) ); ?> (user ID <?php echo esc_html( $legacy_row->user_id ); ?>)</td><td><?php echo esc_html( $legacy_row->guest_names ); ?></td><td><?php echo esc_html( mysql2date( 'j M Y, H:i', $legacy_row->updated_at ) ); ?></td></tr><?php
+					$legacy_owner = at_gathering_roster_guest_by_user( $legacy_row->user_id );
+					?><tr><td><?php echo esc_html( $legacy_row->display_name ?: 'Unknown account #' . absint( $legacy_row->user_id ) ); ?> (user ID <?php echo esc_html( $legacy_row->user_id ); ?>)</td><td><?php echo esc_html( $legacy_row->guest_names ); ?></td><td><?php if ( $legacy_owner ) : ?><strong><?php echo esc_html( $legacy_owner->display_name ); ?></strong> (linked)<?php else : ?><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><input type="hidden" name="action" value="at_legacy_owner_link"><input type="hidden" name="at_legacy_user_id" value="<?php echo esc_attr( $legacy_row->user_id ); ?>"><?php wp_nonce_field( 'at_legacy_owner_' . absint( $legacy_row->user_id ), 'at_legacy_owner_nonce' ); ?><label><span class="screen-reader-text">Roster guest for <?php echo esc_html( $legacy_row->display_name ); ?></span><select name="at_legacy_guest_id" required><option value="">Select roster guest</option><?php foreach ( $wpdb->get_results( 'SELECT id, display_name, email_normalized FROM ' . at_gathering_roster_table() . ' ORDER BY display_name ASC, id ASC' ) as $roster_guest ) : ?><option value="<?php echo esc_attr( $roster_guest->id ); ?>"><?php echo esc_html( $roster_guest->display_name . ' · ' . $roster_guest->email_normalized ); ?></option><?php endforeach; ?></select></label><label><span class="screen-reader-text">Confirm current email for <?php echo esc_html( $legacy_row->display_name ); ?></span><input type="email" name="at_legacy_confirmed_email" value="<?php echo esc_attr( $legacy_row->user_email ); ?>" required></label><button class="button" type="submit">Link owner</button></form><?php endif; ?></td><td><?php echo esc_html( mysql2date( 'j M Y, H:i', $legacy_row->updated_at ) ); ?></td></tr><?php
 				endforeach;
 			endif;
 			?>
 			</tbody></table>
+			</div>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<input type="hidden" name="action" value="at_party_reconcile">
 				<input type="hidden" name="at_party_reconcile_hash" value="<?php echo esc_attr( $legacy_hash ); ?>">
 				<?php wp_nonce_field( 'at_party_reconcile', 'at_party_reconcile_nonce' ); ?>
-				<p><label><input type="checkbox" required> I reviewed the legacy names and completed any needed explicit roster links and party assignments.</label></p>
+				<p><label><input type="checkbox" required> I reviewed the legacy names, linked the owners, and explicitly assigned every known adult who should remain reserved.</label></p>
 				<?php submit_button( 'Confirm legacy party review' ); ?>
 			</form>
 		<?php endif; ?>
@@ -525,11 +654,13 @@ function at_gathering_admin_page() {
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="at-add-food">
 			<input type="hidden" name="action" value="at_add_food"><input type="text" name="at_food" placeholder="Add another food"><button class="button button-primary">Add food</button><?php wp_nonce_field( 'at_add_food', 'at_food_nonce' ); ?>
 		</form>
+		<div class="at-gathering-responsive-table" role="region" aria-label="RSVP list" tabindex="0" style="max-width:100%; overflow-x:auto;">
 		<table class="widefat striped at-rsvp-admin-list"><thead><tr><th>Friend</th><th>Status</th><th>People</th><th>Food</th><th>Dietary</th><th>Note for hosts</th><th>Updated</th><th>Actions</th></tr></thead><tbody>
 		<?php if ( ! $rows ) : ?><tr><td colspan="8">No RSVPs yet.</td></tr><?php endif; ?>
-		<?php foreach ( $rows as $row ) : $user = get_user_by( 'id', $row->user_id ); $row_foods = (array) json_decode( $row->foods, true ); $row_food_amounts = at_gathering_rsvp_food_amounts( $row ); ?>
-			<tr><td><strong><?php echo esc_html( $user ? $user->display_name : 'Unknown friend' ); ?></strong><br><small><?php echo esc_html( $user ? $user->user_email : '' ); ?></small></td><td><?php echo esc_html( at_gathering_status_label( $row->status ) ); ?></td><td><?php echo esc_html( $row->guest_count ); ?><?php echo $row->guest_names ? '<br><small>' . esc_html( $row->guest_names ) . '</small>' : ''; ?></td><td><?php echo esc_html( at_gathering_food_amounts_text( $row_foods, $row_food_amounts ) ?: '—' ); ?></td><td><?php echo esc_html( $row->dietary ?: '—' ); ?></td><td><?php echo esc_html( $row->notes ?: '—' ); ?></td><td><?php echo esc_html( mysql2date( 'j M, H:i', $row->updated_at ) ); ?></td><td><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="at-remove-rsvp-form"><input type="hidden" name="action" value="at_remove_rsvp"><input type="hidden" name="at_rsvp_user_id" value="<?php echo esc_attr( $row->user_id ); ?>"><?php wp_nonce_field( 'at_remove_rsvp_' . absint( $row->user_id ), 'at_remove_rsvp_nonce' ); ?><button class="button button-secondary" type="submit" onclick="return confirm('Remove this RSVP? The member account will remain.');">Remove RSVP</button></form></td></tr>
+		<?php foreach ( $rows as $row ) : $user = get_user_by( 'id', $row->user_id ); $row_foods = (array) json_decode( $row->foods, true ); $row_food_amounts = at_gathering_rsvp_food_amounts( $row ); $assigned = $wpdb->get_col( $wpdb->prepare( 'SELECT guest_id FROM ' . at_gathering_assignments_table() . ' WHERE rsvp_user_id = %d', $row->user_id ) ); ?>
+			<tr><td><strong><?php echo esc_html( $user ? $user->display_name : 'Unknown friend' ); ?></strong><br><small><?php echo esc_html( $user ? $user->user_email : '' ); ?></small></td><td><?php echo esc_html( at_gathering_status_label( $row->status ) ); ?></td><td><?php echo esc_html( count( $assigned ) ); ?> adults + <?php echo esc_html( (int) ( $row->children_count ?? 0 ) ); ?> children<?php if ( $row->guest_names ) : ?><br><small>Legacy names: <?php echo esc_html( $row->guest_names ); ?></small><?php endif; ?><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><input type="hidden" name="action" value="at_party_update"><input type="hidden" name="at_rsvp_user_id" value="<?php echo esc_attr( $row->user_id ); ?>"><?php wp_nonce_field( 'at_party_update_' . absint( $row->user_id ), 'at_party_update_nonce' ); ?><select name="at_party_guest_ids[]" multiple aria-label="Adults assigned to this RSVP" style="min-width:16rem;max-width:100%;"><?php foreach ( at_gathering_roster_choices() as $choice ) : if ( (int) $choice->id === (int) ( at_gathering_roster_guest_by_user( $row->user_id )->id ?? 0 ) ) { continue; } ?><option value="<?php echo esc_attr( $choice->id ); ?>" <?php selected( in_array( (int) $choice->id, array_map( 'intval', $assigned ), true ) ); ?>><?php echo esc_html( $choice->display_name ); ?></option><?php endforeach; ?></select><button class="button" type="submit">Save party</button></form></td><td><?php echo esc_html( at_gathering_food_amounts_text( $row_foods, $row_food_amounts ) ?: '—' ); ?></td><td><?php echo esc_html( $row->dietary ?: '—' ); ?></td><td><?php echo esc_html( $row->notes ?: '—' ); ?></td><td><?php echo esc_html( mysql2date( 'j M, H:i', $row->updated_at ) ); ?></td><td><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="at-remove-rsvp-form"><input type="hidden" name="action" value="at_remove_rsvp"><input type="hidden" name="at_rsvp_user_id" value="<?php echo esc_attr( $row->user_id ); ?>"><?php wp_nonce_field( 'at_remove_rsvp_' . absint( $row->user_id ), 'at_remove_rsvp_nonce' ); ?><button class="button button-secondary" type="submit" onclick="return confirm('Remove this RSVP? The member account will remain.');">Remove RSVP</button></form></td></tr>
 		<?php endforeach; ?></tbody></table>
+		</div>
 		<?php if ( $admins ) : ?>
 			<hr>
 			<h2>Send a sample confirmation</h2>
@@ -600,5 +731,9 @@ function at_gathering_register_party_rsvps() {
 	add_action( 'admin_post_at_party_reconcile', 'at_gathering_reconcile_legacy_parties' );
 	add_action( 'admin_menu', 'at_gathering_admin_menu' );
 	add_action( 'admin_post_at_remove_rsvp', 'at_gathering_remove_rsvp' );
+	add_action( 'admin_post_at_party_update', 'at_gathering_admin_update_party' );
+	add_action( 'admin_post_at_legacy_owner_link', 'at_gathering_admin_link_legacy_owner' );
+	add_action( 'wp_ajax_at_gathering_party_roster_choices', 'at_gathering_party_roster_choices_endpoint' );
+	add_action( 'wp_ajax_nopriv_at_gathering_party_roster_choices', 'at_gathering_party_roster_choices_endpoint' );
 }
 add_action( 'at_gathering_register_party_rsvps', 'at_gathering_register_party_rsvps' );
