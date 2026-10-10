@@ -76,7 +76,7 @@ function at_gathering_claim_guest( $token, $display_name, $password = '', $passw
 		return new WP_Error( 'at_claim_conflict', 'This invitation needs host review.' );
 	}
 	$user_id = at_gathering_transaction(
-		static function () use ( $wpdb, $guest, $token_hash, $display_name, $password, $existing ) {
+		static function () use ( $wpdb, $guest, $token_hash, $display_name, $password, $password_confirm ) {
 			$locked = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . at_gathering_roster_table() . ' WHERE id = %d FOR UPDATE', (int) $guest->id ) );
 			if ( ! $locked || ! hash_equals( (string) $locked->token_hash, $token_hash ) || ! $locked->token_expires || strtotime( $locked->token_expires . ' UTC' ) < time() || 'invited' !== $locked->claim_state || ! empty( $locked->user_id ) ) {
 				return new WP_Error( 'at_claim_invalid', 'This setup link is invalid or expired.' );
@@ -91,6 +91,12 @@ function at_gathering_claim_guest( $token, $display_name, $password = '', $passw
 			if ( $existing_user ) {
 				$account_id = (int) $existing_user->ID;
 			} else {
+				// The email may have belonged to an existing account during the
+				// initial lookup and been deleted before this locked re-read. Validate
+				// again here so every new-account path requires a chosen password.
+				if ( strlen( $password ) < 10 || $password !== $password_confirm ) {
+					return new WP_Error( 'at_claim_password_invalid', 'Choose a password of at least 10 characters and enter it twice.' );
+				}
 				$account_id = wp_insert_user(
 					array(
 						'user_login'   => at_gathering_unique_login( $locked->email_normalized ),

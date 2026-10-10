@@ -63,6 +63,9 @@ test('setup token creates one password account, is consumed once, and leaves exi
   const existingToken = `${'b'.repeat(55)}${(Date.now() + 1).toString(16)}`.padEnd(64, 'b').slice(0, 64);
   runWpEval(`global $wpdb; $now = current_time('mysql', true); $expires = gmdate('Y-m-d H:i:s', time() + DAY_IN_SECONDS); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => ${php(newEmail)}, 'display_name' => 'New Guest', 'claim_state' => 'invited', 'token_hash' => hash('sha256', ${php(newToken)}), 'token_expires' => $expires, 'created_at' => $now, 'updated_at' => $now)); $id = wp_insert_user(array('user_login' => at_gathering_unique_login(${php(existingEmail)}), 'user_pass' => 'existing-password-2026', 'user_email' => ${php(existingEmail)}, 'display_name' => 'Existing account', 'role' => 'editor')); if (is_wp_error($id)) { WP_CLI::error($id->get_error_message()); } $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => ${php(existingEmail)}, 'display_name' => 'Existing Guest', 'claim_state' => 'invited', 'token_hash' => hash('sha256', ${php(existingToken)}), 'token_expires' => $expires, 'created_at' => $now, 'updated_at' => $now));`);
 
+  const missingPassword = runWpEval(`$result = at_gathering_claim_guest(${php(newToken)}, 'New Guest', '', ''); echo is_wp_error($result) && 'at_claim_password_invalid' === $result->get_error_code() ? 'rejected' : 'accepted';`).trim();
+  expect(missingPassword).toBe('rejected');
+
   await page.goto(`/signup/?at_setup=${newToken}`);
   await expect(page.getByRole('heading', { name: 'Set up your account' })).toBeVisible();
   await page.getByLabel('Display name').fill('New Guest');
