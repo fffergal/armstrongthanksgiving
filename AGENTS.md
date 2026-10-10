@@ -65,6 +65,7 @@ explain that in the completion message.
 When a pull request includes a meaningful visible interface change, include
 fresh screenshots of the integrated implementation directly in the PR
 description using inline Markdown images or the platform's image attachments.
+With `gh`, screenshots can be attached using `--attach`.
 Show the surrounding page and relevant details, and include desktop, tablet,
 and mobile views when responsive behavior changes. Use real screenshots from
 the running implementation rather than mockups. Keep screenshot files outside
