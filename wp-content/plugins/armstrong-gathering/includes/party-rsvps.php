@@ -410,10 +410,25 @@ if ( 'local' === wp_get_environment_type() ) {
 }
 
 /** New roster based party writes remain closed until a host reviews legacy names. */
-function at_gathering_party_legacy_names_fingerprint() {
+function at_gathering_party_legacy_names_fingerprint( $rows = null ) {
 	global $wpdb;
-	$rows = $wpdb->get_results( 'SELECT user_id, guest_names FROM ' . at_gathering_table() . " WHERE guest_names <> '' ORDER BY user_id ASC", ARRAY_A );
-	return hash( 'sha256', wp_json_encode( $rows ?: array() ) );
+	if ( 0 === func_num_args() ) {
+		$rows = $wpdb->get_results( 'SELECT user_id, guest_names FROM ' . at_gathering_table() . " WHERE guest_names <> '' ORDER BY user_id ASC" );
+	}
+	$fingerprint_rows = array();
+	foreach ( (array) $rows as $row ) {
+		$fingerprint_rows[] = array(
+			'user_id'     => absint( is_array( $row ) ? ( $row['user_id'] ?? 0 ) : ( $row->user_id ?? 0 ) ),
+			'guest_names' => (string) ( is_array( $row ) ? ( $row['guest_names'] ?? '' ) : ( $row->guest_names ?? '' ) ),
+		);
+	}
+	usort(
+		$fingerprint_rows,
+		static function ( $a, $b ) {
+			return $a['user_id'] <=> $b['user_id'];
+		}
+	);
+	return hash( 'sha256', wp_json_encode( $fingerprint_rows ) );
 }
 
 function at_gathering_party_rsvps_enabled() {
@@ -428,9 +443,14 @@ function at_gathering_reconcile_legacy_parties() {
 	if ( ! current_user_can( 'manage_options' ) || ! isset( $_POST['at_party_reconcile_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['at_party_reconcile_nonce'] ) ), 'at_party_reconcile' ) ) {
 		wp_die( 'Sorry, only a host can confirm legacy party review.' );
 	}
+	$reviewed_hash = sanitize_text_field( wp_unslash( $_POST['at_party_reconcile_hash'] ?? '' ) );
+	if ( ! $reviewed_hash || ! hash_equals( $reviewed_hash, at_gathering_party_legacy_names_fingerprint() ) ) {
+		wp_safe_redirect( admin_url( 'admin.php?page=at-gathering&at_party_reconcile=changed' ) );
+		exit;
+	}
 	update_option( 'at_gathering_party_reconciliation_complete', true );
 	update_option( 'at_gathering_party_reconciliation_reviewed_at', current_time( 'mysql' ) );
-	update_option( 'at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint() );
+	update_option( 'at_gathering_party_reconciliation_review_hash', $reviewed_hash );
 	wp_safe_redirect( admin_url( 'admin.php?page=at-gathering&at_party_reconcile=complete' ) );
 	exit;
 }
@@ -451,6 +471,7 @@ function at_gathering_admin_page() {
 		<p>Host view: attendance, notes, and what is coming to the table.</p>
 		<?php if ( 'removed' === ( $_GET['at_rsvp'] ?? '' ) ) : ?><div class="notice notice-success is-dismissible"><p>RSVP removed.</p></div><?php elseif ( 'not_found' === ( $_GET['at_rsvp'] ?? '' ) ) : ?><div class="notice notice-warning is-dismissible"><p>That RSVP was already removed.</p></div><?php endif; ?>
 		<h2>Legacy party reconciliation</h2>
+		<?php if ( 'changed' === ( $_GET['at_party_reconcile'] ?? '' ) ) : ?><div class="notice notice-error inline"><p>The legacy party list changed while you were reviewing it. Please review the current names and confirm again.</p></div><?php endif; ?>
 		<?php if ( at_gathering_party_rsvps_enabled() ) : ?>
 			<div class="notice notice-success inline"><p>Legacy party names have been reviewed. Roster based party saves are enabled.</p></div>
 		<?php else : ?>
@@ -458,6 +479,7 @@ function at_gathering_admin_page() {
 			<table class="widefat striped"><thead><tr><th>RSVP owner</th><th>Legacy party names</th><th>Updated</th></tr></thead><tbody>
 			<?php
 			$legacy_rows = $wpdb->get_results( 'SELECT r.user_id, r.guest_names, r.updated_at, u.display_name FROM ' . at_gathering_table() . ' r LEFT JOIN ' . $wpdb->users . ' u ON u.ID = r.user_id WHERE r.guest_names <> \'\' ORDER BY r.updated_at DESC' );
+			$legacy_hash = at_gathering_party_legacy_names_fingerprint( $legacy_rows );
 			if ( ! $legacy_rows ) :
 				?><tr><td colspan="3">No legacy party names are waiting for review.</td></tr><?php
 			else :
@@ -469,6 +491,7 @@ function at_gathering_admin_page() {
 			</tbody></table>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<input type="hidden" name="action" value="at_party_reconcile">
+				<input type="hidden" name="at_party_reconcile_hash" value="<?php echo esc_attr( $legacy_hash ); ?>">
 				<?php wp_nonce_field( 'at_party_reconcile', 'at_party_reconcile_nonce' ); ?>
 				<p><label><input type="checkbox" required> I reviewed the legacy names and completed any needed explicit roster links and party assignments.</label></p>
 				<?php submit_button( 'Confirm legacy party review' ); ?>
@@ -535,9 +558,8 @@ function at_gathering_remove_rsvp() {
 		wp_die( 'Sorry, that RSVP could not be removed.' );
 	}
 
-	global $wpdb;
-	$deleted = $wpdb->delete( at_gathering_table(), array( 'user_id' => $user_id ), array( '%d' ) );
-	if ( false === $deleted ) {
+	$deleted = at_gathering_remove_rsvp_records( $user_id );
+	if ( is_wp_error( $deleted ) ) {
 		wp_die( 'Sorry, that RSVP could not be removed.' );
 	}
 	if ( $deleted && function_exists( 'wp_cache_clear_cache' ) ) {
@@ -547,6 +569,25 @@ function at_gathering_remove_rsvp() {
 	$result = $deleted ? 'removed' : 'not_found';
 	wp_safe_redirect( admin_url( 'admin.php?page=at-gathering&at_rsvp=' . $result ) );
 	exit;
+}
+
+/** Delete the RSVP and its guest reservations together so removed guests can be reassigned. */
+function at_gathering_remove_rsvp_records( $user_id ) {
+	global $wpdb;
+	$user_id = absint( $user_id );
+	return at_gathering_transaction(
+		function () use ( $wpdb, $user_id ) {
+			$assignments_deleted = $wpdb->delete( at_gathering_assignments_table(), array( 'rsvp_user_id' => $user_id ), array( '%d' ) );
+			if ( false === $assignments_deleted ) {
+				return new WP_Error( 'at_rsvp_remove_failed', 'The party assignments could not be removed.' );
+			}
+			$rsvp_deleted = $wpdb->delete( at_gathering_table(), array( 'user_id' => $user_id ), array( '%d' ) );
+			if ( false === $rsvp_deleted ) {
+				return new WP_Error( 'at_rsvp_remove_failed', 'The RSVP could not be removed.' );
+			}
+			return (bool) $rsvp_deleted;
+		}
+	);
 }
 
 function at_gathering_register_party_rsvps() {

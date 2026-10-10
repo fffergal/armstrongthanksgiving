@@ -52,15 +52,17 @@ assignment in one transaction. It returns `true` or `WP_Error`.
   `WP_Error`; errors and exceptions roll back.
 - `at_gathering_party_rsvps_enabled()` is the reconciliation gate. New
   roster-based party saves must reject writes until a host has reviewed the
-  legacy list and confirmed. The review stores a fingerprint of the legacy
-  party names; any later edit to that list reopens the gate.
+  legacy list and confirmed. The review stores a fingerprint of the exact
+  legacy-name snapshot shown to the host; stale confirmations are rejected,
+  and any later edit to that list reopens the gate.
 
 Stable error codes currently include `at_transaction_unavailable`,
 `at_party_reconciliation_required`, `at_party_owner_required`,
 `at_roster_guest_not_found`, `at_party_assignment_conflict`,
 `at_party_assignment_write_failed`, `at_party_write_failed`,
 `at_invalid_write_callback`, `at_owner_email_mismatch`, `at_owner_link_conflict`,
-`at_legacy_owner_not_found`, and `at_host_required`. Conflict errors include
+`at_legacy_owner_not_found`, `at_host_required`, and `at_rsvp_remove_failed`.
+Conflict errors include
 the conflicting `guest_id` where available. Callers should show a useful
 host-resolution message without exposing invitee email addresses.
 
