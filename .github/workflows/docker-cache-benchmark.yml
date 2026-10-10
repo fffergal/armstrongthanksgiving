@@ -1,3 +1,4 @@
+# This comment triggers the warm-cache rerun; all build inputs remain unchanged.
 name: Playwright Docker cache benchmark
 
 on:
