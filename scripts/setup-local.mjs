@@ -58,6 +58,14 @@ const code = `
   update_option('_bbp_thread_replies_depth', 3);
   update_option('permalink_structure', '/%postname%/');
 
+  // bbPress registered its post types and rewrite structures during the
+  // initial WordPress bootstrap, before these slug options were updated.
+  // Re-register them so the fixture routes use /community/topic/ immediately.
+  if (function_exists('bbp_register_post_types')) bbp_register_post_types();
+  if (function_exists('bbp_add_rewrite_tags')) bbp_add_rewrite_tags();
+  if (function_exists('bbp_add_rewrite_rules')) bbp_add_rewrite_rules();
+  if (function_exists('bbp_add_permastructs')) bbp_add_permastructs();
+
   delete_option('at_gathering_event_details');
   update_option('at_gathering_db_version', '0.5.2');
   at_gathering_maybe_upgrade();

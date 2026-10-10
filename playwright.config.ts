@@ -55,7 +55,7 @@ export default defineConfig({
     { name: 'login', testMatch: /login\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
     { name: 'accessibility', testMatch: /a11y\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
     { name: 'visual', testMatch: /visual\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
-    { name: 'member', testMatch: /member\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
+    { name: 'member', testMatch: /member\.spec\.ts/, dependencies: ['rsvp-mobile'], use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
     { name: 'forum', testMatch: /forum\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
     { name: 'rsvp', testMatch: /rsvp\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
     {
