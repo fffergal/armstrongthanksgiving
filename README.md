@@ -113,8 +113,12 @@ mail procedure, and current rollout status.
 
 The GitHub workflow for multiple concurrent worktrees is documented in
 [GitHub workflow](docs/github-workflow.md). Pull requests into `main` run the
-complete browser and Lighthouse suite. No reviewer approval is required;
-Codex review is enabled and its useful feedback can be addressed before merge.
+complete browser and Lighthouse suite. The GitHub Codex reviewer is optional
+and may not be enabled for every PR; reviewer approval is not required.
+Address useful feedback when it arrives; there is no need to trigger a review
+manually or wait indefinitely for one before merging once the merge gates pass.
+If you decide not to take the reviewer's advice, resolve the corresponding
+review conversation anyway; unresolved conversations block merging.
 Squash merges to `main` deploy the changed theme, plugin, and block-editor
 content. The **Sync block editor content** workflow can pull the published Home
 page into a PR.
