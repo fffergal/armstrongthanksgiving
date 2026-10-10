@@ -14,15 +14,18 @@ function runWpEval(code: string): void {
   if (result.status !== 0) throw new Error(result.stderr || result.stdout || 'Could not update the local RSVP fixture.');
 }
 
-test.afterEach(() => {
+test.afterEach(({}, testInfo) => {
+  const cleanupStartedAt = performance.now();
   const cleanup = spawnSync(process.execPath, [path.join(root, 'scripts/reset-rsvp-test-data.mjs')], {
     cwd: root,
     encoding: 'utf8',
     stdio: 'pipe',
   });
+  const cleanupDuration = ((performance.now() - cleanupStartedAt) / 1000).toFixed(2);
   if (cleanup.status !== 0) {
     throw new Error(cleanup.stderr || cleanup.stdout || 'Could not reset local RSVP test data.');
   }
+  console.log(`[cleanup][${testInfo.project.name}] RSVP data reset for "${testInfo.title}" in ${cleanupDuration}s`);
 });
 
 test('schema upgrades preserve legacy RSVPs and link an owner only after host email confirmation', async ({}, testInfo) => {

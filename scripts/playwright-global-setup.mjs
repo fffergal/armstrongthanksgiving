@@ -23,6 +23,11 @@ const isWorktreeRuntime = Boolean(runtime.url) && new URL(runtime.url).origin ==
 const isDefaultWpEnv = !runtime.url && target.origin === 'http://localhost:8888';
 
 export default async function globalSetup() {
+  if (process.env.SKIP_PLAYWRIGHT_GLOBAL_SETUP === '1') {
+    console.log(`Skipping local test-data reset for ${target.origin}; it was reset before the Linux visual checks.`);
+    return;
+  }
+
   if (!isLoopback || (!isWorktreeRuntime && !isDefaultWpEnv)) {
     console.log(`Skipping local test-data reset for ${target.origin}.`);
     return;

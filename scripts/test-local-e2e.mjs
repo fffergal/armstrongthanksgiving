@@ -22,11 +22,16 @@ try {
 const useSharedLinuxVisuals = process.platform === 'linux'
   && isLoopbackTarget
   && localTarget.origin === worktreeRuntimeOrigin;
+const canRunLocalLinuxVisuals = useSharedLinuxVisuals || (
+  process.platform === 'darwin'
+  && isLoopbackTarget
+  && localTarget.origin === worktreeRuntimeOrigin
+);
 const helperFlags = new Set(['--visual-only', '--linux-visual-only', '--exclude-visual', '--update-snapshots']);
 const forwardedArgs = process.argv.slice(2).filter(argument => !helperFlags.has(argument));
 const playwrightArgs = visualOnly || linuxVisualOnly || updateSnapshots
   ? ['test', '--project=visual', ...(updateSnapshots ? ['--update-snapshots'] : []), ...forwardedArgs]
-  : ['test', ...(excludeVisual || useSharedLinuxVisuals ? ['--grep-invert', 'visual contract'] : []), ...forwardedArgs];
+  : ['test', ...(excludeVisual || useSharedLinuxVisuals ? ['--grep-invert=visual'] : []), ...forwardedArgs];
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -176,9 +181,32 @@ if (useSharedLinuxVisuals && (visualOnly || updateSnapshots)) {
   process.exit(runLinuxVisuals({ args: forwardedArgs }));
 }
 
-const nativeStatus = run('npx', ['playwright', ...playwrightArgs]);
+if (!visualOnly && !updateSnapshots && canRunLocalLinuxVisuals) {
+  // Run screenshots before browser tests mutate users, RSVPs, and forum
+  // content. The full reset here also gives the native suite its usual
+  // starting state, so Playwright's global setup can be skipped below.
+  const prepareStatus = run(process.execPath, [path.join(root, 'scripts/prepare-tests.mjs')]);
+  if (prepareStatus !== 0) process.exit(prepareStatus);
+
+  process.env.SKIP_PLAYWRIGHT_GLOBAL_SETUP = '1';
+  if (process.platform === 'darwin' && !useSharedLinuxVisuals) {
+    const nativeVisualStatus = run('npx', ['playwright', 'test', '--project=visual']);
+    if (nativeVisualStatus !== 0) process.exit(nativeVisualStatus);
+  }
+
+  const visualStatus = runLinuxVisuals({ reset: false, skipForRemoteTarget: true });
+  if (visualStatus !== 0) process.exit(visualStatus);
+}
+
+const nativeArgs = process.platform === 'darwin' && !visualOnly && !updateSnapshots && canRunLocalLinuxVisuals
+  ? [...playwrightArgs, '--grep-invert=visual']
+  : playwrightArgs;
+const nativeStatus = run('npx', ['playwright', ...nativeArgs]);
 if (nativeStatus !== 0) process.exit(nativeStatus);
 
-if (process.platform === 'darwin' || useSharedLinuxVisuals) {
+if (
+  (process.platform === 'darwin' || useSharedLinuxVisuals)
+  && (!canRunLocalLinuxVisuals || visualOnly || updateSnapshots)
+) {
   process.exit(runLinuxVisuals({ reset: !visualOnly && !updateSnapshots, skipForRemoteTarget: true }));
 }

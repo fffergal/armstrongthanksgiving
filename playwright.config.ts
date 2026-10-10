@@ -33,10 +33,12 @@ export default defineConfig({
   timeout: process.env.LOCAL_LINUX_QEMU === '1' ? 60_000 : 30_000,
   globalSetup: './scripts/playwright-global-setup.mjs',
   outputDir: 'test-results',
-  fullyParallel: true,
+  // Parallelize independent spec files while keeping stateful tests within
+  // each file in order. RSVP tests reset shared RSVP/user data after each test.
+  fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
-  workers: 1,
+  workers: 3,
   reporter: [['html', { open: 'never' }], ['list']],
   expect: { timeout: 10_000, toHaveScreenshot: { animations: 'disabled' } },
   use: {
@@ -56,11 +58,16 @@ export default defineConfig({
     { name: 'member', testMatch: /member\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
     { name: 'forum', testMatch: /forum\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
     { name: 'rsvp', testMatch: /rsvp\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
-    { name: 'rsvp-mobile', testMatch: /rsvp\.spec\.ts/, use: { ...devices['iPhone 13'] } },
+    {
+      name: 'rsvp-mobile',
+      testMatch: /rsvp\.spec\.ts/,
+      dependencies: ['rsvp'],
+      use: { ...devices['iPhone 13'] }
+    },
     {
       name: 'admin',
       testMatch: /admin\.spec\.ts/,
-      dependencies: ['desktop-chromium', 'mobile-safari', 'login', 'accessibility', 'visual', 'member', 'forum', 'rsvp', 'rsvp-mobile'],
+      dependencies: ['desktop-chromium', 'mobile-safari', 'login', 'accessibility', 'member', 'forum', 'rsvp', 'rsvp-mobile'],
       use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions }
     }
   ]
