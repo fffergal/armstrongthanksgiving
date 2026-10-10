@@ -64,7 +64,8 @@ explain that in the completion message.
 
 When a pull request includes a meaningful visible interface change, include
 fresh screenshots of the integrated implementation directly in the PR
-description using inline Markdown images or the platform's image attachments.
+description using inline Markdown images, the platform's image attachments, or
+`--attach` with `gh pr create` and `gh pr edit` (GitHub CLI 2.99.0 or later).
 Show the surrounding page and relevant details, and include desktop, tablet,
 and mobile views when responsive behavior changes. Use real screenshots from
 the running implementation rather than mockups. Keep screenshot files outside
@@ -100,11 +101,17 @@ The production site is `https://www.armstrongthanksgiving.com/`. Use that
 canonical domain for deployment checks and production browser work; the local
 site URL comes from `.worktree/runtime.json` instead.
 
-Agents are explicitly free to make commits in this repository after verifying
-their changes. Use descriptive commits and leave the worktree with the source
-state recorded. This repository does not require GPG-signed commits; when the
+Never commit directly to `main` or merge a worktree into local `main`. GitHub
+denies pushes to `main`; changes must go through a pull request. Agents may
+commit verified changes on the worktree's feature branch, using descriptive
+commit messages. This repository does not require GPG-signed commits; when the
 local Git configuration attempts signing, commit with
 `git -c commit.gpgsign=false commit -m "..."`.
+
+When the user says **"Merge."**, follow the documented pull request procedure
+below: create or update a PR, complete the required checks and review steps,
+then squash-merge the PR on GitHub. Do not interpret "Merge." as permission to
+merge a worktree into local `main`.
 
 Treat requests to close, close out, close down, wind down, shut down, wrap up,
 finish, finish up, complete, call it done, tidy up, clean up, tear down, archive,
