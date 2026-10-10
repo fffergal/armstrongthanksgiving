@@ -585,7 +585,9 @@ function at_gathering_admin_page() {
 		foreach ( $rows as $attendance_row ) {
 			$attendance[ $attendance_row->status ] = ( $attendance[ $attendance_row->status ] ?? 0 ) + 1;
 			if ( 'yes' === $attendance_row->status ) {
-				$adults = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . at_gathering_assignments_table() . ' WHERE rsvp_user_id = %d', $attendance_row->user_id ) );
+				$assigned_adults = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . at_gathering_assignments_table() . ' WHERE rsvp_user_id = %d', $attendance_row->user_id ) );
+				// Preserve pre-reconciliation totals until this legacy party has explicit assignments.
+				$adults = $assigned_adults ?: (int) $attendance_row->guest_count;
 				$expected_people += $adults + (int) ( $attendance_row->children_count ?? 0 );
 			}
 		}
