@@ -305,7 +305,10 @@ jobs:
   deploy_production:
     name: Deploy production after CI
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.test.result == 'success' && needs.test.outputs.run_tests == 'true'
+    # Always check the deploy baseline after a successful main push. Skipping
+    # this reusable workflow for docs-only pushes could advance the successful
+    # CI baseline past production changes from a failed deployment.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.test.result == 'success'
     uses: ./.github/workflows/deploy-production.yml
     permissions:
       actions: read
