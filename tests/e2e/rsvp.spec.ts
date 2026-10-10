@@ -194,9 +194,9 @@ test('form controls only show the brown focus ring during keyboard navigation', 
   await logIn(page);
   await page.goto('/rsvp/');
 
-  const children = page.getByLabel('Children (ages 0–17)');
-  await children.click();
-  await expect(children).toHaveCSS('outline-style', 'none');
+  const dietary = page.getByLabel('Dietary notes (optional)');
+  await dietary.click();
+  await expect(dietary).toHaveCSS('outline-style', 'none');
 
   await page.keyboard.press('Tab');
   await expect(page.locator(':focus')).toHaveCSS('outline-style', 'solid');
