@@ -39,7 +39,17 @@ jobs:
       check_id: ${{ steps.context.outputs.check_id }}
       test_sha: ${{ steps.context.outputs.test_sha }}
       head_sha: ${{ steps.context.outputs.head_sha }}
+      run_tests: ${{ steps.context.outputs.run_tests }}
     steps:
+      - name: Check out base-branch change-scope helper
+        uses: actions/checkout@v5
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Test CI change-scope helper
+        run: node --test tests/ci-change-scope.test.cjs
+
       - name: Verify pull request and create check
         id: context
         uses: actions/github-script@v7
@@ -48,6 +58,8 @@ jobs:
           INPUT_PR_NUMBER: ${{ inputs.pr_number }}
         with:
           script: |
+            const { isDocsOnlyPullRequestFiles } = require('./scripts/ci-change-scope.cjs');
+            core.setOutput('run_tests', 'true');
             const requestedNumber = Number(process.env.INPUT_PR_NUMBER || 0);
             const prNumber = context.payload.pull_request?.number || requestedNumber;
 
@@ -91,6 +103,37 @@ jobs:
               core.setFailed('The pull-request merge commit does not match the captured base and head SHAs.');
               return;
             }
+            const changedFiles = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              per_page: 100,
+            });
+            const docsOnly = isDocsOnlyPullRequestFiles(changedFiles, pullRequest.changed_files);
+
+            if (docsOnly) {
+              const now = new Date().toISOString();
+              await github.rest.checks.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'CI / test',
+                head_sha: headSha,
+                status: 'completed',
+                conclusion: 'success',
+                started_at: now,
+                completed_at: now,
+                details_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+                output: {
+                  title: 'Docs-only change; long CI skipped',
+                  summary: 'All changed files are under docs/ or are Markdown files. Browser and Lighthouse tests were skipped.',
+                },
+              });
+              core.setOutput('test_sha', testSha);
+              core.setOutput('head_sha', headSha);
+              core.setOutput('run_tests', 'false');
+              return;
+            }
+
             const { data: check } = await github.rest.checks.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -112,11 +155,13 @@ jobs:
   test:
     name: Run base-branch CI
     needs: prepare_check
-    if: needs.prepare_check.result == 'success'
+    if: needs.prepare_check.result == 'success' && needs.prepare_check.outputs.run_tests == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
       contents: read
+    outputs:
+      run_tests: ${{ steps.change-scope.outputs.run_tests }}
     steps:
       - name: Check out source
         uses: actions/checkout@v5
@@ -124,6 +169,7 @@ jobs:
           # This workflow comes from the base branch; only the source under
           # test comes from the verified immutable pull-request merge commit.
           ref: ${{ needs.prepare_check.outputs.test_sha || github.sha }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up Node.js
@@ -131,11 +177,30 @@ jobs:
         with:
           node-version: 22
 
+      - name: Check whether the push changes only documentation
+        id: change-scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: |
+          if [ "$EVENT_NAME" != 'push' ]; then
+            echo 'run_tests=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          node scripts/ci-change-scope.cjs "$BEFORE_SHA" "$AFTER_SHA" >> "$GITHUB_OUTPUT"
+          if grep -Fqx 'run_tests=false' "$GITHUB_OUTPUT"; then
+            echo 'Docs-only push; browser and Lighthouse tests are skipped.'
+          fi
+
       - name: Set up Docker Buildx
+        if: steps.change-scope.outputs.run_tests == 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Restore Playwright image layer cache
         id: playwright-build-cache
+        if: steps.change-scope.outputs.run_tests == 'true'
         uses: actions/cache/restore@v4
         with:
           path: /tmp/armstrong-thanksgiving-playwright-cache
@@ -144,29 +209,35 @@ jobs:
             playwright-linux-amd64-
 
       - name: Configure Playwright image cache paths
+        if: steps.change-scope.outputs.run_tests == 'true'
         run: |
           echo "PLAYWRIGHT_DOCKER_CACHE_FROM=/tmp/armstrong-thanksgiving-playwright-cache" >> "$GITHUB_ENV"
           echo "PLAYWRIGHT_DOCKER_CACHE_TO=/tmp/armstrong-thanksgiving-playwright-cache-next" >> "$GITHUB_ENV"
 
       - name: Install dependencies
+        if: steps.change-scope.outputs.run_tests == 'true'
         run: npm ci
 
       - name: Install Playwright browser
+        if: steps.change-scope.outputs.run_tests == 'true'
         run: npx playwright install --with-deps chromium webkit
 
       - name: Start WordPress
+        if: steps.change-scope.outputs.run_tests == 'true'
         run: npm run wp:start
 
       - name: Seed WordPress fixtures
+        if: steps.change-scope.outputs.run_tests == 'true'
         run: npm run wp:setup
 
       - name: Run browser and Lighthouse tests
         id: browser-tests
+        if: steps.change-scope.outputs.run_tests == 'true'
         run: npm run test:all
 
       - name: Prepare Playwright image cache for saving
         id: playwright-cache-export
-        if: always()
+        if: always() && steps.change-scope.outputs.run_tests == 'true'
         run: |
           if [ -d /tmp/armstrong-thanksgiving-playwright-cache-next ]; then
             rm -rf /tmp/armstrong-thanksgiving-playwright-cache
@@ -175,14 +246,14 @@ jobs:
           fi
 
       - name: Save Playwright image layer cache
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && always() && steps.browser-tests.conclusion == 'success' && steps.playwright-build-cache.outputs.cache-hit != 'true' && steps.playwright-cache-export.outputs.available == 'true'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && always() && steps.change-scope.outputs.run_tests == 'true' && steps.browser-tests.conclusion == 'success' && steps.playwright-build-cache.outputs.cache-hit != 'true' && steps.playwright-cache-export.outputs.available == 'true'
         uses: actions/cache/save@v4
         with:
           path: /tmp/armstrong-thanksgiving-playwright-cache
           key: playwright-linux-amd64-${{ hashFiles('scripts/playwright.Dockerfile', 'package-lock.json') }}
 
       - name: Upload browser reports
-        if: always()
+        if: always() && steps.change-scope.outputs.run_tests == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: ci-reports-${{ github.run_id }}
@@ -193,7 +264,7 @@ jobs:
             lighthouse-results/
 
       - name: Stop WordPress
-        if: always()
+        if: always() && steps.change-scope.outputs.run_tests == 'true'
         run: npm run wp:cleanup
 
   complete_check:
@@ -234,6 +305,9 @@ jobs:
   deploy_production:
     name: Deploy production after CI
     needs: test
+    # Always check the deploy baseline after a successful main push. Skipping
+    # this reusable workflow for docs-only pushes could advance the successful
+    # CI baseline past production changes from a failed deployment.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.test.result == 'success'
     uses: ./.github/workflows/deploy-production.yml
     permissions:
