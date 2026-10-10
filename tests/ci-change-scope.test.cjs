@@ -43,6 +43,16 @@ test('runs CI when GitHub truncates the pull request file listing', () => {
   assert.equal(isDocsOnlyPullRequestFiles(returnedFiles, 3001), false);
 });
 
+test('keeps production baseline detection enabled after docs-only main pushes', () => {
+  const workflow = fs.readFileSync(path.join(__dirname, '../.github/workflows/ci.yml'), 'utf8');
+  const deployJob = workflow.split('\n  deploy_production:\n')[1];
+  assert.ok(deployJob);
+
+  const condition = deployJob.split('\n    uses:')[0];
+  assert.match(condition, /needs\.test\.result == 'success'/);
+  assert.doesNotMatch(condition, /needs\.test\.outputs\.run_tests/);
+});
+
 test('classifies actual push diffs, including code-to-docs renames and empty diffs', (t) => {
   const repository = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-change-scope-'));
   t.after(() => fs.rmSync(repository, { recursive: true, force: true }));
