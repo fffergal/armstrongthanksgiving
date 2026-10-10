@@ -41,6 +41,15 @@ jobs:
       head_sha: ${{ steps.context.outputs.head_sha }}
       run_tests: ${{ steps.context.outputs.run_tests }}
     steps:
+      - name: Check out base-branch change-scope helper
+        uses: actions/checkout@v5
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Test CI change-scope helper
+        run: node --test tests/ci-change-scope.test.cjs
+
       - name: Verify pull request and create check
         id: context
         uses: actions/github-script@v7
@@ -49,6 +58,7 @@ jobs:
           INPUT_PR_NUMBER: ${{ inputs.pr_number }}
         with:
           script: |
+            const { isDocsOnlyPullRequestFiles } = require('./scripts/ci-change-scope.cjs');
             core.setOutput('run_tests', 'true');
             const requestedNumber = Number(process.env.INPUT_PR_NUMBER || 0);
             const prNumber = context.payload.pull_request?.number || requestedNumber;
@@ -99,13 +109,7 @@ jobs:
               pull_number: prNumber,
               per_page: 100,
             });
-            const isDocumentation = filename =>
-              filename.startsWith('docs/') || filename.toLowerCase().endsWith('.md');
-            const docsOnly = changedFiles.length > 0
-              && changedFiles.length === pullRequest.changed_files
-              && changedFiles.every(({ filename, previous_filename }) =>
-                isDocumentation(filename) && (!previous_filename || isDocumentation(previous_filename))
-              );
+            const docsOnly = isDocsOnlyPullRequestFiles(changedFiles, pullRequest.changed_files);
 
             if (docsOnly) {
               const now = new Date().toISOString();
@@ -168,6 +172,11 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
       - name: Check whether the push changes only documentation
         id: change-scope
         env:
@@ -175,37 +184,15 @@ jobs:
           BEFORE_SHA: ${{ github.event.before }}
           AFTER_SHA: ${{ github.sha }}
         run: |
-          if [ "$EVENT_NAME" != 'push' ] || [ -z "$BEFORE_SHA" ] || [ "$BEFORE_SHA" = '0000000000000000000000000000000000000000' ]; then
+          if [ "$EVENT_NAME" != 'push' ]; then
             echo 'run_tests=true' >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          changed_files="$(git diff --name-only --no-renames "$BEFORE_SHA" "$AFTER_SHA")"
-          if [ -z "$changed_files" ]; then
-            echo 'run_tests=true' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          docs_only=true
-          while IFS= read -r file; do
-            case "$file" in
-              docs/*|*.md) ;;
-              *) docs_only=false; break ;;
-            esac
-          done <<< "$changed_files"
-
-          if [ "$docs_only" = true ]; then
-            echo 'run_tests=false' >> "$GITHUB_OUTPUT"
+          node scripts/ci-change-scope.cjs "$BEFORE_SHA" "$AFTER_SHA" >> "$GITHUB_OUTPUT"
+          if grep -Fqx 'run_tests=false' "$GITHUB_OUTPUT"; then
             echo 'Docs-only push; browser and Lighthouse tests are skipped.'
-          else
-            echo 'run_tests=true' >> "$GITHUB_OUTPUT"
           fi
-
-      - name: Set up Node.js
-        if: steps.change-scope.outputs.run_tests == 'true'
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
 
       - name: Set up Docker Buildx
         if: steps.change-scope.outputs.run_tests == 'true'
