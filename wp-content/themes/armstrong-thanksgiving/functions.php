@@ -156,7 +156,7 @@ function armstrong_thanksgiving_theme_login_branding() {
 add_action( 'login_head', 'armstrong_thanksgiving_theme_login_branding' );
 
 function armstrong_thanksgiving_theme_login_message() {
-	return '<p class="message at-login-message"><strong>Sign in</strong><br>Use the username or email address and password you chose when you signed up. New here? <a href="' . esc_url( home_url( '/signup/' ) ) . '">Sign up</a> to create an account.</p>';
+	return '<p class="message at-login-message"><strong>Sign in</strong><br>Use the username or email address and password you chose when you signed up. New here? Account setup is by invitation. If you have an invitation, <a href="' . esc_url( home_url( '/signup/' ) ) . '">Sign up</a> to set up your account.</p>';
 }
 add_filter( 'login_message', 'armstrong_thanksgiving_theme_login_message' );
 
