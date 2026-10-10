@@ -57,11 +57,18 @@ export default defineConfig({
     { name: 'visual', testMatch: /visual\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
     { name: 'member', testMatch: /member\.spec\.ts/, dependencies: ['rsvp-mobile'], use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
     { name: 'forum', testMatch: /forum\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
-    { name: 'rsvp', testMatch: /rsvp\.spec\.ts/, use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions } },
+    {
+      name: 'rsvp',
+      testMatch: /rsvp\.spec\.ts/,
+      // RSVP and invitation specs share one disposable WordPress database.
+      workers: 1,
+      use: { ...devices['Desktop Chrome'], ...chromiumLaunchOptions }
+    },
     {
       name: 'rsvp-mobile',
       testMatch: /rsvp\.spec\.ts/,
       dependencies: ['rsvp'],
+      workers: 1,
       use: { ...devices['iPhone 13'] }
     },
     {

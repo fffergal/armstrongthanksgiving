@@ -5,13 +5,14 @@ import { logIn, logInAsAdmin } from './helpers/auth';
 
 const root = path.resolve(__dirname, '../..');
 
-function runWpEval(code: string): void {
+function runWpEval(code: string): string {
   const result = spawnSync(process.execPath, [path.join(root, 'scripts/wp-env.mjs'), 'run', 'cli', 'wp', 'eval', code], {
     cwd: root,
     encoding: 'utf8',
     stdio: 'pipe',
   });
   if (result.status !== 0) throw new Error(result.stderr || result.stdout || 'Could not update the local RSVP fixture.');
+  return result.stdout;
 }
 
 test.afterEach(({}, testInfo) => {
@@ -204,64 +205,35 @@ test('food contributor names are shown to signed-in guests only', async ({ page,
     await observer.screenshot({ path: testInfo.outputPath('rsvp-listed-food-contributor-mobile.png') });
     await customFoodList.scrollIntoViewIfNeeded();
     await observer.screenshot({ path: testInfo.outputPath('rsvp-custom-food-mobile.png') });
-
-    const signInEmail = `names-handoff-${unique}@example.test`;
-    const signInPassword = 'cranberry-sauce-2026';
-    await observer.goto('/signup/');
-    await observer.getByLabel('Display name').fill('Names Link Friend');
-    await observer.getByLabel('Email').fill(signInEmail);
-    await observer.getByLabel('Password', { exact: true }).fill(signInPassword);
-    await observer.getByLabel('Confirm password').fill(signInPassword);
-    await observer.getByRole('button', { name: 'Sign up' }).click();
-    await observer.waitForURL(/at_signup=saved/);
-    await observer.context().clearCookies();
-    await observer.goto('/rsvp/');
-
-    await observer.getByLabel('Names', { exact: true }).fill('Draft from names link');
-    await observer.getByLabel('Something else?').fill('Draft cider');
-    await observer.getByLabel('Amount of something else').fill('5');
-    await customFoodRow.getByRole('button', { name: 'Sign in to see who' }).click();
-    await expect(observer).toHaveURL(/wp-login\.php/);
-    await observer.locator('#user_login').fill(signInEmail);
-    await observer.locator('#user_pass').fill(signInPassword);
-    await observer.locator('#wp-submit').click();
-    await observer.waitForURL(/\/rsvp\//);
-    await expect(observer.getByLabel('Names', { exact: true })).toHaveValue('Draft from names link');
-    await expect(observer.getByLabel('Something else?')).toHaveValue('Draft cider');
-    await expect(observer.getByLabel('Amount of something else')).toHaveValue('5');
   } finally {
     await observerContext.close();
   }
 
-  const signedInContext = await browser.newContext();
-  try {
-    const signedIn = await signedInContext.newPage();
-    await logIn(signedIn);
-    await signedIn.goto('/rsvp/');
-    const customFoodList = signedIn.locator('.at-custom-food-list');
-    const customFoodRow = customFoodList.getByRole('listitem').filter({ hasText: customFood });
-    await expect(customFoodRow.locator('small')).toHaveText(`3 from ${guestNames}`);
-    const gravySummary = signedIn.getByLabel('Gravy — vegetarian', { exact: true }).locator('..').locator('..').locator('small');
-    await expect(gravySummary).toContainText(`Bringing: ${guestNames}`);
-    await expect(gravySummary).not.toContainText('×');
-    await expect(signedIn.locator('.at-rsvp-app')).toContainText(guestNames);
-    await gravySummary.scrollIntoViewIfNeeded();
-    await signedIn.screenshot({ path: testInfo.outputPath('rsvp-listed-food-contributors-desktop.png') });
-    await customFoodList.scrollIntoViewIfNeeded();
-    await signedIn.screenshot({ path: testInfo.outputPath('rsvp-signed-in-contributors-desktop.png') });
-    await signedIn.setViewportSize({ width: 768, height: 1024 });
-    await gravySummary.scrollIntoViewIfNeeded();
-    await signedIn.screenshot({ path: testInfo.outputPath('rsvp-listed-food-contributors-tablet.png') });
-    await customFoodList.scrollIntoViewIfNeeded();
-    await signedIn.screenshot({ path: testInfo.outputPath('rsvp-signed-in-contributors-tablet.png') });
-    await signedIn.setViewportSize({ width: 390, height: 844 });
-    await gravySummary.scrollIntoViewIfNeeded();
-    await signedIn.screenshot({ path: testInfo.outputPath('rsvp-listed-food-contributors-mobile.png') });
-    await customFoodList.scrollIntoViewIfNeeded();
-    await signedIn.screenshot({ path: testInfo.outputPath('rsvp-signed-in-contributors-mobile.png') });
-  } finally {
-    await signedInContext.close();
-  }
+  // The RSVP submission above creates and signs in the account under test.
+  // Reuse that authenticated session to verify contributor names rather than
+  // creating a second account through the now invitation-only signup form.
+  await page.goto('/rsvp/');
+  const customFoodList = page.locator('.at-custom-food-list');
+  const customFoodRow = customFoodList.getByRole('listitem').filter({ hasText: customFood });
+  await expect(customFoodRow.locator('small')).toHaveText(`3 from ${guestNames}`);
+  const gravySummary = page.getByLabel('Gravy — vegetarian', { exact: true }).locator('..').locator('..').locator('small');
+  await expect(gravySummary).toContainText(`Bringing: ${guestNames}`);
+  await expect(gravySummary).not.toContainText('×');
+  await expect(page.locator('.at-rsvp-app')).toContainText(guestNames);
+  await gravySummary.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('rsvp-listed-food-contributors-desktop.png') });
+  await customFoodList.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('rsvp-signed-in-contributors-desktop.png') });
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await gravySummary.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('rsvp-listed-food-contributors-tablet.png') });
+  await customFoodList.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('rsvp-signed-in-contributors-tablet.png') });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await gravySummary.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('rsvp-listed-food-contributors-mobile.png') });
+  await customFoodList.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('rsvp-signed-in-contributors-mobile.png') });
 });
 
 test('the RSVP form remains usable on a phone', async ({ page }) => {
@@ -461,22 +433,17 @@ test('a signed-in RSVP has no login prompt, emails its full payload, and repopul
   await expect(page.locator('.at-custom-food-list')).toHaveCount(0);
 });
 
-test('a standalone signup creates a member without an RSVP', async ({ page }, testInfo) => {
+test('a standalone signup requests setup without creating an account', async ({ page }, testInfo) => {
   const unique = `${testInfo.project.name.replace(/\W/g, '')}${Date.now()}`.toLowerCase();
+  const email = `signup-${unique}@example.test`;
   await page.goto('/signup/');
 
-  await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible();
-  await expect(page.getByText('before, during, or after Thanksgiving')).toBeVisible();
-  await page.getByLabel('Display name').fill('Forum Friend');
-  await page.getByLabel('Email').fill(`signup-${unique}@example.test`);
-  await page.getByLabel('Password', { exact: true }).fill('cranberry-sauce-2026');
-  await page.getByLabel('Confirm password').fill('cranberry-sauce-2026');
-  await page.getByRole('button', { name: 'Sign up' }).click();
-  await page.waitForURL(/at_signup=saved/);
-
-  await expect(page.getByRole('status')).toContainText('You’re signed up');
-  await expect(page.getByRole('link', { name: 'gathering forum' })).toBeVisible();
-  await expect(page.getByRole('group', { name: 'Your details' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Set up your gathering account' })).toBeVisible();
+  await page.getByLabel('Email').fill(email);
+  await page.getByRole('button', { name: 'Request setup link' }).click();
+  await expect(page.getByRole('status')).toContainText('If an invitation can be set up for that address');
+  const accountExists = runWpEval(`echo email_exists('${email}') ? 'yes' : 'no';`).trim();
+  expect(accountExists).toBe('no');
 });
 
 test('a new friend creates an account as the last step of RSVP', async ({ page }, testInfo) => {
@@ -562,47 +529,6 @@ test.describe('RSVP sign-in handoff', () => {
     await expect(page.getByLabel('Cranberry sauce', { exact: true })).toHaveValue('1');
     await expect(page.getByLabel('Something else?')).toHaveValue('Saved cider');
     await expect(page.getByLabel('Anything else for the hosts? (optional)')).toHaveValue('Saved host note');
-  });
-
-  test('a new account restores the submitted RSVP once after sign-in', async ({ page }, testInfo) => {
-    const unique = `${testInfo.project.name.replace(/\W/g, '')}${Date.now()}`.toLowerCase();
-    const email = `handoff-${unique}@example.test`;
-    const password = 'cranberry-sauce-2026';
-    await page.goto('/signup/');
-    await page.getByLabel('Display name').fill('Handoff Test Friend');
-    await page.getByLabel('Email').fill(email);
-    await page.getByLabel('Password', { exact: true }).fill(password);
-    await page.getByLabel('Confirm password').fill(password);
-    await page.getByRole('button', { name: 'Sign up' }).click();
-    await page.waitForURL(/at_signup=saved/);
-
-    await page.context().clearCookies();
-    await page.goto('/rsvp/');
-    await page.getByLabel('Maybe').check();
-    await page.getByLabel('I’m coming').check();
-    await page.getByLabel('How many people are coming?').selectOption('2');
-    await page.getByLabel('How many people are coming?').selectOption('1');
-    await page.getByLabel('Names', { exact: true }).fill('Handoff Guest');
-    await page.getByLabel('Cranberry sauce', { exact: true }).fill('1');
-    await page.getByLabel('Something else?').fill('Handoff mulled cider');
-    await page.getByRole('button', { name: 'Sign in first' }).click();
-    await expect(page).toHaveURL(/wp-login\.php/);
-    await page.locator('#user_login').fill(email);
-    await page.locator('#user_pass').fill(password);
-    await page.locator('#wp-submit').click();
-    await page.waitForURL(/\/rsvp\//);
-    await expect(page.getByLabel('I’m coming')).toBeChecked();
-    await expect(page.getByLabel('How many people are coming?')).toHaveValue('1');
-    await expect(page.getByLabel('Names', { exact: true })).toHaveValue('Handoff Guest');
-    await expect(page.getByLabel('Cranberry sauce', { exact: true })).toHaveValue('1');
-    await expect(page.getByLabel('Something else?')).toHaveValue('Handoff mulled cider');
-
-    await page.reload();
-    await expect(page.getByLabel('Names', { exact: true })).toHaveValue('');
-    await expect(page.getByLabel('I’m coming')).toBeChecked();
-    await expect(page.getByLabel('How many people are coming?')).toHaveValue('1');
-    await expect(page.getByLabel('Cranberry sauce', { exact: true })).toHaveValue('0');
-    await expect(page.getByLabel('Something else?')).toHaveValue('');
   });
 
   test('an untouched sign-in handoff keeps the account’s existing RSVP', async ({ page }, testInfo) => {
