@@ -74,6 +74,7 @@ test.describe('party RSVP assignments', () => {
     await page.goto('/wp-admin/admin.php?page=at-gathering');
     const row = page.locator('.at-rsvp-admin-list tr').filter({ hasText: 'guest@example.test' });
     const party = row.getByLabel('Adults assigned to this RSVP');
+    await expect(party).toHaveCSS('min-width', '256px');
     await expect(party.locator('option:checked')).toHaveText('Party friend');
     await row.getByRole('button', { name: 'Save party' }).click();
     await expect(page.getByText('Party assignments updated.')).toBeVisible();
