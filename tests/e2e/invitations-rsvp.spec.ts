@@ -89,6 +89,34 @@ test('setup token creates one password account, is consumed once, and leaves exi
   runWpEval(`global $wpdb; $guest = at_gathering_roster_guest_by_email(${php(newEmail)}); if ($guest && $guest->user_id) { require_once ABSPATH . 'wp-admin/includes/user.php'; wp_delete_user((int) $guest->user_id); } $guest = at_gathering_roster_guest_by_email(${php(existingEmail)}); if ($guest && $guest->user_id) { require_once ABSPATH . 'wp-admin/includes/user.php'; wp_delete_user((int) $guest->user_id); } $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(newEmail)})); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(existingEmail)}));`);
 });
 
+test('RSVP draft survives invitation request and new-account setup', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'rsvp', 'Run invitation coverage in the desktop RSVP project.');
+  const suffix = `${testInfo.project.name.replace(/\W/g, '')}${Date.now()}`.toLowerCase();
+  const email = `handoff-${suffix}@example.test`;
+  const draftToken = `${Date.now().toString(36)}${'c'.repeat(32)}`.slice(0, 32);
+  runWpEval(`global $wpdb; $now = current_time('mysql', true); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => ${php(email)}, 'display_name' => 'RSVP Handoff Guest', 'claim_state' => 'invited', 'created_at' => $now, 'updated_at' => $now)); set_transient('at_gathering_rsvp_draft_' . ${php(draftToken)}, array('status' => 'yes', 'guest_count' => 1, 'guest_names' => ''), 30 * MINUTE_IN_SECONDS);`);
+
+  await page.goto(`/signup/?at_rsvp_draft=${draftToken}`);
+  await page.getByLabel('Email').fill(email);
+  await page.getByRole('button', { name: 'Request setup link' }).click();
+  await expect(page.getByRole('status')).toContainText('If an invitation can be set up for that address');
+  const capturedMail = JSON.parse(runWpEval('echo wp_json_encode(get_transient("at_gathering_last_test_mail"));')) as { to: string; message: string };
+  expect(capturedMail.to).toBe(email);
+  expect(capturedMail.message).toContain(`at_rsvp_draft=${draftToken}`);
+  const setupToken = capturedMail.message.match(/at_setup=([a-f0-9]{64})/)?.[1];
+  expect(setupToken).toBeTruthy();
+
+  await page.goto(`/signup/?at_setup=${setupToken}&at_rsvp_draft=${draftToken}`);
+  await page.getByLabel('Display name').fill('RSVP Handoff Guest');
+  await page.getByLabel('Password', { exact: true }).fill('cranberry-sauce-2026');
+  await page.getByLabel('Confirm password').fill('cranberry-sauce-2026');
+  await page.getByRole('button', { name: 'Set up account' }).click();
+  await expect(page).toHaveURL(new RegExp(`/rsvp/\\?at_rsvp_draft=${draftToken}`));
+  await expect(page.getByRole('heading', { name: 'Will you join us?' })).toBeVisible();
+
+  runWpEval(`global $wpdb; $guest = at_gathering_roster_guest_by_email(${php(email)}); if ($guest && $guest->user_id) { require_once ABSPATH . 'wp-admin/includes/user.php'; wp_delete_user((int) $guest->user_id); } $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(email)})); delete_transient('at_gathering_rsvp_draft_' . ${php(draftToken)});`);
+});
+
 test('host invitations can be sent and resent with the earlier link invalidated', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'rsvp', 'Run invitation management coverage in the desktop RSVP project.');
   const email = `host-invite-${Date.now()}@example.test`;
