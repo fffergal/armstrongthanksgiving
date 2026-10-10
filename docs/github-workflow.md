@@ -30,10 +30,15 @@ requests into `main`:
    production secrets, and disables checkout credentials. Separate
    jobs create and complete `CI / test` with `checks: write`, including when a
    token-created automation PR cannot start a normal pull-request workflow.
-5. Codex review is enabled. Review any feedback it provides and address useful
-   findings before merging; reviewer approval is not required.
-6. After required checks pass and review feedback is addressed, squash-merge the
-   pull request.
+5. The GitHub Codex reviewer is optional and may not be enabled for every PR.
+   Review any available feedback and address useful findings before merging;
+   reviewer approval is not required. There is no need to trigger a review
+   manually or wait indefinitely for feedback.
+   If you decide not to take the reviewer's advice, resolve the corresponding
+   review conversation anyway; unresolved conversations block merging.
+6. After required checks pass and available review feedback is addressed,
+   squash-merge the pull request. If no Codex review arrives, proceed once the
+   documented merge gates pass.
 7. A push to `main` deploys changed theme, plugin, and block-editor content in
    sequence, then checks the public site. When publishing a changed Home page,
    deployment compares production against the previous committed page (or the
@@ -48,17 +53,21 @@ The `Protect main` repository ruleset configures the `main` branch with:
 
 - Require a pull request before merging; no direct pushes or bypasses.
 - Require zero approvals.
-- Codex review feedback is advisory and is not an approval gate.
+- GitHub Codex review, when enabled, is advisory and is not an approval gate.
 - Require the `CI / test` status check.
 - Require branches to be up to date before merging.
 - Require conversation resolution before merging.
 - Disable merge commits and rebase merges; leave squash merging enabled.
 - Disable branch deletion and force pushes.
 
-The review process uses Codex feedback as an advisory part of the pull request
-conversation. Assess and address useful comments before merging; reviewer
-approval is not required. Keep the `CI / test` check, up-to-date branch
-requirement, and conversation-resolution requirement as the merge gates.
+The review process uses available GitHub Codex feedback as an advisory part of
+the pull request conversation. The reviewer is not always enabled. Assess and
+address useful comments before merging; reviewer approval is not required.
+Do not trigger a review manually or wait indefinitely for one. Keep the
+`CI / test` check, up-to-date branch requirement, and conversation-resolution
+requirement as the merge gates.
+If you decide not to take the reviewer's advice, resolve the corresponding
+review conversation anyway so it does not block merging.
 
 The deployment workflow expects these Actions secrets, preferably on a
 `production` environment with any required approval gate:
@@ -81,12 +90,14 @@ finds a difference. If that PR has not been merged yet, later runs merge the
 latest `main` into it and add a new content commit instead of opening
 duplicates. If the PR is merged, the next scheduled or manual run can create a
 new one.
-The PR receives the same CI checks as every other change. Codex review may
-provide feedback, but no reviewer approval is required. Once merged, the
-deployment workflow publishes the checked-in block
-document back to production. Since the sync workflow writes with
+The PR receives the same CI checks as every other change. The optional GitHub
+Codex reviewer may provide feedback, but it may not be enabled and no reviewer
+approval is required. Do not trigger a review manually or wait indefinitely;
+if no review arrives, proceed once the documented merge gates pass. Once
+merged, the deployment workflow publishes the checked-in block document back to
+production. Since the sync workflow writes with
 `GITHUB_TOKEN`, it explicitly dispatches the base-branch CI workflow from `main`
 with the PR number and head SHA; that workflow reports the required
 `CI / test` check on the PR commit. The workflow runs from `main` while it
-tests the PR's immutable merge commit. Codex review feedback can be addressed as
-part of the ordinary PR conversation; it does not create an approval gate.
+tests the PR's immutable merge commit. Address available GitHub Codex feedback
+as part of the ordinary PR conversation; it does not create an approval gate.

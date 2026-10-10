@@ -22,11 +22,16 @@ try {
 const useSharedLinuxVisuals = process.platform === 'linux'
   && isLoopbackTarget
   && localTarget.origin === worktreeRuntimeOrigin;
+const canRunLocalLinuxVisuals = useSharedLinuxVisuals || (
+  process.platform === 'darwin'
+  && isLoopbackTarget
+  && localTarget.origin === worktreeRuntimeOrigin
+);
 const helperFlags = new Set(['--visual-only', '--linux-visual-only', '--exclude-visual', '--update-snapshots']);
 const forwardedArgs = process.argv.slice(2).filter(argument => !helperFlags.has(argument));
 const playwrightArgs = visualOnly || linuxVisualOnly || updateSnapshots
   ? ['test', '--project=visual', ...(updateSnapshots ? ['--update-snapshots'] : []), ...forwardedArgs]
-  : ['test', ...(excludeVisual || useSharedLinuxVisuals ? ['--grep-invert', 'visual contract'] : []), ...forwardedArgs];
+  : ['test', ...(excludeVisual || useSharedLinuxVisuals ? ['--grep-invert=visual'] : []), ...forwardedArgs];
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -154,9 +159,12 @@ function runLinuxVisuals({ reset = true, skipForRemoteTarget = false, args = [] 
     '--env', 'USE_WORKTREE_RUNTIME=0',
     '--env', 'LOCAL_LINUX_QEMU=1',
     ...(process.env.CI ? ['--env', `CI=${process.env.CI}`] : []),
+    ...(process.platform === 'linux'
+      ? ['--env', `HOST_UID=${process.getuid()}`, '--env', `HOST_GID=${process.getgid()}`]
+      : []),
     localImage,
     'sh', '-lc',
-    `if [ ! -x node_modules/.bin/playwright ]; then npm ci; fi && npx playwright test --project=visual --workers=1${updateSnapshots ? ' --update-snapshots' : ''}${args.length ? ` ${args.map(shellQuote).join(' ')}` : ''}`,
+    `${process.platform === 'linux' ? `trap 'status=$?; for path in playwright-report test-results; do if [ -e "$path" ]; then chown -R "$HOST_UID:$HOST_GID" "$path" 2>/dev/null || true; fi; done; exit "$status"' EXIT; ` : ''}if [ ! -x node_modules/.bin/playwright ]; then npm ci; fi && npx playwright test --project=visual --workers=1${updateSnapshots ? ' --update-snapshots' : ''}${args.length ? ` ${args.map(shellQuote).join(' ')}` : ''}`,
   ];
   let status = updateWordPressUrl('http://wordpress');
   let restoreStatus = 0;
@@ -176,9 +184,32 @@ if (useSharedLinuxVisuals && (visualOnly || updateSnapshots)) {
   process.exit(runLinuxVisuals({ args: forwardedArgs }));
 }
 
-const nativeStatus = run('npx', ['playwright', ...playwrightArgs]);
+if (!visualOnly && !updateSnapshots && canRunLocalLinuxVisuals) {
+  // Run screenshots before browser tests mutate users, RSVPs, and forum
+  // content. The full reset here also gives the native suite its usual
+  // starting state, so Playwright's global setup can be skipped below.
+  const prepareStatus = run(process.execPath, [path.join(root, 'scripts/prepare-tests.mjs')]);
+  if (prepareStatus !== 0) process.exit(prepareStatus);
+
+  process.env.SKIP_PLAYWRIGHT_GLOBAL_SETUP = '1';
+  if (process.platform === 'darwin' && !useSharedLinuxVisuals) {
+    const nativeVisualStatus = run('npx', ['playwright', 'test', '--project=visual']);
+    if (nativeVisualStatus !== 0) process.exit(nativeVisualStatus);
+  }
+
+  const visualStatus = runLinuxVisuals({ reset: false, skipForRemoteTarget: true });
+  if (visualStatus !== 0) process.exit(visualStatus);
+}
+
+const nativeArgs = process.platform === 'darwin' && !visualOnly && !updateSnapshots && canRunLocalLinuxVisuals
+  ? [...playwrightArgs, '--grep-invert=visual']
+  : playwrightArgs;
+const nativeStatus = run('npx', ['playwright', ...nativeArgs]);
 if (nativeStatus !== 0) process.exit(nativeStatus);
 
-if (process.platform === 'darwin' || useSharedLinuxVisuals) {
+if (
+  (process.platform === 'darwin' || useSharedLinuxVisuals)
+  && (!canRunLocalLinuxVisuals || visualOnly || updateSnapshots)
+) {
   process.exit(runLinuxVisuals({ reset: !visualOnly && !updateSnapshots, skipForRemoteTarget: true }));
 }

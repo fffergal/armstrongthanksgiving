@@ -218,13 +218,31 @@ jobs:
         if: steps.change-scope.outputs.run_tests == 'true'
         run: npm ci
 
-      - name: Install Playwright browser
+      - name: Start WordPress and install Playwright browsers
         if: steps.change-scope.outputs.run_tests == 'true'
-        run: npx playwright install --with-deps chromium webkit
+        shell: bash
+        run: |
+          wp_log="$RUNNER_TEMP/wordpress-start.log"
+          started_at=$(date +%s)
+          npm run wp:start > "$wp_log" 2>&1 &
+          wp_pid=$!
 
-      - name: Start WordPress
-        if: steps.change-scope.outputs.run_tests == 'true'
-        run: npm run wp:start
+          if npx playwright install --with-deps chromium webkit; then
+            browser_status=0
+          else
+            browser_status=$?
+          fi
+
+          if wait "$wp_pid"; then
+            wp_status=0
+          else
+            wp_status=$?
+          fi
+          cat "$wp_log"
+          echo "WordPress startup and browser installation completed in $(( $(date +%s) - started_at )) seconds."
+
+          if [ "$browser_status" -ne 0 ]; then exit "$browser_status"; fi
+          exit "$wp_status"
 
       - name: Seed WordPress fixtures
         if: steps.change-scope.outputs.run_tests == 'true'
