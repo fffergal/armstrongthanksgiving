@@ -78,8 +78,8 @@ npm test
 ```
 
 `npm run wp:setup` is also the repair step if a local forum, topic, or page
-fixture is missing. The suite verifies the RSVP journey, account creation,
-food-count updates, sign-in draft restoration, responsive layouts,
+fixture is missing. The suite verifies the current RSVP journey, account
+creation, food-count updates, sign-in draft restoration, responsive layouts,
 accessibility, visuals, forums, albums, and 404 recovery. It does not prove
 delivery through the production SMTP service.
 
@@ -95,12 +95,19 @@ inviting the next person so every account can keep a distinct turkey.
 
 ## Required production checks
 
-The suite will grow with the site and cover account claiming, password/passwordless login, access control, forum posting and subscriptions, album creation/upload, responsive rendering, keyboard navigation, email delivery, direct media access, caching headers, and plugin-update compatibility.
+As the suite grows, production checks should cover account and access behavior,
+forum posting and subscriptions, album creation/upload, responsive rendering,
+keyboard navigation, RSVP handling, direct media access, caching headers, and
+plugin-update compatibility. Invitation claiming and roster-based adult-party
+assignments remain rollout checks; verify them after plan sections 1A and 1B
+are integrated. Routine sign-in is password-based, with WordPress password
+recovery for forgotten passwords.
 
 See [plugin evaluation](docs/plugin-evaluation.md) for the theming and acceptance gates.
 
-See [email and friend onboarding](docs/email-onboarding.md) for the production mail settings,
-invite flow, deliverability follow-up, and the evidence needed to confirm a real invitation.
+See [email and friend onboarding](docs/email-onboarding.md) for the specified
+invitation/password flow, party RSVP rules, legacy reconciliation, production
+mail procedure, and current rollout status.
 
 ## Production updates
 
@@ -148,5 +155,8 @@ Do not edit the theme through the online Theme File Editor.
 
 The **Gathering RSVPs** admin page includes **Send a sample confirmation**. It
 sends the normal RSVP confirmation through WordPress mail without creating or
-changing an RSVP, which is useful for proofing the rendered message. A
-successful WordPress handoff still needs to be checked in the recipient inbox.
+changing an RSVP. This sends a real email and should only be used when that
+send has been requested. A successful WordPress handoff still needs to be
+checked in the recipient inbox. The invitation and party workflow described in
+[email and friend onboarding](docs/email-onboarding.md) is not live until
+sections 1A and 1B have been integrated and verified.
