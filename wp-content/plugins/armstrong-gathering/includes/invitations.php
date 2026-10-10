@@ -1,115 +1,276 @@
 <?php
-function at_gathering_signup_form_values() {
-	$token = sanitize_key( wp_unslash( $_GET['at_signup_form'] ?? '' ) );
-	if ( ! $token ) {
-		return array();
-	}
-	$values = get_transient( 'at_gathering_signup_' . $token );
-	delete_transient( 'at_gathering_signup_' . $token );
-	return is_array( $values ) ? $values : array();
+/** Return the public invitation form destination. */
+function at_gathering_invitation_url( $token = '' ) {
+	$url = home_url( '/signup/' );
+	return $token ? add_query_arg( 'at_setup', rawurlencode( $token ), $url ) : $url;
 }
 
-function at_gathering_signup_redirect_error( $return, $message, $values = array() ) {
-	$args = array( 'at_signup' => 'error', 'at_message' => $message );
-	if ( $values ) {
-		$token = strtolower( wp_generate_password( 20, false, false ) );
-		set_transient( 'at_gathering_signup_' . $token, $values, 10 * MINUTE_IN_SECONDS );
-		$args['at_signup_form'] = $token;
+/** Store only a one-way digest of each setup token. */
+function at_gathering_create_setup_token() {
+	try {
+		return bin2hex( random_bytes( 32 ) );
+	} catch ( Throwable $error ) {
+		return '';
 	}
-	wp_safe_redirect( add_query_arg( $args, $return ) );
-	exit;
+}
+
+/**
+ * Rotate an invited guest's setup token and send the link.
+ * This is also the shared entry point for RSVP account-claim handoffs.
+ * Public callers must always return the same generic response.
+ */
+function at_gathering_send_claim_link( $email ) {
+	global $wpdb;
+	$email = at_gathering_normalize_email( $email );
+	if ( ! is_email( $email ) ) {
+		return false;
+	}
+	$guest = at_gathering_roster_guest_by_email( $email );
+	if ( ! $guest || ! empty( $guest->user_id ) ) {
+		return false;
+	}
+	$token = at_gathering_create_setup_token();
+	if ( ! $token ) {
+		return false;
+	}
+	$now = current_time( 'mysql', true );
+	$expires = gmdate( 'Y-m-d H:i:s', time() + 2 * DAY_IN_SECONDS );
+	$result = at_gathering_transaction(
+		static function () use ( $wpdb, $guest, $token, $now, $expires ) {
+			$table = at_gathering_roster_table();
+			$updated = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET token_hash = %s, token_expires = %s, invited_at = %s, updated_at = %s WHERE id = %d AND user_id IS NULL AND claim_state = %s", hash( 'sha256', $token ), $expires, $now, $now, (int) $guest->id, 'invited' ) );
+			return 1 === $updated ? true : new WP_Error( 'at_invitation_unavailable', 'This invitation is not available.' );
+		}
+	);
+	if ( is_wp_error( $result ) ) {
+		return false;
+	}
+	$url = at_gathering_invitation_url( $token );
+	$message = '<p>You have been invited to join the Armstrong Thanksgiving gathering site.</p><p><a href="' . esc_url( $url ) . '">Set up your account</a>. This link expires in two days and can be used once.</p>';
+	return (bool) wp_mail( $email, 'Set up your Armstrong Thanksgiving account', $message, array( 'Content-Type: text/html; charset=UTF-8' ) );
+}
+
+/**
+ * Claim a setup token. The roster row lock and token consumption are in the
+ * same database transaction as creating or linking the WordPress account.
+ * Existing users retain their password, display name, and capabilities.
+ * Returns a WP_User or WP_Error; it does not sign the account in.
+ */
+function at_gathering_claim_guest( $token, $display_name, $password = '', $password_confirm = '' ) {
+	global $wpdb;
+	$token = trim( (string) $token );
+	$display_name = sanitize_text_field( (string) $display_name );
+	if ( ! preg_match( '/\A[a-f0-9]{64}\z/', $token ) ) {
+		return new WP_Error( 'at_claim_invalid', 'This setup link is invalid or expired.' );
+	}
+	$token_hash = hash( 'sha256', $token );
+	$guest = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . at_gathering_roster_table() . ' WHERE token_hash = %s LIMIT 1', $token_hash ) );
+	if ( ! $guest || ! $guest->token_expires || strtotime( $guest->token_expires . ' UTC' ) < time() || 'invited' !== $guest->claim_state || ! $display_name ) {
+		return new WP_Error( 'at_claim_invalid', 'This setup link is invalid or expired.' );
+	}
+	$existing = get_user_by( 'email', $guest->email_normalized );
+	if ( ! $existing && ( strlen( $password ) < 10 || $password !== $password_confirm ) ) {
+		return new WP_Error( 'at_claim_password_invalid', 'Choose a password of at least 10 characters and enter it twice.' );
+	}
+	if ( $existing && (int) $guest->user_id && (int) $guest->user_id !== (int) $existing->ID ) {
+		return new WP_Error( 'at_claim_conflict', 'This invitation needs host review.' );
+	}
+	$user_id = at_gathering_transaction(
+		static function () use ( $wpdb, $guest, $token_hash, $display_name, $password, $existing ) {
+			$locked = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . at_gathering_roster_table() . ' WHERE id = %d FOR UPDATE', (int) $guest->id ) );
+			if ( ! $locked || ! hash_equals( (string) $locked->token_hash, $token_hash ) || ! $locked->token_expires || strtotime( $locked->token_expires . ' UTC' ) < time() || 'invited' !== $locked->claim_state || ! empty( $locked->user_id ) ) {
+				return new WP_Error( 'at_claim_invalid', 'This setup link is invalid or expired.' );
+			}
+			// Re-read while holding the roster lock so a concurrent legacy account
+			// creation cannot turn a verified claim into a duplicate account.
+			$existing_user = get_user_by( 'email', $locked->email_normalized );
+			$linked_guest = at_gathering_roster_guest_by_user( $existing_user ? $existing_user->ID : 0 );
+			if ( $existing_user && $linked_guest && (int) $linked_guest->id !== (int) $locked->id ) {
+				return new WP_Error( 'at_claim_conflict', 'This invitation needs host review.' );
+			}
+			if ( $existing_user ) {
+				$account_id = (int) $existing_user->ID;
+			} else {
+				$account_id = wp_insert_user(
+					array(
+						'user_login'   => at_gathering_unique_login( $locked->email_normalized ),
+						'user_pass'    => $password,
+						'user_email'   => $locked->email_normalized,
+						'display_name' => $display_name,
+						'role'         => 'subscriber',
+					)
+				);
+				if ( is_wp_error( $account_id ) ) {
+					return new WP_Error( 'at_claim_create_failed', 'The account could not be created.' );
+				}
+				if ( function_exists( 'bbp_set_user_role' ) && function_exists( 'bbp_get_participant_role' ) ) {
+					bbp_set_user_role( $account_id, bbp_get_participant_role() );
+				}
+			}
+			$now = current_time( 'mysql', true );
+			$guest_update = array( 'user_id' => (int) $account_id, 'claim_state' => 'claimed', 'token_hash' => '', 'token_expires' => null, 'claimed_at' => $now, 'updated_at' => $now );
+			$guest_formats = array( '%d', '%s', '%s', '%s', '%s', '%s' );
+			if ( ! $existing_user ) {
+				$guest_update['display_name'] = $display_name;
+				$guest_formats[] = '%s';
+			}
+			$updated = $wpdb->update(
+				at_gathering_roster_table(),
+				$guest_update,
+				array( 'id' => (int) $locked->id, 'token_hash' => $token_hash, 'claim_state' => 'invited' ),
+				$guest_formats,
+				array( '%d', '%s', '%s' )
+			);
+			if ( 1 !== $updated ) {
+				return new WP_Error( 'at_claim_invalid', 'This setup link is invalid or expired.' );
+			}
+			return (int) $account_id;
+		}
+	);
+	if ( is_wp_error( $user_id ) ) {
+		return $user_id;
+	}
+	return get_user_by( 'id', $user_id );
+}
+
+function at_gathering_invitation_rate_limited( $email ) {
+	$ip = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? 'unknown' ) );
+	$email_key = 'at_invite_rate_email_' . hash( 'sha256', at_gathering_normalize_email( $email ) );
+	$ip_key = 'at_invite_rate_ip_' . hash( 'sha256', $ip );
+	$email_count = (int) get_transient( $email_key );
+	$ip_count = (int) get_transient( $ip_key );
+	set_transient( $email_key, $email_count + 1, HOUR_IN_SECONDS );
+	set_transient( $ip_key, $ip_count + 1, HOUR_IN_SECONDS );
+	return $email_count >= 3 || $ip_count >= 20;
 }
 
 function at_gathering_signup_shortcode() {
-	$user   = wp_get_current_user();
-	$values = at_gathering_signup_form_values();
-	$saved  = isset( $_GET['at_signup'] ) && 'saved' === sanitize_key( $_GET['at_signup'] );
-
+	$token = sanitize_text_field( wp_unslash( $_GET['at_setup'] ?? '' ) );
+	$guest = '' !== $token && preg_match( '/\A[a-f0-9]{64}\z/', $token )
+		? $GLOBALS['wpdb']->get_row( $GLOBALS['wpdb']->prepare( 'SELECT * FROM ' . at_gathering_roster_table() . ' WHERE token_hash = %s AND claim_state = %s AND token_expires > %s LIMIT 1', hash( 'sha256', $token ), 'invited', current_time( 'mysql', true ) ) )
+		: null;
+	$existing = $guest ? get_user_by( 'email', $guest->email_normalized ) : false;
+	$notice = sanitize_key( wp_unslash( $_GET['at_setup_result'] ?? '' ) );
 	ob_start();
 	?>
 	<div class="at-signup-app">
-		<?php if ( $saved ) : ?>
-			<div class="at-success" role="status"><strong>You’re signed up.</strong><br>You can now visit the <a href="<?php echo esc_url( home_url( '/forum/' ) ); ?>">gathering forum</a> and <a href="<?php echo esc_url( home_url( '/albums/' ) ); ?>">shared photos</a>. If you’re coming to dinner, you can <a href="<?php echo esc_url( home_url( '/rsvp/' ) ); ?>">RSVP separately</a>.</div>
-		<?php elseif ( $user->exists() ) : ?>
-			<div class="at-success" role="status"><strong>You’re already signed up.</strong><br>Visit the <a href="<?php echo esc_url( home_url( '/forum/' ) ); ?>">gathering forum</a> or <a href="<?php echo esc_url( home_url( '/albums/' ) ); ?>">shared photos</a>, or <a href="<?php echo esc_url( home_url( '/rsvp/' ) ); ?>">add an RSVP</a> if you’re coming.</div>
-		<?php elseif ( isset( $_GET['at_signup'] ) && 'error' === sanitize_key( $_GET['at_signup'] ) ) : ?>
-			<div class="at-success at-error" role="alert"><strong>We could not create that account.</strong><br><?php echo esc_html( sanitize_text_field( wp_unslash( $_GET['at_message'] ?? 'Please check the form and try again.' ) ) ); ?></div>
-		<?php endif; ?>
-		<?php if ( ! $user->exists() && ! $saved ) : ?>
+		<?php if ( 'requested' === $notice ) : ?>
+			<div class="at-success" role="status">If an invitation can be set up for that address, we’ll email a link shortly. Check your inbox.</div>
+		<?php elseif ( 'claimed' === $notice ) : ?>
+			<div class="at-success" role="status"><strong>Your account is ready.</strong><br><a href="<?php echo esc_url( wp_login_url() ); ?>">Sign in with your password</a> to visit the gathering site.</div>
+		<?php elseif ( $guest ) : ?>
+			<?php if ( 'error' === $notice ) : ?><div class="at-success at-error" role="alert">We could not finish setting up your account. Check the details and try again.</div><?php endif; ?>
 			<form class="at-signup-form at-rsvp-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post">
-				<div class="at-rsvp-intro">
-					<h2>Create your account</h2>
-					<p>Sign up to use the gathering forum and shared photos before, during, or after Thanksgiving.</p>
-				</div>
-				<input type="hidden" name="action" value="at_signup">
-				<input type="hidden" name="at_return_url" value="<?php echo esc_url( get_permalink() ); ?>">
-				<?php wp_nonce_field( 'at_signup', 'at_signup_nonce' ); ?>
+				<div class="at-rsvp-intro"><h2>Set up your account</h2><p>Choose a password for your gathering account.</p></div>
+				<input type="hidden" name="action" value="at_claim_invitation"><input type="hidden" name="at_setup_token" value="<?php echo esc_attr( $token ); ?>">
+				<?php wp_nonce_field( 'at_claim_invitation_' . hash( 'sha256', $token ), 'at_claim_nonce' ); ?>
+				<fieldset class="at-account-fields"><legend>Your details</legend><div class="at-rsvp-grid">
+					<label>Display name<input type="text" name="at_display_name" value="<?php echo esc_attr( $guest->display_name ); ?>" autocomplete="name" required></label>
+					<?php if ( $existing ) : ?><p>This address already has an account. Claiming the invitation will link it without changing its password. <a href="<?php echo esc_url( wp_login_url() ); ?>">Use your existing password to sign in</a>.</p>
+					<?php else : ?><label>Password<input type="password" name="at_password" autocomplete="new-password" minlength="10" required></label><label>Confirm password<input type="password" name="at_password_confirm" autocomplete="new-password" minlength="10" required></label><?php endif; ?>
+				</div></fieldset><p class="at-form-actions"><button class="at-button" type="submit">Set up account</button></p>
+			</form>
+		<?php else : ?>
+			<?php if ( 'error' === $notice ) : ?><div class="at-success at-error" role="alert">That setup link is unavailable. Request a new link if you have an invitation.</div><?php endif; ?>
+			<form class="at-signup-form at-rsvp-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post">
+				<div class="at-rsvp-intro"><h2>Set up your gathering account</h2><p>Enter your email address and we’ll send a setup link if an invitation is available.</p></div>
+				<input type="hidden" name="action" value="at_request_invitation"><input type="hidden" name="at_return_url" value="<?php echo esc_url( home_url( '/signup/' ) ); ?>"><?php wp_nonce_field( 'at_request_invitation', 'at_request_nonce' ); ?>
 				<p class="at-form-login-note">Already have an account? <a href="<?php echo esc_url( wp_login_url( get_permalink() ) ); ?>">Sign in</a>.</p>
-				<fieldset class="at-account-fields">
-					<legend>Your details</legend>
-					<div class="at-rsvp-grid">
-						<label>Display name<input type="text" name="at_display_name" value="<?php echo esc_attr( $values['display_name'] ?? '' ); ?>" autocomplete="name" required></label>
-						<label>Email<input type="email" name="at_email" value="<?php echo esc_attr( $values['email'] ?? '' ); ?>" autocomplete="email" required></label>
-						<label>Password<input type="password" name="at_password" autocomplete="new-password" minlength="10" required></label>
-						<label>Confirm password<input type="password" name="at_password_confirm" autocomplete="new-password" minlength="10" required></label>
-					</div>
-				</fieldset>
-				<p class="at-form-actions"><button class="at-button" type="submit">Sign up</button></p>
+				<label>Email<input type="email" name="at_email" autocomplete="email" required></label><p class="at-form-actions"><button class="at-button" type="submit">Request setup link</button></p>
 			</form>
 		<?php endif; ?>
 	</div>
 	<?php
 	return ob_get_clean();
 }
-function at_gathering_signup() {
-	if ( ! isset( $_POST['at_signup_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['at_signup_nonce'] ) ), 'at_signup' ) ) {
-		wp_die( 'Sorry, we could not create that account.' );
-	}
-	$return = esc_url_raw( wp_unslash( $_POST['at_return_url'] ?? home_url( '/signup/' ) ) );
-	if ( is_user_logged_in() ) {
-		wp_safe_redirect( $return );
-		exit;
-	}
 
-	$name             = sanitize_text_field( wp_unslash( $_POST['at_display_name'] ?? '' ) );
-	$email            = sanitize_email( wp_unslash( $_POST['at_email'] ?? '' ) );
-	$password         = (string) wp_unslash( $_POST['at_password'] ?? '' );
-	$password_confirm = (string) wp_unslash( $_POST['at_password_confirm'] ?? '' );
-	$form_values      = array( 'display_name' => $name, 'email' => $email );
-	if ( ! $name || ! is_email( $email ) || strlen( $password ) < 10 || $password !== $password_confirm ) {
-		at_gathering_signup_redirect_error( $return, 'Please complete your account details. Passwords need at least 10 characters and must match.', $form_values );
+function at_gathering_request_invitation() {
+	if ( ! isset( $_POST['at_request_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['at_request_nonce'] ) ), 'at_request_invitation' ) ) {
+		wp_die( 'Sorry, we could not process that request.' );
 	}
-	if ( email_exists( $email ) ) {
-		at_gathering_signup_redirect_error( $return, 'There is already an account for that email. Please sign in instead.', $form_values );
+	$email = sanitize_email( wp_unslash( $_POST['at_email'] ?? '' ) );
+	if ( ! at_gathering_invitation_rate_limited( $email ) ) {
+		at_gathering_send_claim_link( $email );
 	}
-
-	$username = at_gathering_unique_login( $email );
-	$user_id  = wp_insert_user( array( 'user_login' => $username, 'user_pass' => $password, 'user_email' => $email, 'display_name' => $name, 'role' => 'subscriber' ) );
-	if ( is_wp_error( $user_id ) ) {
-		at_gathering_signup_redirect_error( $return, $user_id->get_error_message(), $form_values );
-	}
-	if ( function_exists( 'bbp_set_user_role' ) && function_exists( 'bbp_get_participant_role' ) ) {
-		bbp_set_user_role( $user_id, bbp_get_participant_role() );
-	}
-	wp_set_current_user( $user_id );
-	wp_set_auth_cookie( $user_id, true );
-	wp_safe_redirect( add_query_arg( 'at_signup', 'saved', $return ) );
+	wp_safe_redirect( add_query_arg( 'at_setup_result', 'requested', home_url( '/signup/' ) ) );
 	exit;
 }
 
-function at_gathering_rotate_invite() {
-	if ( ! current_user_can( 'manage_options' ) || ! isset( $_POST['at_invite_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['at_invite_nonce'] ) ), 'at_rotate_invite' ) ) {
-		wp_die( 'Sorry, the invite link could not be replaced.' );
+function at_gathering_claim_invitation_post() {
+	$token = sanitize_text_field( wp_unslash( $_POST['at_setup_token'] ?? '' ) );
+	$nonce = sanitize_text_field( wp_unslash( $_POST['at_claim_nonce'] ?? '' ) );
+	if ( ! $token || ! wp_verify_nonce( $nonce, 'at_claim_invitation_' . hash( 'sha256', $token ) ) ) {
+		wp_safe_redirect( add_query_arg( 'at_setup_result', 'error', home_url( '/signup/' ) ) );
+		exit;
 	}
-	update_option( 'at_gathering_invite_key', wp_generate_password( 32, false, false ) );
-	wp_safe_redirect( admin_url( 'admin.php?page=at-gathering' ) );
+	$user = at_gathering_claim_guest( $token, wp_unslash( $_POST['at_display_name'] ?? '' ), wp_unslash( $_POST['at_password'] ?? '' ), wp_unslash( $_POST['at_password_confirm'] ?? '' ) );
+	if ( is_wp_error( $user ) ) {
+		wp_safe_redirect( add_query_arg( array( 'at_setup' => rawurlencode( $token ), 'at_setup_result' => 'error' ), home_url( '/signup/' ) ) );
+		exit;
+	}
+	wp_safe_redirect( add_query_arg( 'at_setup_result', 'claimed', home_url( '/signup/' ) ) );
+	exit;
+}
+
+function at_gathering_save_invitation() {
+	if ( ! current_user_can( 'manage_options' ) || ! isset( $_POST['at_invitation_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['at_invitation_nonce'] ) ), 'at_save_invitation' ) ) {
+		wp_die( 'Sorry, the invitation could not be saved.' );
+	}
+	$name = sanitize_text_field( wp_unslash( $_POST['at_invitation_name'] ?? '' ) );
+	$email = at_gathering_normalize_email( wp_unslash( $_POST['at_invitation_email'] ?? '' ) );
+	if ( ! $name || ! is_email( $email ) ) {
+		wp_safe_redirect( add_query_arg( 'at_invitation', 'invalid', admin_url( 'admin.php?page=at-gathering' ) ) );
+		exit;
+	}
+	global $wpdb;
+	$guest = at_gathering_roster_guest_by_email( $email );
+	if ( $guest && 'claimed' === $guest->claim_state ) {
+		wp_safe_redirect( add_query_arg( 'at_invitation', 'claimed', admin_url( 'admin.php?page=at-gathering' ) ) );
+		exit;
+	}
+	if ( $guest ) {
+		$wpdb->update( at_gathering_roster_table(), array( 'display_name' => $name, 'updated_at' => current_time( 'mysql', true ) ), array( 'id' => (int) $guest->id ) );
+	} else {
+		$now = current_time( 'mysql', true );
+		$wpdb->insert( at_gathering_roster_table(), array( 'email_normalized' => $email, 'display_name' => $name, 'claim_state' => 'invited', 'created_at' => $now, 'updated_at' => $now ), array( '%s', '%s', '%s', '%s', '%s' ) );
+	}
+	$sent = at_gathering_send_claim_link( $email );
+	wp_safe_redirect( add_query_arg( 'at_invitation', $sent ? 'sent' : 'failed', admin_url( 'admin.php?page=at-gathering' ) ) );
+	exit;
+}
+
+function at_gathering_invitation_admin_section() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
+	global $wpdb;
+	$guests = $wpdb->get_results( 'SELECT id, display_name, email_normalized, claim_state, invited_at, token_expires FROM ' . at_gathering_roster_table() . ' ORDER BY display_name ASC, id ASC' );
+	?>
+	<hr><h2>Guest invitations</h2>
+	<?php if ( isset( $_GET['at_invitation'] ) ) : ?><div class="notice notice-info"><p><?php echo esc_html( array( 'sent' => 'Invitation link sent.', 'failed' => 'Invitation saved, but its email could not be sent.', 'claimed' => 'That invitation has already been claimed.', 'invalid' => 'Enter a name and valid email address.' )[ sanitize_key( wp_unslash( $_GET['at_invitation'] ) ) ] ?? 'Invitation updated.' ); ?></p></div><?php endif; ?>
+	<form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?>
+		<p><label>Name <input type="text" name="at_invitation_name" required></label> <label>Email <input type="email" name="at_invitation_email" required></label> <button class="button button-primary" type="submit">Save and send invitation</button></p>
+	</form>
+	<table class="widefat striped"><thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Invitation</th><th>Action</th></tr></thead><tbody>
+	<?php if ( ! $guests ) : ?><tr><td colspan="5">No invited guests yet.</td></tr><?php else : foreach ( $guests as $guest ) : ?><tr><td><?php echo esc_html( $guest->display_name ); ?></td><td><?php echo esc_html( $guest->email_normalized ); ?></td><td><?php echo esc_html( $guest->claim_state ); ?></td><td><?php echo esc_html( $guest->invited_at ?: 'Not sent' ); ?></td><td><?php if ( 'invited' === $guest->claim_state ) : ?><form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><input type="hidden" name="at_invitation_name" value="<?php echo esc_attr( $guest->display_name ); ?>"><input type="hidden" name="at_invitation_email" value="<?php echo esc_attr( $guest->email_normalized ); ?>"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?><button class="button" type="submit">Resend</button></form><?php endif; ?></td></tr><?php endforeach; endif; ?>
+	</tbody></table>
+	<?php
+}
+
+function at_gathering_reject_legacy_signup() {
+	wp_safe_redirect( add_query_arg( 'at_setup_result', 'error', home_url( '/signup/' ) ) );
 	exit;
 }
 
 function at_gathering_register_invitations() {
 	add_shortcode( 'at_signup', 'at_gathering_signup_shortcode' );
-	add_action( 'admin_post_at_signup', 'at_gathering_signup' );
-	add_action( 'admin_post_nopriv_at_signup', 'at_gathering_signup' );
-	add_action( 'admin_post_at_rotate_invite', 'at_gathering_rotate_invite' );
+	add_action( 'admin_post_at_signup', 'at_gathering_reject_legacy_signup' );
+	add_action( 'admin_post_nopriv_at_signup', 'at_gathering_reject_legacy_signup' );
+	add_action( 'admin_post_at_request_invitation', 'at_gathering_request_invitation' );
+	add_action( 'admin_post_nopriv_at_request_invitation', 'at_gathering_request_invitation' );
+	add_action( 'admin_post_at_claim_invitation', 'at_gathering_claim_invitation_post' );
+	add_action( 'admin_post_nopriv_at_claim_invitation', 'at_gathering_claim_invitation_post' );
+	add_action( 'admin_post_at_save_invitation', 'at_gathering_save_invitation' );
+	add_action( 'at_gathering_admin_page_sections', 'at_gathering_invitation_admin_section' );
 }
 add_action( 'at_gathering_register_invitations', 'at_gathering_register_invitations' );
