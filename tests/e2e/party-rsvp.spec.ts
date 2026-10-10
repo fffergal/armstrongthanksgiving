@@ -40,6 +40,27 @@ test.describe('party RSVP assignments', () => {
     expect(await response.text()).not.toContain('Private roster choice');
   });
 
+  test('anonymous RSVP drafts go to invitation setup and survive the setup-link request', async ({ page }) => {
+    runWpEval("global $wpdb; $now = current_time('mysql'); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => 'guest@example.test')); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => 'guest@example.test', 'display_name' => 'RSVP owner', 'claim_state' => 'invited', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
+    await page.goto('/rsvp/');
+    await page.getByLabel('Children (ages 0–17)').selectOption('2');
+    await page.getByRole('button', { name: 'Save my RSVP' }).click();
+    await page.waitForURL(/\/signup\/\?at_rsvp_draft=[a-z0-9]+/);
+    const draft = new URL(page.url()).searchParams.get('at_rsvp_draft');
+    expect(draft).toMatch(/^[a-z0-9]+$/);
+    await expect(page.getByLabel('Email')).toBeVisible();
+    await expect(page.locator('input[name="at_rsvp_draft"]')).toHaveValue(draft!);
+    await page.getByLabel('Email').fill('guest@example.test');
+    await page.getByRole('button', { name: 'Request setup link' }).click();
+    await expect(page).toHaveURL(/\/signup\/\?at_setup_result=requested/);
+    await expect(page.getByRole('status')).toContainText('we’ll email a link shortly');
+    const capturedMail = JSON.parse(runWpEval('echo wp_json_encode(get_transient("at_gathering_last_test_mail"));')) as { to: string; message: string };
+    expect(capturedMail.to).toBe('guest@example.test');
+    expect(capturedMail.message).toContain(`at_rsvp_draft=${draft}`);
+    await page.goto(`/rsvp/?at_rsvp_draft=${draft}`);
+    await expect(page.getByLabel('Children (ages 0–17)')).toHaveValue('2');
+  });
+
   test('only claimed guests receive roster choices and the owner is reserved with the party', async ({ page }) => {
     runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $other = get_user_by('login', 'admin'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); foreach (array(array($owner, 'RSVP owner'), array($other, 'Party friend')) as $entry) { $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $entry[0]->user_email, 'display_name' => $entry[1], 'user_id' => $entry[0]->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); } update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
     await logIn(page);

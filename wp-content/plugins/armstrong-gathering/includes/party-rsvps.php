@@ -444,7 +444,7 @@ function at_gathering_save_rsvp() {
 				home_url( '/signup/' )
 			);
 		}
-		wp_safe_redirect( $user->exists() ? $claim_url : wp_login_url( $claim_url ) );
+		wp_safe_redirect( $claim_url );
 		exit;
 	}
 	if ( ! at_gathering_party_choices_authorized() ) {
