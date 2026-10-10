@@ -62,6 +62,14 @@ different interface states, include the images needed to show those states. If
 the feature has no visible interface, or the local site cannot be brought up,
 explain that in the completion message.
 
+## Tests for new functionality
+
+New functionality must include automated tests that cover its expected behavior.
+Extend the relevant existing tests or add focused tests alongside the change,
+then run the appropriate test suite and fix failures before considering the work
+complete. If a behavior cannot be tested automatically, document why and verify
+it with the most relevant available check.
+
 ## Sandbox troubleshooting
 
 When Docker commands, internal browser automation, or the `gh` CLI fail,
