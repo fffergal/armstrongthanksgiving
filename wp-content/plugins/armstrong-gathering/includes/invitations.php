@@ -312,8 +312,9 @@ function at_gathering_save_invitation() {
 	$mode = sanitize_key( wp_unslash( $_POST['at_invitation_mode'] ?? 'save' ) );
 	if ( 'delete' === $mode ) {
 		$guest_id = absint( $_POST['at_invitation_id'] ?? 0 );
-		$deleted = $guest_id && at_gathering_delete_pending_invitation( $guest_id );
-		wp_safe_redirect( add_query_arg( 'at_invitation', $deleted ? 'deleted' : 'claimed', admin_url( 'admin.php?page=at-gathering' ) ) );
+		$result = $guest_id ? at_gathering_delete_pending_invitation( $guest_id ) : false;
+		$notice = true === $result ? 'deleted' : ( is_wp_error( $result ) ? 'delete_failed' : 'claimed' );
+		wp_safe_redirect( add_query_arg( 'at_invitation', $notice, admin_url( 'admin.php?page=at-gathering' ) ) );
 		exit;
 	}
 	if ( 'send_all' === $mode ) {
@@ -435,7 +436,7 @@ function at_gathering_invitation_admin_section() {
 	}
 	?>
 	<hr><h2>Guest invitations</h2>
-	<?php if ( isset( $_GET['at_invitation'] ) ) : $notice = sanitize_key( wp_unslash( $_GET['at_invitation'] ) ); ?><div class="notice notice-info"><p><?php echo esc_html( array( 'sent' => 'Invitation link sent.', 'failed' => 'Invitation saved, but its email could not be sent.', 'saved' => 'Guest added to the invite list. No email was sent.', 'deleted' => 'Pending invitation deleted.', 'claimed' => 'That invitation has already been claimed or is no longer available.', 'invalid' => 'Enter a name and valid email address. Sending needs a name; add one to the invite list first.', 'bulk_added' => sprintf( '%d guests added. %d lines skipped. No emails were sent.', absint( $_GET['at_added_count'] ?? 0 ), absint( $_GET['at_skipped_count'] ?? 0 ) ), 'all_sent' => sprintf( 'Invitation emails sent to %1$d of %2$d guests who have not signed up.', absint( $_GET['at_sent_count'] ?? 0 ), absint( $_GET['at_total_count'] ?? 0 ) ) )[ $notice ] ?? 'Invitation updated.' ); ?></p></div><?php endif; ?>
+	<?php if ( isset( $_GET['at_invitation'] ) ) : $notice = sanitize_key( wp_unslash( $_GET['at_invitation'] ) ); ?><div class="notice notice-info"><p><?php echo esc_html( array( 'sent' => 'Invitation link sent.', 'failed' => 'Invitation saved, but its email could not be sent.', 'saved' => 'Guest added to the invite list. No email was sent.', 'deleted' => 'Pending invitation deleted.', 'delete_failed' => 'The pending invitation could not be deleted. Please try again.', 'claimed' => 'That invitation has already been claimed or is no longer available.', 'invalid' => 'Enter a name and valid email address. Sending needs a name; add one to the invite list first.', 'bulk_added' => sprintf( '%d guests added. %d lines skipped. No emails were sent.', absint( $_GET['at_added_count'] ?? 0 ), absint( $_GET['at_skipped_count'] ?? 0 ) ), 'all_sent' => sprintf( 'Invitation emails sent to %1$d of %2$d guests who have not signed up.', absint( $_GET['at_sent_count'] ?? 0 ), absint( $_GET['at_total_count'] ?? 0 ) ) )[ $notice ] ?? 'Invitation updated.' ); ?></p></div><?php endif; ?>
 	<form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><input type="hidden" name="at_invitation_mode" value="save"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?>
 		<p><label>Name (optional) <input type="text" name="at_invitation_name"></label> <label>Email <input type="email" name="at_invitation_email" required></label> <button class="button button-primary" type="submit">Add to invite list</button></p>
 	</form>
