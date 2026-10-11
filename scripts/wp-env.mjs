@@ -4,44 +4,27 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { withWorktreeMappings } from './wp-env-config.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const worktreeId = crypto.createHash('sha256').update(root).digest('hex').slice(0, 10);
 const sourceTheme = path.join(root, 'wp-content/themes/armstrong-thanksgiving');
 const sourceGatheringPlugin = path.join(root, 'wp-content/plugins/armstrong-gathering');
 const sourceMuPlugins = path.join(root, 'wp-content/mu-plugins');
-// Docker Desktop shares /private/tmp by default on macOS, while the system
-// temporary directory can resolve into a per-user /var/folders path that is
-// not exposed to the VM. Keep the stage in the shared temporary area.
 const stagingBase = process.platform === 'darwin' ? '/private/tmp' : os.tmpdir();
 const stagingRoot = path.join(stagingBase, `armstrong-thanksgiving-wp-env-${worktreeId}`);
-const stagedTheme = path.join(stagingRoot, 'armstrong-thanksgiving');
-const stagedGatheringPlugin = path.join(stagingRoot, 'armstrong-gathering');
-const stagedMuPlugins = path.join(stagingRoot, 'mu-plugins');
 const stagedConfig = path.join(stagingRoot, 'wp-env.json');
 const runtimeDirectory = path.join(root, '.worktree');
 const runtimeFile = path.join(runtimeDirectory, 'runtime.json');
 const command = process.argv.slice(2);
 
 await fs.mkdir(stagingRoot, { recursive: true });
-if (command[0] === 'start' || !(await fs.stat(stagedTheme).catch(() => false))) {
-  await fs.rm(stagedTheme, { recursive: true, force: true });
-  await fs.cp(sourceTheme, stagedTheme, { recursive: true });
-}
-if (command[0] === 'start' || !(await fs.stat(stagedGatheringPlugin).catch(() => false))) {
-  await fs.rm(stagedGatheringPlugin, { recursive: true, force: true });
-  await fs.cp(sourceGatheringPlugin, stagedGatheringPlugin, { recursive: true });
-}
-if (command[0] === 'start' || !(await fs.stat(stagedMuPlugins).catch(() => false))) {
-  await fs.rm(stagedMuPlugins, { recursive: true, force: true });
-  await fs.cp(sourceMuPlugins, stagedMuPlugins, { recursive: true });
-}
 
 const config = JSON.parse(await fs.readFile(path.join(root, '.wp-env.json'), 'utf8'));
-config.autoPort = true;
-// The WordPress image initialiser can clear child bind mounts under
-// /var/www/html. Start wp-env with its normal core mount, then copy our
-// project files into that mount once the containers are ready.
+// Mount project code directly from this worktree so edits are reflected in
+// WordPress immediately without a container restart or a post-start copy.
+const mappedConfig = withWorktreeMappings(config, root);
+mappedConfig.autoPort = true;
 const remotePlugins = config.plugins ?? [];
 const pluginSlugs = remotePlugins
   .map(value => String(value).split('/').pop()?.replace(/\.zip$/, ''))
@@ -62,14 +45,13 @@ for (const slug of pluginSlugs) {
   }
   if (found) cachedPlugins.push({ slug, source: found });
 }
-config.themes = [];
+mappedConfig.themes = [];
 // Cached plugin archives make local worktrees deterministic, but a fresh CI
 // runner has no ~/.wp-env cache yet. Let wp-env install the community plugins
 // on that first run; subsequent starts use the cached-copy path below.
 const pluginsAreCached = cachedPlugins.length === pluginSlugs.length;
-config.plugins = pluginsAreCached ? [] : remotePlugins;
-config.mappings = {};
-await fs.writeFile(stagedConfig, `${JSON.stringify(config, null, 2)}\n`);
+mappedConfig.plugins = pluginsAreCached ? [] : remotePlugins;
+await fs.writeFile(stagedConfig, `${JSON.stringify(mappedConfig, null, 2)}\n`);
 
 async function hasGeneratedEnvironment() {
   const cacheDirectory = path.join(os.homedir(), '.wp-env');
@@ -118,22 +100,42 @@ function environmentStatus() {
   return JSON.parse(runOutput(wpEnvBin, ['status', '--config', stagedConfig, '--json']));
 }
 
-async function copyProjectIntoContainer() {
+function wordpressContainer() {
   const projectDir = environmentStatus().installPath;
   if (!projectDir) throw new Error('Could not locate the generated wp-env project.');
   const composeFile = path.join(projectDir, 'docker-compose.yml');
   const container = run('docker', ['compose', '-f', composeFile, 'ps', '-q', 'wordpress']);
   if (!container) throw new Error('The WordPress container is not running.');
+  return container;
+}
 
-  const targets = [
-    { source: stagedTheme, target: '/var/www/html/wp-content/themes/armstrong-thanksgiving' },
-    { source: stagedGatheringPlugin, target: '/var/www/html/wp-content/plugins/armstrong-gathering' },
-    { source: stagedMuPlugins, target: '/var/www/html/wp-content/mu-plugins' },
-    ...(pluginsAreCached
-      ? cachedPlugins.map(({ slug, source }) => ({ source, target: `/var/www/html/wp-content/plugins/${slug}` }))
-      : [])
+function verifyProjectMappings() {
+  const container = wordpressContainer();
+  const mounts = JSON.parse(runOutput('docker', ['inspect', '--format', '{{json .Mounts}}', container]));
+  const expected = [
+    [sourceTheme, '/var/www/html/wp-content/themes/armstrong-thanksgiving'],
+    [sourceGatheringPlugin, '/var/www/html/wp-content/plugins/armstrong-gathering'],
+    [sourceMuPlugins, '/var/www/html/wp-content/mu-plugins'],
   ];
-  for (const { source, target } of targets) {
+  for (const [source, destination] of expected) {
+    const mounted = mounts.some(mount =>
+      mount.Type === 'bind'
+      && path.resolve(mount.Source) === source
+      && mount.Destination === destination
+    );
+    if (!mounted) {
+      throw new Error(`Expected worktree mapping is missing: ${source} -> ${destination}`);
+    }
+  }
+}
+
+async function copyCachedPluginsIntoContainer() {
+  if (!pluginsAreCached || cachedPlugins.length === 0) return;
+
+  const container = wordpressContainer();
+
+  for (const { slug, source } of cachedPlugins) {
+    const target = `/var/www/html/wp-content/plugins/${slug}`;
     run('docker', ['exec', container, 'rm', '-rf', target]);
     run('docker', ['cp', source, `${container}:${target}`]);
   }
@@ -170,7 +172,8 @@ async function removeGeneratedState() {
 child.on('close', async code => {
   if (code === 0 && command[0] === 'start') {
     try {
-      await copyProjectIntoContainer();
+      verifyProjectMappings();
+      await copyCachedPluginsIntoContainer();
       await writeRuntimeMetadata();
     } catch (error) {
       console.error(error instanceof Error ? error.message : error);

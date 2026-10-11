@@ -42,12 +42,21 @@ use it automatically. Set `BASE_URL` to a non-default URL to target another
 running environment, or set `USE_WORKTREE_RUNTIME=0` to force the configured
 `BASE_URL`.
 
-The wrapper refreshes the staged theme, custom plugin, mu-plugin, and cached
-community plugins on every start. After editing those files, restart with
-`npm run wp:start` before testing. `wp:stop` is intentionally reversible;
+The wrapper bind-mounts this worktree's theme, custom plugin, and mu-plugin
+directories into WordPress, so their edits are visible without restarting the
+container. Cached community plugins are copied into the WordPress volume on
+start. `wp:stop` is intentionally reversible;
 `wp:cleanup`/`env:teardown` are the closing-down commands because they remove
 the worktree's Docker data and generated runtime state while preserving Docker
 images for the next worktree.
+
+Before testing, confirm `.worktree/runtime.json` has a `worktree` value matching
+this checkout and use its recorded `url`. If the environment is stopped or the
+metadata is missing or points elsewhere, run `npm run wp:start` from this
+worktree and wait for it to finish. The theme, custom plugin, and mu-plugin are
+mounted directly, so code edits do not require another start. Clear inherited
+`BASE_URL` or `USE_WORKTREE_RUNTIME=0` overrides when they could send tests to
+another environment. Do not assume `localhost:8888` belongs to this worktree.
 
 ## Feature screenshots
 

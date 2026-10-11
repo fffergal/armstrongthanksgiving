@@ -39,7 +39,10 @@ If `.env` was copied before this change, remove its default
 URL can be used. A non-default `BASE_URL` still takes precedence for production
 or other shared environments.
 
-The start wrapper stages the theme and must-use plugin in Docker Desktop's shared temporary directory, starts the stock WordPress volume, then copies the theme and cached community plugins into that volume. This avoids macOS Docker file-sharing and image-initialiser issues for projects stored in `Documents`; restart the environment after theme or mu-plugin changes so the mirror is refreshed. Plugin archives remain in wp-env's cache rather than Git.
+The start wrapper bind-mounts this worktree's theme, custom plugin, and
+must-use plugins directly into WordPress, so edits appear without restarting
+the environment. Cached community plugins are copied into the WordPress volume
+after startup; their archives remain in wp-env's cache rather than Git.
 
 ## Test layers
 
