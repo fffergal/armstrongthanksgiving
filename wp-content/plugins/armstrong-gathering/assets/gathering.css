@@ -85,3 +85,140 @@
   .at-gathering-admin .at-sample-recipient select { min-width: 0; width: 100%; }
   .at-gathering-admin .at-sample-rsvp-form button { grid-column: 2; justify-self: start; }
 }
+
+/* Invitation setup and party assignment states. */
+.at-rsvp-form {
+  --at-form-ink: #4c2518;
+  --at-form-border: #9b7967;
+  --at-form-surface: #fffaf3;
+  --at-form-focus: #7a4816;
+  --at-form-error: #9f2f24;
+}
+.at-rsvp-form :is(input[type="text"], input[type="email"], input[type="password"], input[type="number"], select, textarea) {
+  min-height: 2.9rem;
+  transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+}
+.at-rsvp-form textarea { min-height: 6rem; resize: vertical; }
+.at-rsvp-form :is(input, select, textarea):focus-visible {
+  border-color: var(--at-form-focus);
+  outline: 3px solid var(--at-form-focus);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--at-form-surface);
+}
+.at-rsvp-form :is(input, select, textarea):user-invalid,
+.at-rsvp-form :is(input, select, textarea)[aria-invalid="true"] {
+  border-color: var(--at-form-error);
+  background-color: #fff2ee;
+}
+.at-rsvp-form :is(input, select, textarea):user-invalid:focus-visible,
+.at-rsvp-form :is(input, select, textarea)[aria-invalid="true"]:focus-visible {
+  outline-color: var(--at-form-error);
+}
+.at-rsvp-form :is(input[type="checkbox"], input[type="radio"]) {
+  width: 1.2rem;
+  height: 1.2rem;
+  flex: 0 0 auto;
+  accent-color: #a54122;
+}
+.at-rsvp-form :is(input[type="checkbox"], input[type="radio"]):focus-visible {
+  outline: 3px solid var(--at-form-focus);
+  outline-offset: 3px;
+}
+.at-rsvp-form fieldset:has(:user-invalid),
+.at-rsvp-form fieldset:has([aria-invalid="true"]) {
+  border-color: var(--at-form-error);
+}
+.at-party-roster {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: .65rem;
+}
+.at-rsvp-form .at-party-roster legend,
+.at-party-roster > .at-field-help { grid-column: 1 / -1; }
+.at-party-roster > .at-field-help { margin: -.15rem 0 .1rem; }
+.at-rsvp-form .at-party-roster > label {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  min-width: 0;
+  min-height: 2.9rem;
+  padding: .65rem .8rem;
+  border: 1px solid #c8ad90;
+  border-radius: .7rem;
+  background: #fff8ef;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.at-party-roster > label:has(input:checked) {
+  border-color: #8f4828;
+  background: #ead7bf;
+}
+.at-party-roster > label:has(input:disabled) {
+  border-style: dashed;
+  color: #6b564c;
+  cursor: not-allowed;
+}
+.at-party-roster input { margin: 0; }
+.at-rsvp-app > .at-field-help {
+  margin: 0;
+  padding: .9rem 1rem;
+  border-left: .3rem solid #706e3d;
+  border-radius: .6rem;
+  background: #fff8ef;
+}
+.at-rsvp-app > .at-field-help a { font-weight: 800; }
+.at-rsvp-app > .at-error,
+.at-signup-app > .at-error {
+  padding: 1rem 1.15rem;
+  border-left: .35rem solid var(--at-form-error, #9f2f24);
+  border-radius: .7rem;
+  background: #fff0e9;
+  color: #54251d;
+}
+.at-signup-app > .at-success { margin: 0; }
+.at-form-actions { margin-top: 0; }
+.at-form-actions .at-button { min-height: 2.9rem; }
+.at-rsvp-form a { text-underline-offset: .18em; }
+
+@media (max-width: 960px) {
+  .at-party-roster { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+  .at-rsvp-page .at-content-card { padding: 1rem; }
+  .at-rsvp-form { gap: 1rem; }
+  .at-rsvp-form fieldset { padding: .9rem; }
+  .at-rsvp-intro { margin: -1rem -1rem .1rem; padding: 1.3rem 1rem; }
+  .at-rsvp-grid,
+  .at-food-list,
+  .at-party-roster { grid-template-columns: minmax(0, 1fr); }
+  .at-rsvp-form .at-party-roster legend,
+  .at-party-roster > .at-field-help { grid-column: 1; }
+  .at-custom-food-fields { grid-template-columns: minmax(0, 1fr) 6rem; gap: .65rem; }
+  .at-choice-row { display: grid; }
+  .at-choice-row label { border-radius: .7rem; }
+  .at-form-actions { align-items: stretch; flex-direction: column; }
+  .at-form-actions .at-button { width: 100%; }
+}
+
+@media (max-width: 420px) {
+  .at-rsvp-page .at-content-card { padding: .8rem; }
+  .at-rsvp-intro { margin: -.8rem -.8rem .1rem; padding: 1.2rem .8rem; }
+  .at-rsvp-form fieldset { padding: .75rem; }
+  .at-custom-food-fields { grid-template-columns: minmax(0, 1fr); }
+  .at-food-choice { padding: .65rem; }
+  .at-food-choice-controls { grid-template-columns: minmax(0, 1fr) 4.5rem; }
+  .at-food-list small { gap: .2rem .55rem; font-size: .75rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .at-rsvp-form :is(input, select, textarea) { transition: none; }
+}
+
+@media (forced-colors: active) {
+  .at-party-roster > label,
+  .at-party-roster > label:has(input:checked) { border: 1px solid CanvasText; }
+  .at-rsvp-form :is(input, select, textarea):user-invalid,
+  .at-rsvp-form :is(input, select, textarea)[aria-invalid="true"] { border: 2px solid Mark; }
+}
