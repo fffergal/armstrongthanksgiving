@@ -89,11 +89,23 @@ function at_gathering_ensure_schema() {
 		UNIQUE KEY party_guest (rsvp_user_id,guest_id),
 		KEY rsvp_user_id (rsvp_user_id)
 	) ENGINE=InnoDB {$collate};";
+	$invitation_sends = at_gathering_invitation_sends_table();
+	$invitation_sends_sql = "CREATE TABLE {$invitation_sends} (
+		id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+		guest_id bigint(20) unsigned NOT NULL,
+		sent_at datetime NOT NULL,
+		PRIMARY KEY  (id),
+		KEY guest_id (guest_id),
+		KEY sent_at (sent_at)
+	) ENGINE=InnoDB {$collate};";
 
 	require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 	dbDelta( $sql );
 	dbDelta( $roster_sql );
 	dbDelta( $assignments_sql );
+	dbDelta( $invitation_sends_sql );
+	// Preserve the latest send time recorded by older plugin versions.
+	$wpdb->query( "INSERT INTO {$invitation_sends} (guest_id, sent_at) SELECT roster.id, roster.invited_at FROM {$roster} AS roster WHERE roster.invited_at IS NOT NULL AND NOT EXISTS (SELECT 1 FROM {$invitation_sends} AS sends WHERE sends.guest_id = roster.id)" );
 	$rsvp_status = $wpdb->get_row( $wpdb->prepare( 'SHOW TABLE STATUS WHERE Name = %s', $table ) );
 	if ( $rsvp_status && 'InnoDB' !== $rsvp_status->Engine ) {
 		$wpdb->query( "ALTER TABLE {$table} ENGINE=InnoDB" );
@@ -126,6 +138,11 @@ function at_gathering_roster_table() {
 function at_gathering_assignments_table() {
 	global $wpdb;
 	return $wpdb->prefix . 'at_party_assignments';
+}
+
+function at_gathering_invitation_sends_table() {
+	global $wpdb;
+	return $wpdb->prefix . 'at_invitation_sends';
 }
 
 function at_gathering_normalize_email( $email ) {
