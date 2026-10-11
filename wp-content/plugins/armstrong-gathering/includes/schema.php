@@ -313,6 +313,7 @@ function at_gathering_migrate_content() {
 	foreach ( get_users( array( 'fields' => 'ID' ) ) as $user_id ) {
 		at_gathering_assign_avatar( $user_id );
 	}
+	at_gathering_migrate_existing_users_to_roster();
 	$page = get_page_by_path( 'rsvp' );
 	if ( $page && '[at_rsvp]' !== trim( $page->post_content ) ) {
 		wp_update_post( array( 'ID' => $page->ID, 'post_content' => '[at_rsvp]' ) );
@@ -344,5 +345,63 @@ function at_gathering_migrate_content() {
 		);
 	} elseif ( false === strpos( (string) $confirmation_page->post_content, '[at_rsvp_confirmation]' ) ) {
 		wp_update_post( array( 'ID' => $confirmation_page->ID, 'post_content' => '[at_rsvp_confirmation]' ) );
+	}
+}
+
+/** Ensure every existing WordPress account has a claimed invite roster entry. */
+function at_gathering_migrate_existing_users_to_roster() {
+	global $wpdb;
+
+	$users = get_users( array( 'fields' => array( 'ID', 'user_email', 'display_name' ), 'orderby' => 'ID', 'order' => 'ASC' ) );
+	foreach ( $users as $user ) {
+		$user_id = (int) $user->ID;
+		$email   = at_gathering_normalize_email( $user->user_email );
+		if ( ! $email || ! is_email( $email ) ) {
+			continue;
+		}
+
+		$linked = at_gathering_roster_guest_by_user( $user_id );
+		if ( $linked ) {
+			continue;
+		}
+
+		$guest = at_gathering_roster_guest_by_email( $email );
+		$now   = current_time( 'mysql', true );
+		if ( ! $guest ) {
+			$wpdb->insert(
+				at_gathering_roster_table(),
+				array(
+					'email_normalized' => $email,
+					'display_name'     => $user->display_name,
+					'user_id'          => $user_id,
+					'claim_state'      => 'claimed',
+					'claimed_at'       => $now,
+					'created_at'       => $now,
+					'updated_at'       => $now,
+				),
+				array( '%s', '%s', '%d', '%s', '%s', '%s', '%s' )
+			);
+			continue;
+		}
+
+		// A host may have added this address as an invitation before the upgrade.
+		// Reuse that row and its send history, linking the account and invalidating
+		// any outstanding setup link instead of creating a duplicate guest.
+		if ( empty( $guest->user_id ) || $user_id === (int) $guest->user_id ) {
+			$wpdb->update(
+				at_gathering_roster_table(),
+				array(
+					'user_id'      => $user_id,
+					'claim_state'  => 'claimed',
+					'token_hash'   => '',
+					'token_expires' => null,
+					'claimed_at'   => $guest->claimed_at ?: $now,
+					'updated_at'   => $now,
+				),
+				array( 'id' => (int) $guest->id ),
+				array( '%d', '%s', '%s', '%s', '%s', '%s' ),
+				array( '%d' )
+			);
+		}
 	}
 }
