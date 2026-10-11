@@ -213,11 +213,12 @@ test('host can bulk add email lines and send to everyone who has not signed up',
   }
   expect(runWpEval(`echo at_gathering_send_claim_link(${php(emails[1])}) ? "sent" : "not-sent";`).trim()).toBe('not-sent');
   expect(runWpEval('echo get_transient("at_gathering_last_test_mail") ? "sent" : "not-sent";').trim()).toBe('not-sent');
+  const eligibleCount = Number(runWpEval("global $wpdb; echo $wpdb->get_var('SELECT COUNT(*) FROM ' . at_gathering_roster_table() . \" WHERE claim_state = 'invited' AND display_name <> ''\");").trim());
   await page.getByRole('button', { name: 'Send to everyone on the invite list who hasn’t signed up' }).click();
   await expect(page).toHaveURL(/at_invitation=all_sent/);
-  await expect(page.getByText('Invitation emails sent to 1 of 1 guests who have not signed up.')).toBeVisible();
-  const lastMail = JSON.parse(runWpEval('echo wp_json_encode(get_transient("at_gathering_last_test_mail"));')) as { to: string };
-  expect(lastMail.to).toBe(emails[0]);
+  await expect(page.getByText(`Invitation emails sent to ${eligibleCount} of ${eligibleCount} guests who have not signed up.`)).toBeVisible();
+  expect(runWpEval(`global $wpdb; $guest = at_gathering_roster_guest_by_email(${php(emails[0])}); echo (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . at_gathering_invitation_sends_table() . ' WHERE guest_id = %d', (int) $guest->id));`).trim()).toBe('1');
+  expect(runWpEval(`global $wpdb; $guest = at_gathering_roster_guest_by_email(${php(emails[1])}); echo (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . at_gathering_invitation_sends_table() . ' WHERE guest_id = %d', (int) $guest->id));`).trim()).toBe('0');
   const unnamedRow = page.getByRole('row').filter({ hasText: emails[1] });
   await unnamedRow.getByLabel('Name', { exact: true }).fill('Bulk Two');
   await unnamedRow.getByRole('button', { name: 'Save name' }).click();
