@@ -53,7 +53,7 @@ function at_gathering_send_claim_link( $email, $draft_token = '' ) {
 		return false;
 	}
 	$guest = at_gathering_roster_guest_by_email( $email );
-	if ( ! $guest || ! empty( $guest->user_id ) ) {
+	if ( ! $guest || ! empty( $guest->user_id ) || '' === trim( (string) $guest->display_name ) ) {
 		return false;
 	}
 	$token = at_gathering_create_setup_token();

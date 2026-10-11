@@ -211,6 +211,8 @@ test('host can bulk add email lines and send to everyone who has not signed up',
   for (const email of emails) {
     await expect(page.getByRole('row').filter({ hasText: email })).toBeVisible();
   }
+  expect(runWpEval(`echo at_gathering_send_claim_link(${php(emails[1])}) ? "sent" : "not-sent";`).trim()).toBe('not-sent');
+  expect(runWpEval('echo get_transient("at_gathering_last_test_mail") ? "sent" : "not-sent";').trim()).toBe('not-sent');
   await page.getByRole('button', { name: 'Send to everyone on the invite list who hasn’t signed up' }).click();
   await expect(page).toHaveURL(/at_invitation=all_sent/);
   await expect(page.getByText('Invitation emails sent to 1 of 1 guests who have not signed up.')).toBeVisible();
