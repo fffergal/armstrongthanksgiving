@@ -99,9 +99,9 @@ function at_gathering_ensure_schema() {
 		$wpdb->query( "ALTER TABLE {$table} ENGINE=InnoDB" );
 	}
 	if ( false === get_option( 'at_gathering_party_reconciliation_complete', false ) ) {
-		$has_legacy_names = (bool) $wpdb->get_var( "SELECT 1 FROM {$table} WHERE guest_names <> '' LIMIT 1" );
-		update_option( 'at_gathering_party_reconciliation_complete', ! $has_legacy_names );
-		if ( ! $has_legacy_names ) {
+		$has_legacy_parties = (bool) $wpdb->get_var( "SELECT 1 FROM {$table} WHERE guest_names <> '' OR guest_count > 1 LIMIT 1" );
+		update_option( 'at_gathering_party_reconciliation_complete', ! $has_legacy_parties );
+		if ( ! $has_legacy_parties ) {
 			update_option( 'at_gathering_party_reconciliation_reviewed_at', current_time( 'mysql' ) );
 			update_option( 'at_gathering_party_reconciliation_review_hash', hash( 'sha256', '[]' ) );
 		}

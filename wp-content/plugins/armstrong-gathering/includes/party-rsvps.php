@@ -522,12 +522,13 @@ if ( 'local' === wp_get_environment_type() ) {
 function at_gathering_party_legacy_names_fingerprint( $rows = null ) {
 	global $wpdb;
 	if ( 0 === func_num_args() ) {
-		$rows = $wpdb->get_results( 'SELECT user_id, guest_names FROM ' . at_gathering_table() . " WHERE guest_names <> '' ORDER BY user_id ASC" );
+		$rows = $wpdb->get_results( 'SELECT user_id, guest_count, guest_names FROM ' . at_gathering_table() . " WHERE guest_names <> '' OR guest_count > 1 ORDER BY user_id ASC" );
 	}
 	$fingerprint_rows = array();
 	foreach ( (array) $rows as $row ) {
 		$fingerprint_rows[] = array(
 			'user_id'     => absint( is_array( $row ) ? ( $row['user_id'] ?? 0 ) : ( $row->user_id ?? 0 ) ),
+			'guest_count' => absint( is_array( $row ) ? ( $row['guest_count'] ?? 1 ) : ( $row->guest_count ?? 1 ) ),
 			'guest_names' => (string) ( is_array( $row ) ? ( $row['guest_names'] ?? '' ) : ( $row->guest_names ?? '' ) ),
 		);
 	}
@@ -605,14 +606,14 @@ function at_gathering_admin_page() {
 			<div class="at-gathering-responsive-table" role="region" aria-label="Legacy party reconciliation" tabindex="0" style="max-width:100%; overflow-x:auto;">
 			<table class="widefat striped"><thead><tr><th>RSVP owner</th><th>Legacy party names</th><th>Owner roster link</th><th>Updated</th></tr></thead><tbody>
 			<?php
-			$legacy_rows = $wpdb->get_results( 'SELECT r.user_id, r.guest_names, r.updated_at, u.display_name, u.user_email FROM ' . at_gathering_table() . ' r LEFT JOIN ' . $wpdb->users . ' u ON u.ID = r.user_id WHERE r.guest_names <> \'\' ORDER BY r.updated_at DESC' );
+			$legacy_rows = $wpdb->get_results( 'SELECT r.user_id, r.guest_count, r.guest_names, r.updated_at, u.display_name, u.user_email FROM ' . at_gathering_table() . ' r LEFT JOIN ' . $wpdb->users . ' u ON u.ID = r.user_id WHERE r.guest_names <> \'\' OR r.guest_count > 1 ORDER BY r.updated_at DESC' );
 			$legacy_hash = at_gathering_party_legacy_names_fingerprint( $legacy_rows );
 			if ( ! $legacy_rows ) :
 				?><tr><td colspan="4">No legacy party names are waiting for review.</td></tr><?php
 			else :
 				foreach ( $legacy_rows as $legacy_row ) :
 					$legacy_owner = at_gathering_roster_guest_by_user( $legacy_row->user_id );
-					?><tr><td><?php echo esc_html( $legacy_row->display_name ?: 'Unknown account #' . absint( $legacy_row->user_id ) ); ?> (user ID <?php echo esc_html( $legacy_row->user_id ); ?>)</td><td><?php echo esc_html( $legacy_row->guest_names ); ?></td><td><?php if ( $legacy_owner ) : ?><strong><?php echo esc_html( $legacy_owner->display_name ); ?></strong> (linked)<?php else : ?><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><input type="hidden" name="action" value="at_legacy_owner_link"><input type="hidden" name="at_legacy_user_id" value="<?php echo esc_attr( $legacy_row->user_id ); ?>"><?php wp_nonce_field( 'at_legacy_owner_' . absint( $legacy_row->user_id ), 'at_legacy_owner_nonce' ); ?><label><span class="screen-reader-text">Roster guest for <?php echo esc_html( $legacy_row->display_name ); ?></span><select name="at_legacy_guest_id" required><option value="">Select roster guest</option><?php foreach ( $wpdb->get_results( 'SELECT id, display_name, email_normalized FROM ' . at_gathering_roster_table() . ' ORDER BY display_name ASC, id ASC' ) as $roster_guest ) : ?><option value="<?php echo esc_attr( $roster_guest->id ); ?>"><?php echo esc_html( $roster_guest->display_name . ' · ' . $roster_guest->email_normalized ); ?></option><?php endforeach; ?></select></label><label><span class="screen-reader-text">Confirm current email for <?php echo esc_html( $legacy_row->display_name ); ?></span><input type="email" name="at_legacy_confirmed_email" value="<?php echo esc_attr( $legacy_row->user_email ); ?>" required></label><button class="button" type="submit">Link owner</button></form><?php endif; ?></td><td><?php echo esc_html( mysql2date( 'j M Y, H:i', $legacy_row->updated_at ) ); ?></td></tr><?php
+					?><tr><td><?php echo esc_html( $legacy_row->display_name ?: 'Unknown account #' . absint( $legacy_row->user_id ) ); ?> (user ID <?php echo esc_html( $legacy_row->user_id ); ?>)</td><td><?php echo esc_html( $legacy_row->guest_names ?: 'Names not recorded' ); ?><br><small>Legacy guest count: <?php echo esc_html( $legacy_row->guest_count ); ?></small></td><td><?php if ( $legacy_owner ) : ?><strong><?php echo esc_html( $legacy_owner->display_name ); ?></strong> (linked)<?php else : ?><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><input type="hidden" name="action" value="at_legacy_owner_link"><input type="hidden" name="at_legacy_user_id" value="<?php echo esc_attr( $legacy_row->user_id ); ?>"><?php wp_nonce_field( 'at_legacy_owner_' . absint( $legacy_row->user_id ), 'at_legacy_owner_nonce' ); ?><label><span class="screen-reader-text">Roster guest for <?php echo esc_html( $legacy_row->display_name ); ?></span><select name="at_legacy_guest_id" required><option value="">Select roster guest</option><?php foreach ( $wpdb->get_results( 'SELECT id, display_name, email_normalized FROM ' . at_gathering_roster_table() . ' ORDER BY display_name ASC, id ASC' ) as $roster_guest ) : ?><option value="<?php echo esc_attr( $roster_guest->id ); ?>"><?php echo esc_html( $roster_guest->display_name . ' · ' . $roster_guest->email_normalized ); ?></option><?php endforeach; ?></select></label><label><span class="screen-reader-text">Confirm current email for <?php echo esc_html( $legacy_row->display_name ); ?></span><input type="email" name="at_legacy_confirmed_email" value="<?php echo esc_attr( $legacy_row->user_email ); ?>" required></label><button class="button" type="submit">Link owner</button></form><?php endif; ?></td><td><?php echo esc_html( mysql2date( 'j M Y, H:i', $legacy_row->updated_at ) ); ?></td></tr><?php
 				endforeach;
 			endif;
 			?>
