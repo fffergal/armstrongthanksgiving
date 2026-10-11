@@ -67,6 +67,22 @@ test('invitation rate limits enforce the per-email boundary', async ({}, testInf
   expect(results).toBe('allowed,allowed,allowed,limited');
 });
 
+test('existing users become claimed invitees and earlier email invites are linked in place', async ({}, testInfo) => {
+  test.skip(testInfo.project.name !== 'rsvp', 'Run invitation migration coverage in the desktop RSVP project.');
+  const suffix = `${testInfo.project.name.replace(/\W/g, '')}${Date.now()}`.toLowerCase();
+  const preInvitedEmail = `pre-invited-${suffix}@example.test`;
+  const existingEmail = `existing-member-${suffix}@example.test`;
+  const setupToken = `${'d'.repeat(55)}${Date.now().toString(16)}`.padEnd(64, 'd').slice(0, 64);
+  runWpEval(`global $wpdb; $now = current_time('mysql', true); $expires = gmdate('Y-m-d H:i:s', time() + DAY_IN_SECONDS); $pre_invited_id = wp_insert_user(array('user_login' => at_gathering_unique_login(${php(preInvitedEmail)}), 'user_pass' => 'existing-password-2026', 'user_email' => ${php(preInvitedEmail)}, 'display_name' => 'Pre-invited Member', 'role' => 'subscriber')); $existing_id = wp_insert_user(array('user_login' => at_gathering_unique_login(${php(existingEmail)}), 'user_pass' => 'existing-password-2026', 'user_email' => ${php(existingEmail)}, 'display_name' => 'Existing Member', 'role' => 'subscriber')); if (is_wp_error($pre_invited_id) || is_wp_error($existing_id)) { WP_CLI::error('Could not create migration fixtures.'); } $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => ${php(preInvitedEmail)}, 'display_name' => 'Host supplied name', 'claim_state' => 'invited', 'token_hash' => hash('sha256', ${php(setupToken)}), 'token_expires' => $expires, 'created_at' => $now, 'updated_at' => $now)); $pre_invited_guest_id = (int) $wpdb->insert_id; $wpdb->insert(at_gathering_invitation_sends_table(), array('guest_id' => $pre_invited_guest_id, 'sent_at' => $now)); at_gathering_migrate_existing_users_to_roster();`);
+
+  const migrated = runWpEval(`global $wpdb; $pre = at_gathering_roster_guest_by_email(${php(preInvitedEmail)}); $existing = at_gathering_roster_guest_by_email(${php(existingEmail)}); $pre_user = get_user_by('email', ${php(preInvitedEmail)}); $existing_user = get_user_by('email', ${php(existingEmail)}); $send_count = (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . at_gathering_invitation_sends_table() . ' WHERE guest_id = %d', (int) $pre->id)); $guest_count = (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . at_gathering_roster_table() . ' WHERE email_normalized = %s', ${php(preInvitedEmail)})); echo $pre && $existing && (int) $pre->user_id === (int) $pre_user->ID && (int) $existing->user_id === (int) $existing_user->ID && 'claimed' === $pre->claim_state && 'claimed' === $existing->claim_state && '' === $pre->token_hash && null === $pre->token_expires && 'Host supplied name' === $pre->display_name && 1 === $send_count && 1 === $guest_count ? 'linked' : 'failed';`).trim();
+  expect(migrated).toBe('linked');
+  const idempotent = runWpEval(`at_gathering_migrate_existing_users_to_roster(); global $wpdb; echo (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . at_gathering_roster_table() . ' WHERE email_normalized IN (%s, %s)', ${php(preInvitedEmail)}, ${php(existingEmail)}));`).trim();
+  expect(idempotent).toBe('2');
+
+  runWpEval(`global $wpdb; foreach (array(${php(preInvitedEmail)}, ${php(existingEmail)}) as $email) { $guest = at_gathering_roster_guest_by_email($email); if ($guest && $guest->user_id) { require_once ABSPATH . 'wp-admin/includes/user.php'; wp_delete_user((int) $guest->user_id); } if ($guest) { $wpdb->delete(at_gathering_invitation_sends_table(), array('guest_id' => (int) $guest->id)); $wpdb->delete(at_gathering_roster_table(), array('id' => (int) $guest->id)); } }`);
+});
+
 test('setup token creates one password account, is consumed once, and leaves existing accounts unchanged', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'rsvp', 'Run invitation coverage in the desktop RSVP project.');
   const suffix = `${testInfo.project.name.replace(/\W/g, '')}${Date.now()}`.toLowerCase();
