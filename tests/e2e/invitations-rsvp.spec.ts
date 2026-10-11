@@ -19,6 +19,11 @@ function php(value: string): string {
   return JSON.stringify(value);
 }
 
+function clearInvitationFixtures(prefixes: string[]): void {
+  const prefixList = `[${prefixes.map(php).join(', ')}]`;
+  runWpEval(`global $wpdb; $prefixes = ${prefixList}; $conditions = implode(' OR ', array_fill(0, count($prefixes), 'email_normalized LIKE %s')); $values = array_map(static function ($prefix) { return $prefix . '%'; }, $prefixes); $ids = $wpdb->get_col($wpdb->prepare('SELECT id FROM ' . at_gathering_roster_table() . ' WHERE ' . $conditions, $values)); foreach ($ids as $id) { $wpdb->delete(at_gathering_invitation_sends_table(), array('guest_id' => (int) $id)); } $wpdb->query($wpdb->prepare('DELETE FROM ' . at_gathering_roster_table() . ' WHERE ' . $conditions, $values));`);
+}
+
 test('signup requests use the same public response and direct legacy posts cannot create accounts', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'rsvp', 'Run invitation coverage in the desktop RSVP project.');
   const suffix = `${testInfo.project.name.replace(/\W/g, '')}${Date.now()}`.toLowerCase();
@@ -162,24 +167,61 @@ test('host invitations can be sent and resent with the earlier link invalidated'
   const email = `host-invite-${Date.now()}@example.test`;
   await logInAsAdmin(page);
   await page.goto('/wp-admin/admin.php?page=at-gathering');
-  await page.getByLabel('Name', { exact: true }).fill('Host Invited Guest');
+  clearInvitationFixtures(['host-invite-']);
+  runWpEval('delete_transient("at_gathering_last_test_mail");');
+  await page.getByLabel('Name (optional)', { exact: true }).fill('Host Invited Guest');
   await page.getByLabel('Email', { exact: true }).fill(email);
-  await page.getByRole('button', { name: 'Save and send invitation' }).click();
+  await page.getByRole('button', { name: 'Add to invite list' }).click();
+  await expect(page).toHaveURL(/at_invitation=saved/);
+  expect(runWpEval('echo get_transient("at_gathering_last_test_mail") ? "sent" : "not-sent";').trim()).toBe('not-sent');
+  const invitationRow = page.getByRole('row').filter({ hasText: email });
+  await invitationRow.getByRole('button', { name: 'Send invitation' }).click();
   await expect(page).toHaveURL(/at_invitation=sent/);
   const firstMail = JSON.parse(runWpEval('echo wp_json_encode(get_transient("at_gathering_last_test_mail"));')) as { to: string; message: string };
   expect(firstMail.to).toBe(email);
   const firstToken = firstMail.message.match(/at_setup=([a-f0-9]{64})/)?.[1];
   expect(firstToken).toBeTruthy();
 
-  const invitationRow = page.getByRole('row').filter({ hasText: email });
-  await invitationRow.getByRole('button', { name: 'Resend' }).click();
+  await invitationRow.getByRole('button', { name: 'Send reminder' }).click();
   await expect(page).toHaveURL(/at_invitation=sent/);
   const secondMail = JSON.parse(runWpEval('echo wp_json_encode(get_transient("at_gathering_last_test_mail"));')) as { to: string; message: string };
   expect(secondMail.to).toBe(email);
   const secondToken = secondMail.message.match(/at_setup=([a-f0-9]{64})/)?.[1];
   expect(secondToken).toBeTruthy();
   expect(secondToken).not.toBe(firstToken);
+  expect(runWpEval(`$guest = at_gathering_roster_guest_by_email(${php(email)}); echo (int) $GLOBALS['wpdb']->get_var($GLOBALS['wpdb']->prepare('SELECT COUNT(*) FROM ' . at_gathering_invitation_sends_table() . ' WHERE guest_id = %d', (int) $guest->id));`).trim()).toBe('2');
   const oldTokenResult = runWpEval(`$result = at_gathering_claim_guest(${php(firstToken!)}, 'Guest', 'cranberry-sauce-2026', 'cranberry-sauce-2026'); echo is_wp_error($result) && 'at_claim_invalid' === $result->get_error_code() ? 'rejected' : 'accepted';`).trim();
   expect(oldTokenResult).toBe('rejected');
-  runWpEval(`global $wpdb; $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(email)}));`);
+  clearInvitationFixtures(['host-invite-']);
+});
+
+test('host can bulk add email lines and send to everyone who has not signed up', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'rsvp', 'Run invitation management coverage in the desktop RSVP project.');
+  const suffix = Date.now();
+  const emails = [`bulk-one-${suffix}@example.test`, `bulk-two-${suffix}@example.test`];
+  await logInAsAdmin(page);
+  await page.goto('/wp-admin/admin.php?page=at-gathering');
+  clearInvitationFixtures(['bulk-one-', 'bulk-two-']);
+  runWpEval('delete_transient("at_gathering_last_test_mail");');
+  await page.getByLabel('Paste names and email addresses').fill(`Bulk One\n${emails[0]}\n${emails[1]}\nbad@`);
+  await page.getByRole('button', { name: 'Add emails to invite list' }).click();
+  await expect(page).toHaveURL(/at_invitation=bulk_added/);
+  await expect(page.getByText('2 guests added. 1 lines skipped. No emails were sent.')).toBeVisible();
+  expect(runWpEval('echo get_transient("at_gathering_last_test_mail") ? "sent" : "not-sent";').trim()).toBe('not-sent');
+  for (const email of emails) {
+    await expect(page.getByRole('row').filter({ hasText: email })).toBeVisible();
+  }
+  await page.getByRole('button', { name: 'Send to everyone on the invite list who hasn’t signed up' }).click();
+  await expect(page).toHaveURL(/at_invitation=all_sent/);
+  await expect(page.getByText('Invitation emails sent to 1 of 1 guests who have not signed up.')).toBeVisible();
+  const lastMail = JSON.parse(runWpEval('echo wp_json_encode(get_transient("at_gathering_last_test_mail"));')) as { to: string };
+  expect(lastMail.to).toBe(emails[0]);
+  const unnamedRow = page.getByRole('row').filter({ hasText: emails[1] });
+  await unnamedRow.getByLabel('Name', { exact: true }).fill('Bulk Two');
+  await unnamedRow.getByRole('button', { name: 'Save name' }).click();
+  const namedRow = page.getByRole('row').filter({ hasText: emails[1] });
+  await namedRow.getByRole('button', { name: 'Send invitation' }).click();
+  await expect(page).toHaveURL(/at_invitation=sent/);
+  await expect(namedRow.locator('td').nth(3)).toContainText(/\d{4}-\d{2}-\d{2}/);
+  clearInvitationFixtures(['bulk-one-', 'bulk-two-']);
 });
