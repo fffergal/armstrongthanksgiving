@@ -20,6 +20,7 @@
     "verify:production": "node scripts/verify-production.mjs",
     "env:setup": "node scripts/worktree-setup.mjs",
     "env:teardown": "node scripts/wp-env.mjs cleanup",
+    "test:unit": "node --test tests/unit/*.test.mjs",
     "test": "npm run test:e2e",
     "test:e2e": "node scripts/test-local-e2e.mjs",
     "test:e2e:ui": "playwright test --ui",
@@ -27,7 +28,7 @@
     "test:visual:linux": "node scripts/test-local-e2e.mjs --linux-visual-only",
     "test:a11y": "playwright test --project=accessibility",
     "test:performance": "node scripts/performance.mjs",
-    "test:all": "npm run test:e2e && npm run test:performance",
+    "test:all": "npm run test:unit && npm run test:e2e && npm run test:performance",
     "test:update-snapshots": "node scripts/test-local-e2e.mjs --update-snapshots"
   },
   "devDependencies": {
