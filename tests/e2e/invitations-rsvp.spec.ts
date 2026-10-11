@@ -208,6 +208,13 @@ test('host invitations can be sent and resent with the earlier link invalidated'
   expect(runWpEval(`$guest = at_gathering_roster_guest_by_email(${php(email)}); echo (int) $GLOBALS['wpdb']->get_var($GLOBALS['wpdb']->prepare('SELECT COUNT(*) FROM ' . at_gathering_invitation_sends_table() . ' WHERE guest_id = %d', (int) $guest->id));`).trim()).toBe('2');
   const oldTokenResult = runWpEval(`$result = at_gathering_claim_guest(${php(firstToken!)}, 'Guest', 'cranberry-sauce-2026', 'cranberry-sauce-2026'); echo is_wp_error($result) && 'at_claim_invalid' === $result->get_error_code() ? 'rejected' : 'accepted';`).trim();
   expect(oldTokenResult).toBe('rejected');
+  const guestId = Number(runWpEval(`$guest = at_gathering_roster_guest_by_email(${php(email)}); echo (int) $guest->id;`).trim());
+  expect(runWpEval(`global $wpdb; $admins = get_users(array('role' => 'administrator', 'number' => 1)); $wpdb->update(at_gathering_roster_table(), array('user_id' => (int) $admins[0]->ID, 'claim_state' => 'claimed'), array('id' => ${guestId})); echo at_gathering_delete_pending_invitation(${guestId}) ? 'deleted' : 'protected';`).trim()).toBe('protected');
+  runWpEval(`global $wpdb; $wpdb->update(at_gathering_roster_table(), array('user_id' => null, 'claim_state' => 'invited'), array('id' => ${guestId}));`);
+  await invitationRow.getByRole('button', { name: 'Delete invite' }).click();
+  await expect(page).toHaveURL(/at_invitation=deleted/);
+  await expect(page.getByRole('row').filter({ hasText: email })).toHaveCount(0);
+  expect(runWpEval(`global $wpdb; echo (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . at_gathering_invitation_sends_table() . ' WHERE guest_id = %d', ${guestId}));`).trim()).toBe('0');
   clearInvitationFixtures(['host-invite-']);
 });
 

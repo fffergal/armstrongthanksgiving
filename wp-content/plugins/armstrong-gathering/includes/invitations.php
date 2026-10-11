@@ -310,6 +310,13 @@ function at_gathering_save_invitation() {
 		wp_die( 'Sorry, the invitation could not be saved.' );
 	}
 	$mode = sanitize_key( wp_unslash( $_POST['at_invitation_mode'] ?? 'save' ) );
+	if ( 'delete' === $mode ) {
+		$guest_id = absint( $_POST['at_invitation_id'] ?? 0 );
+		$result = $guest_id ? at_gathering_delete_pending_invitation( $guest_id ) : false;
+		$notice = true === $result ? 'deleted' : ( is_wp_error( $result ) ? 'delete_failed' : 'claimed' );
+		wp_safe_redirect( add_query_arg( 'at_invitation', $notice, admin_url( 'admin.php?page=at-gathering' ) ) );
+		exit;
+	}
 	if ( 'send_all' === $mode ) {
 		global $wpdb;
 		$emails = $wpdb->get_col( 'SELECT email_normalized FROM ' . at_gathering_roster_table() . " WHERE claim_state = 'invited' AND display_name <> '' ORDER BY id ASC" );
@@ -373,6 +380,33 @@ function at_gathering_save_invitation() {
 	exit;
 }
 
+/** Delete an invitation only while it remains unclaimed and unlinked to a user. */
+function at_gathering_delete_pending_invitation( $guest_id ) {
+	global $wpdb;
+	$guest_id = absint( $guest_id );
+	if ( ! $guest_id ) {
+		return false;
+	}
+	return at_gathering_transaction(
+		static function () use ( $wpdb, $guest_id ) {
+			$table = at_gathering_roster_table();
+			$guest = $wpdb->get_row( $wpdb->prepare( "SELECT id, user_id, claim_state FROM {$table} WHERE id = %d FOR UPDATE", $guest_id ) );
+			if ( ! $guest || ! empty( $guest->user_id ) || 'invited' !== $guest->claim_state ) {
+				return false;
+			}
+			$deleted = $wpdb->delete( $table, array( 'id' => $guest_id, 'user_id' => null, 'claim_state' => 'invited' ), array( '%d', '%d', '%s' ) );
+			if ( 1 !== $deleted ) {
+				return false;
+			}
+			$history_deleted = $wpdb->delete( at_gathering_invitation_sends_table(), array( 'guest_id' => $guest_id ), array( '%d' ) );
+			if ( false === $history_deleted ) {
+				return new WP_Error( 'at_invitation_delete_failed', 'Invitation history could not be deleted.' );
+			}
+			return true;
+		}
+	);
+}
+
 /** Save or update an unclaimed roster entry without sending an email. */
 function at_gathering_store_invitation( $email, $name ) {
 	global $wpdb;
@@ -394,7 +428,7 @@ function at_gathering_invitation_admin_section() {
 		return;
 	}
 	global $wpdb;
-	$guests = $wpdb->get_results( 'SELECT id, display_name, email_normalized, claim_state, invited_at, token_expires FROM ' . at_gathering_roster_table() . ' ORDER BY display_name ASC, id ASC' );
+	$guests = $wpdb->get_results( 'SELECT id, display_name, email_normalized, user_id, claim_state, invited_at, token_expires FROM ' . at_gathering_roster_table() . ' ORDER BY display_name ASC, id ASC' );
 	$send_history = $wpdb->get_results( 'SELECT guest_id, sent_at FROM ' . at_gathering_invitation_sends_table() . ' ORDER BY sent_at DESC, id DESC' );
 	$send_history_by_guest = array();
 	foreach ( $send_history as $send ) {
@@ -402,7 +436,7 @@ function at_gathering_invitation_admin_section() {
 	}
 	?>
 	<hr><h2>Guest invitations</h2>
-	<?php if ( isset( $_GET['at_invitation'] ) ) : $notice = sanitize_key( wp_unslash( $_GET['at_invitation'] ) ); ?><div class="notice notice-info"><p><?php echo esc_html( array( 'sent' => 'Invitation link sent.', 'failed' => 'Invitation saved, but its email could not be sent.', 'saved' => 'Guest added to the invite list. No email was sent.', 'claimed' => 'That invitation has already been claimed.', 'invalid' => 'Enter a name and valid email address. Sending needs a name; add one to the invite list first.', 'bulk_added' => sprintf( '%d guests added. %d lines skipped. No emails were sent.', absint( $_GET['at_added_count'] ?? 0 ), absint( $_GET['at_skipped_count'] ?? 0 ) ), 'all_sent' => sprintf( 'Invitation emails sent to %1$d of %2$d guests who have not signed up.', absint( $_GET['at_sent_count'] ?? 0 ), absint( $_GET['at_total_count'] ?? 0 ) ) )[ $notice ] ?? 'Invitation updated.' ); ?></p></div><?php endif; ?>
+	<?php if ( isset( $_GET['at_invitation'] ) ) : $notice = sanitize_key( wp_unslash( $_GET['at_invitation'] ) ); ?><div class="notice notice-info"><p><?php echo esc_html( array( 'sent' => 'Invitation link sent.', 'failed' => 'Invitation saved, but its email could not be sent.', 'saved' => 'Guest added to the invite list. No email was sent.', 'deleted' => 'Pending invitation deleted.', 'delete_failed' => 'The pending invitation could not be deleted. Please try again.', 'claimed' => 'That invitation has already been claimed or is no longer available.', 'invalid' => 'Enter a name and valid email address. Sending needs a name; add one to the invite list first.', 'bulk_added' => sprintf( '%d guests added. %d lines skipped. No emails were sent.', absint( $_GET['at_added_count'] ?? 0 ), absint( $_GET['at_skipped_count'] ?? 0 ) ), 'all_sent' => sprintf( 'Invitation emails sent to %1$d of %2$d guests who have not signed up.', absint( $_GET['at_sent_count'] ?? 0 ), absint( $_GET['at_total_count'] ?? 0 ) ) )[ $notice ] ?? 'Invitation updated.' ); ?></p></div><?php endif; ?>
 	<form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><input type="hidden" name="at_invitation_mode" value="save"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?>
 		<p><label>Name (optional) <input type="text" name="at_invitation_name"></label> <label>Email <input type="email" name="at_invitation_email" required></label> <button class="button button-primary" type="submit">Add to invite list</button></p>
 	</form>
@@ -410,7 +444,7 @@ function at_gathering_invitation_admin_section() {
 		<p><label for="at-invitation-emails">Paste guest names and emails</label><br><span class="description">Lines with an @ are emails. The previous nonblank line is the name; consecutive email lines leave the name blank.</span><br><textarea id="at-invitation-emails" name="at_invitation_emails" rows="5" class="large-text" required></textarea></p><p><button class="button" type="submit">Add emails to invite list</button></p>
 	</form>
 	<table class="widefat striped"><thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Invites sent</th><th>Action</th></tr></thead><tbody>
-	<?php if ( ! $guests ) : ?><tr><td colspan="5">No invited guests yet.</td></tr><?php else : foreach ( $guests as $guest ) : ?><tr><td><?php echo esc_html( $guest->display_name ?: 'Name needed' ); ?></td><td><?php echo esc_html( $guest->email_normalized ); ?></td><td><?php echo esc_html( $guest->claim_state ); ?></td><td><?php $history = $send_history_by_guest[ (int) $guest->id ] ?? array(); if ( ! $history && $guest->invited_at ) { $history[] = $guest->invited_at; } $history = array_map( static function ( $sent_at ) { return get_date_from_gmt( $sent_at, 'Y-m-d H:i' ); }, $history ); echo $history ? nl2br( esc_html( implode( "\n", $history ) ) ) : 'Not sent'; ?></td><td><?php if ( 'invited' === $guest->claim_state ) : ?><form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><input type="hidden" name="at_invitation_mode" value="save"><input type="hidden" name="at_invitation_email" value="<?php echo esc_attr( $guest->email_normalized ); ?>"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?><label>Name <input type="text" name="at_invitation_name" value="<?php echo esc_attr( $guest->display_name ); ?>"></label> <button class="button" type="submit">Save name</button></form><?php if ( $guest->display_name ) : ?><form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><input type="hidden" name="at_invitation_mode" value="send"><input type="hidden" name="at_invitation_name" value="<?php echo esc_attr( $guest->display_name ); ?>"><input type="hidden" name="at_invitation_email" value="<?php echo esc_attr( $guest->email_normalized ); ?>"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?><button class="button" type="submit"><?php echo $guest->invited_at ? 'Send reminder' : 'Send invitation'; ?></button></form><?php endif; ?><?php endif; ?></td></tr><?php endforeach; endif; ?>
+	<?php if ( ! $guests ) : ?><tr><td colspan="5">No invited guests yet.</td></tr><?php else : foreach ( $guests as $guest ) : ?><tr><td><?php echo esc_html( $guest->display_name ?: 'Name needed' ); ?></td><td><?php echo esc_html( $guest->email_normalized ); ?></td><td><?php echo esc_html( $guest->claim_state ); ?></td><td><?php $history = $send_history_by_guest[ (int) $guest->id ] ?? array(); if ( ! $history && $guest->invited_at ) { $history[] = $guest->invited_at; } $history = array_map( static function ( $sent_at ) { return get_date_from_gmt( $sent_at, 'Y-m-d H:i' ); }, $history ); echo $history ? nl2br( esc_html( implode( "\n", $history ) ) ) : 'Not sent'; ?></td><td><?php if ( 'invited' === $guest->claim_state && empty( $guest->user_id ) ) : ?><form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><input type="hidden" name="at_invitation_mode" value="save"><input type="hidden" name="at_invitation_email" value="<?php echo esc_attr( $guest->email_normalized ); ?>"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?><label>Name <input type="text" name="at_invitation_name" value="<?php echo esc_attr( $guest->display_name ); ?>"></label> <button class="button" type="submit">Save name</button></form><?php if ( $guest->display_name ) : ?><form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><input type="hidden" name="at_invitation_mode" value="send"><input type="hidden" name="at_invitation_name" value="<?php echo esc_attr( $guest->display_name ); ?>"><input type="hidden" name="at_invitation_email" value="<?php echo esc_attr( $guest->email_normalized ); ?>"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?><button class="button" type="submit"><?php echo $guest->invited_at ? 'Send reminder' : 'Send invitation'; ?></button></form><?php endif; ?><form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><input type="hidden" name="at_invitation_mode" value="delete"><input type="hidden" name="at_invitation_id" value="<?php echo esc_attr( $guest->id ); ?>"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?><button class="button" type="submit">Delete invite</button></form><?php endif; ?></td></tr><?php endforeach; endif; ?>
 	</tbody></table>
 	<form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><input type="hidden" name="at_invitation_mode" value="send_all"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?><p><button class="button" type="submit">Send to everyone on the invite list who hasn’t signed up</button></p></form>
 	<?php
