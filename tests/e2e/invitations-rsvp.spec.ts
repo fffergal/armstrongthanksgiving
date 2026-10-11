@@ -203,7 +203,7 @@ test('host can bulk add email lines and send to everyone who has not signed up',
   await page.goto('/wp-admin/admin.php?page=at-gathering');
   clearInvitationFixtures(['bulk-one-', 'bulk-two-']);
   runWpEval('delete_transient("at_gathering_last_test_mail");');
-  await page.getByLabel('Paste names and email addresses').fill(`Bulk One\n${emails[0]}\n${emails[1]}\nbad@`);
+  await page.getByLabel('Paste guest names and emails').fill(`Bulk One\n${emails[0]}\n${emails[1]}\nbad@`);
   await page.getByRole('button', { name: 'Add emails to invite list' }).click();
   await expect(page).toHaveURL(/at_invitation=bulk_added/);
   await expect(page.getByText('2 guests added. 1 lines skipped. No emails were sent.')).toBeVisible();
