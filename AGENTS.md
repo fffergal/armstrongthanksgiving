@@ -80,6 +80,16 @@ then run the appropriate test suite and fix failures before considering the work
 complete. If a behavior cannot be tested automatically, document why and verify
 it with the most relevant available check.
 
+## Sandbox-sensitive command preflight
+
+In a managed sandbox, invoke `git commit`, Docker-backed commands (including
+the `npm run wp:*` wrappers), and `gh` commands with the required elevated
+sandbox access on the first attempt. Include a brief, command-specific
+justification; do not first try the restricted invocation and wait for it to
+fail. If elevation is rejected or the command still fails, use the
+sandbox-troubleshooting steps below before investigating credentials or project
+configuration.
+
 ## Sandbox troubleshooting
 
 When Docker commands, internal browser automation, or the `gh` CLI fail,
