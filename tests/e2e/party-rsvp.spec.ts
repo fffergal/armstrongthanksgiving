@@ -89,6 +89,21 @@ test.describe('party RSVP assignments', () => {
     await expect(page.getByLabel('Children (ages 0–17)')).toHaveValue('2');
   });
 
+  test('administrators see claimed roster IDs and names without exposing invitee email addresses', async ({ page }) => {
+    runWpEval("global $wpdb; $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); foreach (array(array('claimed@example.test', 'Claimed roster choice', 'claimed'), array('pending@example.test', 'Pending invite choice', 'invited')) as $entry) { $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $entry[0], 'display_name' => $entry[1], 'claim_state' => $entry[2], 'created_at' => $now, 'updated_at' => $now)); } update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
+    await logInAsAdmin(page);
+    await page.goto('/rsvp/');
+    const nonce = await page.locator('#at-rsvp-form').getAttribute('data-party-roster-nonce');
+    const response = await page.request.get(`/wp-admin/admin-ajax.php?action=at_gathering_party_roster_choices&nonce=${nonce}`);
+    expect(response.status()).toBe(200);
+    const payload = await response.text();
+    expect(payload).toContain('Claimed roster choice');
+    expect(payload).not.toContain('Pending invite choice');
+    expect(payload).not.toContain('claimed@example.test');
+    expect(payload).not.toContain('pending@example.test');
+    expect(payload).toMatch(/"id":\d+/);
+  });
+
   test('an unchanged host party save keeps the selected adults reserved', async ({ page }) => {
     runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $friend = get_user_by('login', 'admin'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); foreach (array(array($owner, 'RSVP owner'), array($friend, 'Party friend')) as $entry) { $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $entry[0]->user_email, 'display_name' => $entry[1], 'user_id' => $entry[0]->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); } $wpdb->replace(at_gathering_table(), array('user_id' => $owner->ID, 'status' => 'yes', 'guest_count' => 2, 'guest_names' => '', 'children_count' => 0, 'dietary' => '', 'foods' => '[]', 'food_amounts' => '{}', 'custom_food' => '', 'notes' => '', 'created_at' => $now, 'updated_at' => $now)); $owner_guest = at_gathering_roster_guest_by_user($owner->ID); $friend_guest = at_gathering_roster_guest_by_user($friend->ID); foreach (array(array($owner_guest->id, 1), array($friend_guest->id, 0)) as $assignment) { $wpdb->insert(at_gathering_assignments_table(), array('rsvp_user_id' => $owner->ID, 'guest_id' => $assignment[0], 'is_owner' => $assignment[1], 'created_at' => $now)); } update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
     await logInAsAdmin(page);
@@ -142,6 +157,48 @@ test.describe('party RSVP assignments', () => {
     await page.getByRole('button', { name: 'Save my RSVP' }).click();
     await expect(page.getByRole('alert')).toContainText('already assigned to another party');
     runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); if (at_gathering_get_rsvp($owner->ID) || $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . at_gathering_assignments_table() . ' WHERE rsvp_user_id = %d', $owner->ID))) { WP_CLI::error('A conflicting party update partially saved.'); }");
+  });
+
+  test('genuinely overlapping party submissions reserve a shared adult for only one RSVP', async ({ browser, page }) => {
+    runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $other_owner = get_user_by('login', 'admin'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_table() . ' WHERE user_id IN (' . (int) $owner->ID . ',' . (int) $other_owner->ID . ')'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); foreach (array(array($owner->user_email, 'First owner', $owner->ID), array($other_owner->user_email, 'Second owner', $other_owner->ID), array('shared-adult@example.test', 'Shared adult', null)) as $entry) { $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $entry[0], 'display_name' => $entry[1], 'user_id' => $entry[2], 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); } update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
+    await logIn(page);
+    await page.goto('/rsvp/');
+    const firstOwnerNonce = await page.locator('input[name="at_rsvp_nonce"]').inputValue();
+    const sharedGuestId = Number(runWpEval("echo (int) at_gathering_roster_guest_by_email('shared-adult@example.test')->id;"));
+    const adminContext = await browser.newContext({ baseURL: new URL(page.url()).origin });
+    try {
+      const adminPage = await adminContext.newPage();
+      await logInAsAdmin(adminPage);
+      await adminPage.goto('/rsvp/');
+      const secondOwnerNonce = await adminPage.locator('input[name="at_rsvp_nonce"]').inputValue();
+      const sharedPartyPost = (nonce: string) => ({
+        action: 'at_save_rsvp',
+        at_rsvp_nonce: nonce,
+        at_status: 'yes',
+        at_children_count: '0',
+        at_dietary: '',
+        at_custom_food: '',
+        at_custom_food_amount: '0',
+        at_notes: '',
+        _at_rsvp_touched: '1',
+        'at_party_guest_ids[]': String(sharedGuestId),
+      });
+      const [firstResponse, secondResponse] = await Promise.all([
+        page.request.post('/wp-admin/admin-post.php', { form: sharedPartyPost(firstOwnerNonce), maxRedirects: 0 }),
+        adminPage.request.post('/wp-admin/admin-post.php', { form: sharedPartyPost(secondOwnerNonce), maxRedirects: 0 }),
+      ]);
+      expect(firstResponse.status()).toBe(302);
+      expect(secondResponse.status()).toBe(302);
+      const firstLocation = firstResponse.headers().location ?? '';
+      const secondLocation = secondResponse.headers().location ?? '';
+      expect([firstLocation, secondLocation].filter(location => location.includes('at_rsvp=saved'))).toHaveLength(1);
+      expect([firstLocation, secondLocation].filter(location => location.includes('at_rsvp=error'))).toHaveLength(1);
+      const assignment = JSON.parse(runWpEval("global $wpdb; $shared = at_gathering_roster_guest_by_email('shared-adult@example.test'); $row = at_gathering_party_assignment_for_guest((int) $shared->id); echo wp_json_encode(array('rsvp_user_id' => (int) ($row->rsvp_user_id ?? 0), 'assignment_count' => (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . at_gathering_assignments_table() . ' WHERE guest_id = %d', $shared->id))));")) as { rsvp_user_id: number; assignment_count: number };
+      expect(assignment.assignment_count).toBe(1);
+      expect([Number(runWpEval("echo (int) get_user_by('login', 'guest')->ID;")), Number(runWpEval("echo (int) get_user_by('login', 'admin')->ID;"))]).toContain(assignment.rsvp_user_id);
+    } finally {
+      await adminContext.close();
+    }
   });
 
   test('a rejected party conflict restores exactly the attempted guest selection', async ({ page }) => {
