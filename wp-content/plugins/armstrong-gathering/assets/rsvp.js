@@ -4,11 +4,117 @@
   var form = document.querySelector('.at-rsvp-form');
   if (!form) return;
 
+  var roster = form.querySelector('.at-party-roster');
+  if (roster) {
+    var choices = Array.from(roster.querySelectorAll('input[type="checkbox"]'));
+    var selected = document.createElement('div');
+    selected.className = 'at-party-selected';
+    var search = document.createElement('input');
+    search.type = 'text';
+    search.id = 'at-party-search';
+    search.placeholder = 'Search or browse names';
+    search.setAttribute('role', 'combobox');
+    search.setAttribute('aria-label', 'Add an adult');
+    search.setAttribute('aria-autocomplete', 'list');
+    search.setAttribute('aria-controls', 'at-party-options');
+    search.setAttribute('autocomplete', 'off');
+    var list = document.createElement('div');
+    list.id = 'at-party-options';
+    list.className = 'at-party-options';
+    list.setAttribute('role', 'listbox');
+    list.setAttribute('aria-label', 'Adults to add');
+    var message = document.createElement('p');
+    message.className = 'at-field-help';
+    message.setAttribute('role', 'status');
+    var active = -1;
+    var matches = [];
+    choices.forEach(function (choice) { choice.parentElement.hidden = true; });
+    roster.classList.add('at-party-enhanced');
+    roster.append(selected, search, list, message);
+
+    function closeOptions() {
+      list.hidden = true;
+      search.setAttribute('aria-expanded', 'false');
+      search.removeAttribute('aria-activedescendant');
+      active = -1;
+    }
+    function renderSelected() {
+      selected.replaceChildren();
+      choices.filter(function (choice) { return choice.checked; }).forEach(function (choice) {
+        var chip = document.createElement(choice.disabled ? 'span' : 'button');
+        chip.className = 'at-party-chip';
+        chip.textContent = choice.parentElement.textContent.trim();
+        if (!choice.disabled) {
+          chip.type = 'button';
+          chip.textContent += ' ×';
+          chip.setAttribute('aria-label', 'Remove ' + choice.parentElement.textContent.trim());
+          chip.addEventListener('click', function () {
+            choice.checked = false;
+            choice.dispatchEvent(new Event('change', { bubbles: true }));
+            renderSelected();
+            search.focus();
+          });
+        }
+        selected.append(chip);
+      });
+    }
+    function renderOptions() {
+      active = -1;
+      search.removeAttribute('aria-activedescendant');
+      matches = choices.filter(function (choice) {
+        return !choice.checked && !choice.disabled && choice.parentElement.textContent.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase());
+      });
+      list.replaceChildren();
+      matches.forEach(function (choice, index) {
+        var option = document.createElement('div');
+        option.id = 'at-party-option-' + choice.value;
+        option.setAttribute('role', 'option');
+        option.setAttribute('aria-selected', 'false');
+        option.textContent = choice.parentElement.textContent.trim();
+        option.addEventListener('pointerdown', function (event) { event.preventDefault(); });
+        option.addEventListener('click', function () { addChoice(index); });
+        list.append(option);
+      });
+      list.hidden = false;
+      search.setAttribute('aria-expanded', 'true');
+      message.textContent = matches.length ? '' : 'No matching adults to add.';
+    }
+    function addChoice(index) {
+      if (!matches[index]) return;
+      matches[index].checked = true;
+      matches[index].dispatchEvent(new Event('change', { bubbles: true }));
+      search.value = '';
+      renderSelected();
+      message.textContent = 'Adult added to your party.';
+      closeOptions();
+      search.focus({ preventScroll: true });
+    }
+    search.addEventListener('focus', renderOptions);
+    search.addEventListener('click', renderOptions);
+    search.addEventListener('input', renderOptions);
+    search.addEventListener('blur', closeOptions);
+    search.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') { event.preventDefault(); closeOptions(); }
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (list.hidden) renderOptions();
+        if (!matches.length) return;
+        active = active < 0 ? (event.key === 'ArrowDown' ? 0 : matches.length - 1) : (active + (event.key === 'ArrowDown' ? 1 : -1) + matches.length) % matches.length;
+        Array.from(list.children).forEach(function (option, index) { option.setAttribute('aria-selected', String(index === active)); });
+        search.setAttribute('aria-activedescendant', list.children[active].id);
+        list.children[active].scrollIntoView({ block: 'nearest' });
+      }
+      if (event.key === 'Enter') { event.preventDefault(); if (!list.hidden) addChoice(active < 0 ? 0 : active); }
+    });
+    renderSelected();
+    closeOptions();
+  }
+
   var touched = form.querySelector('[name="_at_rsvp_touched"]');
   function markRsvpTouched(event) {
     var field = event.target;
     if (!touched || !field || !field.matches('input, select, textarea') || field.type === 'hidden') return;
-	if (!/^(at_status|at_guest_count|at_guest_names|at_dietary|at_custom_food|at_custom_food_amount|at_notes)$/.test(field.name) && field.name.indexOf('at_food_amounts[') !== 0 && field.name.indexOf('at_food_offers[') !== 0) return;
+	if (!/^(at_status|at_children_count|at_guest_count|at_guest_names|at_dietary|at_custom_food|at_custom_food_amount|at_notes)$/.test(field.name) && field.name !== 'at_party_guest_ids[]' && field.name.indexOf('at_food_amounts[') !== 0 && field.name.indexOf('at_food_offers[') !== 0) return;
     touched.value = '1';
   }
   form.addEventListener('input', markRsvpTouched);
