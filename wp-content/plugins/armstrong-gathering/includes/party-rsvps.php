@@ -241,6 +241,11 @@ function at_gathering_rsvp_shortcode() {
 	$party_choices = at_gathering_party_roster_choices();
 	$linked_guest = $user->exists() ? at_gathering_roster_guest_by_user( $user->ID ) : null;
 	$assigned_ids = array();
+	$unavailable_ids = array();
+	if ( at_gathering_party_choices_authorized() ) {
+		global $wpdb;
+		$unavailable_ids = array_map( 'intval', $wpdb->get_col( $wpdb->prepare( 'SELECT DISTINCT guest_id FROM ' . at_gathering_assignments_table() . ' WHERE rsvp_user_id <> %d', $user->ID ) ) );
+	}
 	if ( ! array_key_exists( 'party_guest_ids', $values ) && $rsvp && at_gathering_party_choices_authorized() ) {
 		global $wpdb;
 		$assigned_ids = array_map( 'intval', $wpdb->get_col( $wpdb->prepare( 'SELECT guest_id FROM ' . at_gathering_assignments_table() . ' WHERE rsvp_user_id = %d', $user->ID ) ) );
@@ -279,8 +284,8 @@ function at_gathering_rsvp_shortcode() {
 			</fieldset>
 			<?php if ( $party_choices ) : ?>
 				<fieldset class="at-party-roster"><legend>Adults in your party</legend><p class="at-field-help">You’re included automatically. Search or browse to add the adults coming with you.</p>
-					<?php foreach ( $party_choices as $choice ) : ?>
-						<label><input type="checkbox" name="at_party_guest_ids[]" value="<?php echo esc_attr( $choice->id ); ?>" <?php checked( in_array( (int) $choice->id, $assigned_ids, true ) ); ?> <?php disabled( $linked_guest && (int) $linked_guest->id === (int) $choice->id ); ?>> <?php echo esc_html( $choice->display_name ); ?><?php echo $linked_guest && (int) $linked_guest->id === (int) $choice->id ? ' (you)' : ''; ?></label>
+					<?php foreach ( $party_choices as $choice ) : $is_you = $linked_guest && (int) $linked_guest->id === (int) $choice->id; $is_unavailable = ! $is_you && in_array( (int) $choice->id, $unavailable_ids, true ); ?>
+						<label class="<?php echo $is_unavailable ? 'is-unavailable' : ''; ?>"><input type="checkbox" name="at_party_guest_ids[]" value="<?php echo esc_attr( $choice->id ); ?>" <?php checked( in_array( (int) $choice->id, $assigned_ids, true ) ); ?> <?php disabled( $is_you || $is_unavailable ); ?>> <?php echo esc_html( $choice->display_name ); ?><?php echo $is_you ? ' (you)' : ( $is_unavailable ? ' (already RSVP’d)' : '' ); ?></label>
 					<?php endforeach; ?>
 				</fieldset>
 			<?php elseif ( is_user_logged_in() && ! at_gathering_party_choices_authorized() ) : ?>

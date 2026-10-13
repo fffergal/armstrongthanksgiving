@@ -197,6 +197,15 @@ a.at-button.is-secondary { background: var(--at-olive); }
   background: currentColor;
   transform: scale(0);
 }
+.at-rsvp-form .at-party-roster label.is-unavailable {
+  color: rgba(76, 37, 24, .58);
+  background: rgba(76, 37, 24, .06);
+  cursor: not-allowed;
+}
+.at-rsvp-form .at-party-roster label.is-unavailable input {
+  cursor: not-allowed;
+  opacity: .6;
+}
 #bbpress-forums input[type="checkbox"]:checked, #bbpress-forums input[type="radio"]:checked,
 .at-rsvp-form input[type="checkbox"]:checked, .at-rsvp-form input[type="radio"]:checked {
   border-color: var(--at-coral);

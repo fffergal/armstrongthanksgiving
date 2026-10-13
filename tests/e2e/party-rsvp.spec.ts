@@ -158,7 +158,7 @@ test.describe('party RSVP assignments', () => {
 
   test('an unclaimed signed-in guest is handed to setup with the RSVP draft intact', async ({ page }) => {
     test.setTimeout(90000);
-    runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => $owner->user_email)); $now = current_time('mysql', true); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $owner->user_email, 'display_name' => 'RSVP owner', 'claim_state' => 'invited', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
+    runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query(\"DELETE FROM {$wpdb->options} WHERE option_name LIKE 'at_invite_rate_%'\"); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => $owner->user_email)); $now = current_time('mysql', true); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $owner->user_email, 'display_name' => 'RSVP owner', 'claim_state' => 'invited', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
     await logIn(page);
     await page.goto('/rsvp/');
     await expect(page.locator('.at-party-roster')).toHaveCount(0);
@@ -192,10 +192,23 @@ test.describe('party RSVP assignments', () => {
     await logIn(page);
     await page.goto('/rsvp/');
     await page.getByRole('combobox', { name: 'Add an adult' }).fill('Reserved');
-    await page.getByRole('option', { name: 'Reserved adult', exact: true }).click();
-    await page.getByLabel('Children (ages 0–17)').selectOption('4');
-    await page.getByRole('button', { name: 'Save my RSVP' }).click();
-    await expect(page.getByRole('alert')).toContainText('already assigned to another party');
+    const reservedOption = page.getByRole('option', { name: /Reserved adult.*already RSVP/i });
+    await expect(reservedOption).toHaveAttribute('aria-disabled', 'true');
+    await expect(page.getByRole('status')).toContainText('already have an RSVP');
+    const nonce = await page.locator('input[name="at_rsvp_nonce"]').inputValue();
+    const reservedGuestId = Number(runWpEval("echo (int) at_gathering_roster_guest_by_user(get_user_by('login', 'admin')->ID)->id;"));
+    const response = await page.request.post('/wp-admin/admin-post.php', {
+      form: {
+        action: 'at_save_rsvp',
+        at_rsvp_nonce: nonce,
+        at_status: 'yes',
+        at_children_count: '4',
+        at_party_guest_ids: [String(reservedGuestId)],
+      },
+      maxRedirects: 0,
+    });
+    expect(response.status()).toBe(302);
+    expect(response.headers().location).toContain('at_rsvp=error');
     runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); if (at_gathering_get_rsvp($owner->ID) || $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . at_gathering_assignments_table() . ' WHERE rsvp_user_id = %d', $owner->ID))) { WP_CLI::error('A conflicting party update partially saved.'); }");
   });
 
@@ -241,18 +254,20 @@ test.describe('party RSVP assignments', () => {
     }
   });
 
-  test('a rejected party conflict restores exactly the attempted guest selection', async ({ page }) => {
+  test('unavailable adults remain visible in search but cannot be selected', async ({ page }) => {
     runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $owner->user_email, 'display_name' => 'RSVP owner', 'user_id' => $owner->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); foreach (array(array('party-friend@example.test', 'Party friend'), array('reserved-adult@example.test', 'Reserved adult')) as $entry) { $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $entry[0], 'display_name' => $entry[1], 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); } $owner_guest = at_gathering_roster_guest_by_user($owner->ID); $friend = at_gathering_roster_guest_by_email('party-friend@example.test'); $reserved = at_gathering_roster_guest_by_email('reserved-adult@example.test'); $wpdb->replace(at_gathering_table(), array('user_id' => $owner->ID, 'status' => 'yes', 'guest_count' => 2, 'guest_names' => '', 'children_count' => 0, 'dietary' => '', 'foods' => '[]', 'food_amounts' => '{}', 'custom_food' => '', 'notes' => '', 'created_at' => $now, 'updated_at' => $now)); foreach (array(array($owner_guest->id, $owner->ID, 1), array($friend->id, $owner->ID, 0), array($reserved->id, 999999, 0)) as $assignment) { $wpdb->insert(at_gathering_assignments_table(), array('guest_id' => $assignment[0], 'rsvp_user_id' => $assignment[1], 'is_owner' => $assignment[2], 'created_at' => $now)); } update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
     await logIn(page);
     await page.goto('/rsvp/');
     await page.getByRole('button', { name: 'Remove Party friend' }).click();
     await page.getByRole('combobox', { name: 'Add an adult' }).fill('Reserved');
-    await page.getByRole('option', { name: 'Reserved adult', exact: true }).click();
-    await page.getByRole('button', { name: 'Update my RSVP' }).click();
-    await expect(page.getByRole('alert')).toContainText('already assigned to another party');
+    const reservedOption = page.getByRole('option', { name: /Reserved adult.*already RSVP/i });
+    await expect(reservedOption).toHaveAttribute('aria-disabled', 'true');
+    await expect(page.getByRole('status')).toContainText('already have an RSVP');
+    await reservedOption.dispatchEvent('click');
+    await expect(page.getByRole('option', { name: /Reserved adult.*already RSVP/i })).toBeVisible();
+    await expect(page.locator('.at-party-selected').getByText('Reserved adult', { exact: false })).toHaveCount(0);
     await expect(page.getByLabel('Party friend', { exact: true })).not.toBeChecked();
-    await expect(page.getByLabel('Reserved adult', { exact: true })).toBeChecked();
-    runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $friend = at_gathering_roster_guest_by_email('party-friend@example.test'); $reserved = at_gathering_roster_guest_by_email('reserved-adult@example.test'); $party_ids = array_map('intval', $wpdb->get_col($wpdb->prepare('SELECT guest_id FROM ' . at_gathering_assignments_table() . ' WHERE rsvp_user_id = %d', $owner->ID))); if (count($party_ids) !== 2 || ! in_array((int) $friend->id, $party_ids, true) || in_array((int) $reserved->id, $party_ids, true)) { WP_CLI::error('A rejected edit changed the saved party assignments.'); }");
+    runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $friend = at_gathering_roster_guest_by_email('party-friend@example.test'); $reserved = at_gathering_roster_guest_by_email('reserved-adult@example.test'); $party_ids = array_map('intval', $wpdb->get_col($wpdb->prepare('SELECT guest_id FROM ' . at_gathering_assignments_table() . ' WHERE rsvp_user_id = %d', $owner->ID))); if (count($party_ids) !== 2 || ! in_array((int) $friend->id, $party_ids, true) || in_array((int) $reserved->id, $party_ids, true)) { WP_CLI::error('An unavailable search result changed the saved party assignments.'); }");
   });
 
   test('no responses keep adult reservations and save zero children', async ({ page }) => {

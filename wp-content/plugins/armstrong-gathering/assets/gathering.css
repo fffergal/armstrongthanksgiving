@@ -233,6 +233,8 @@
 }
 .at-party-options { max-height: 13rem; overflow-y: auto; border: 1px solid #c8ad90; border-radius: .5rem; background: #fff8ef; margin-top: .35rem; }
 .at-party-options [role="option"] { padding: .75rem; cursor: pointer; overflow-wrap: anywhere; }
+.at-party-options [role="option"].is-unavailable { color: #6b564c; background: #f1e8df; cursor: not-allowed; }
+.at-party-options [role="option"][aria-disabled="true"]:hover { background: #f1e8df; outline: 0; }
 .at-party-options [role="option"]:hover,
 .at-party-options [aria-selected="true"] { background: #ead7bf; outline: 2px solid #8f4828; outline-offset: -2px; }
 .at-party-options[hidden] { display: none; }

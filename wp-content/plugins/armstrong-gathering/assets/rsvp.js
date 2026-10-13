@@ -62,27 +62,32 @@
       active = -1;
       search.removeAttribute('aria-activedescendant');
       matches = choices.filter(function (choice) {
-        return !choice.checked && !choice.disabled && choice.parentElement.textContent.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase());
+        return !choice.checked && choice.parentElement.textContent.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase());
       });
       list.replaceChildren();
-      matches.forEach(function (choice, index) {
+      matches.forEach(function (choice) {
         var option = document.createElement('div');
         option.id = 'at-party-option-' + choice.value;
         option.setAttribute('role', 'option');
+        option.setAttribute('aria-disabled', String(choice.disabled));
         option.setAttribute('aria-selected', 'false');
+        if (choice.disabled) option.className = 'is-unavailable';
         option.textContent = choice.parentElement.textContent.trim();
         option.addEventListener('pointerdown', function (event) { event.preventDefault(); });
-        option.addEventListener('click', function () { addChoice(index); });
+        if (!choice.disabled) {
+          option.addEventListener('click', function () { addChoice(choice); });
+        }
         list.append(option);
       });
       list.hidden = false;
       search.setAttribute('aria-expanded', 'true');
-      message.textContent = matches.length ? '' : 'No matching adults to add.';
+      var availableCount = matches.filter(function (choice) { return !choice.disabled; }).length;
+      message.textContent = matches.length ? (availableCount ? '' : 'These guests already have an RSVP and can’t be added.') : 'No matching adults to add.';
     }
-    function addChoice(index) {
-      if (!matches[index]) return;
-      matches[index].checked = true;
-      matches[index].dispatchEvent(new Event('change', { bubbles: true }));
+    function addChoice(choice) {
+      if (!choice || choice.disabled) return;
+      choice.checked = true;
+      choice.dispatchEvent(new Event('change', { bubbles: true }));
       search.value = '';
       renderSelected();
       message.textContent = 'Adult added to your party.';
@@ -98,13 +103,22 @@
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault();
         if (list.hidden) renderOptions();
-        if (!matches.length) return;
-        active = active < 0 ? (event.key === 'ArrowDown' ? 0 : matches.length - 1) : (active + (event.key === 'ArrowDown' ? 1 : -1) + matches.length) % matches.length;
+        var available = matches.map(function (choice, index) { return choice.disabled ? -1 : index; }).filter(function (index) { return index >= 0; });
+        if (!available.length) return;
+        var current = available.indexOf(active);
+        var next = current < 0 ? (event.key === 'ArrowDown' ? 0 : available.length - 1) : (current + (event.key === 'ArrowDown' ? 1 : -1) + available.length) % available.length;
+        active = available[next];
         Array.from(list.children).forEach(function (option, index) { option.setAttribute('aria-selected', String(index === active)); });
         search.setAttribute('aria-activedescendant', list.children[active].id);
         list.children[active].scrollIntoView({ block: 'nearest' });
       }
-      if (event.key === 'Enter') { event.preventDefault(); if (!list.hidden) addChoice(active < 0 ? 0 : active); }
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        if (!list.hidden) {
+          var firstAvailable = matches.findIndex(function (choice) { return !choice.disabled; });
+          addChoice(matches[active >= 0 ? active : firstAvailable]);
+        }
+      }
     });
     renderSelected();
     closeOptions();
