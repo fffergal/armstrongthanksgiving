@@ -41,7 +41,8 @@ test('repeatable upgrades gate legacy count-only parties and detect changes to t
   runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); if (!$owner) { WP_CLI::error('The count-only migration fixture is missing.'); } $now = current_time('mysql'); $wpdb->replace(at_gathering_table(), array('user_id' => $owner->ID, 'status' => 'yes', 'guest_count' => 2, 'guest_names' => '', 'children_count' => 0, 'dietary' => '', 'foods' => '[]', 'food_amounts' => '{}', 'custom_food' => '', 'notes' => '', 'created_at' => $now, 'updated_at' => $now)); delete_option('at_gathering_party_reconciliation_complete'); delete_option('at_gathering_party_reconciliation_reviewed_at'); delete_option('at_gathering_party_reconciliation_review_hash'); at_gathering_ensure_schema(); at_gathering_ensure_schema(); if (at_gathering_party_rsvps_enabled()) { WP_CLI::error('A legacy RSVP with a count but no names bypassed reconciliation.'); } $snapshot = at_gathering_party_legacy_names_fingerprint(); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', $snapshot); $wpdb->update(at_gathering_table(), array('guest_count' => 3), array('user_id' => $owner->ID)); if (at_gathering_party_rsvps_enabled()) { WP_CLI::error('A changed legacy guest count did not invalidate the host review.'); } echo 'count-only legacy reconciliation checks passed';");
   await logInAsAdmin(page);
   await page.goto('/wp-admin/admin.php?page=at-gathering');
-  await expect(page.getByText('Names not recorded', { exact: true }).first()).toBeVisible();
+  const legacyPartyNames = page.getByRole('row').filter({ hasText: 'guest (user ID' }).locator('td').nth(1);
+  await expect(legacyPartyNames).toContainText('Names not recorded');
   await expect(page.getByText('Legacy guest count: 3')).toBeVisible();
   await expect(page.getByText(/Guest party saves are locked/)).toBeVisible();
 });
