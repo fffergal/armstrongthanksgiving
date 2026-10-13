@@ -165,7 +165,7 @@ test('a host can remove an RSVP without deleting the member account', async ({ p
   runWpEval("if (! get_user_by('login', 'guest')) { WP_CLI::error('Removing an RSVP also removed the member account.'); }");
 });
 
-test('food contributor names are shown to claimed signed-in guests only', async ({ page, browser }) => {
+test('food contributor names are only shown after sign-in', async ({ page, browser }) => {
   runWpEval("global $wpdb; $user = get_user_by('login', 'guest'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => $user->user_email)); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $user->user_email, 'display_name' => 'RSVP owner', 'user_id' => $user->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
   await logIn(page);
   await page.goto('/rsvp/');
@@ -177,9 +177,8 @@ test('food contributor names are shown to claimed signed-in guests only', async 
   try {
     const observer = await observerContext.newPage();
     await observer.goto('/rsvp/');
-    const summary = observer.getByLabel('Gravy — vegetarian', { exact: true }).locator('..').locator('..').locator('small');
-    await expect(summary).toContainText('Claimed: 2');
-    await expect(summary).toContainText('Sign in to see who is bringing it');
+    await expect(observer.getByRole('heading', { name: 'Continue to your RSVP' })).toBeVisible();
+    await expect(observer.getByLabel('Gravy — vegetarian', { exact: true })).toHaveCount(0);
     await expect(observer.locator('.at-rsvp-app')).not.toContainText(contributorName);
   } finally { await observerContext.close(); }
   await page.goto('/rsvp/');

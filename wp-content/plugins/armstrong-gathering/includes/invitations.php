@@ -19,7 +19,7 @@ function at_gathering_rsvp_draft_return_url( $token ) {
 }
 
 /** Return the public invitation form destination, optionally preserving an RSVP draft. */
-function at_gathering_invitation_url( $token = '', $draft_token = '' ) {
+function at_gathering_invitation_url( $token = '', $draft_token = '', $continue_to_rsvp = false ) {
 	$url = home_url( '/signup/' );
 	$args = array();
 	if ( $token ) {
@@ -28,6 +28,9 @@ function at_gathering_invitation_url( $token = '', $draft_token = '' ) {
 	$draft_token = at_gathering_rsvp_draft_token( $draft_token );
 	if ( $draft_token ) {
 		$args['at_rsvp_draft'] = $draft_token;
+	}
+	if ( $continue_to_rsvp ) {
+		$args['at_continue'] = 'rsvp';
 	}
 	return $args ? add_query_arg( $args, $url ) : $url;
 }
@@ -46,7 +49,7 @@ function at_gathering_create_setup_token() {
  * This is also the shared entry point for RSVP account-claim handoffs.
  * Public callers must always return the same generic response.
  */
-function at_gathering_send_claim_link( $email, $draft_token = '' ) {
+function at_gathering_send_claim_link( $email, $draft_token = '', $continue_to_rsvp = false ) {
 	global $wpdb;
 	$email = at_gathering_normalize_email( $email );
 	if ( ! is_email( $email ) ) {
@@ -73,9 +76,12 @@ function at_gathering_send_claim_link( $email, $draft_token = '' ) {
 		return false;
 	}
 	$draft_token = at_gathering_rsvp_draft_token( $draft_token );
-	$url = at_gathering_invitation_url( $token, $draft_token );
-	$message = '<p>You have been invited to join the Armstrong Thanksgiving gathering site.</p><p><a href="' . esc_url( $url ) . '">Set up your account</a>. This link expires in two days and can be used once.</p>';
-	$sent = (bool) wp_mail( $email, 'Set up your Armstrong Thanksgiving account', $message, array( 'Content-Type: text/html; charset=UTF-8' ) );
+	$url = at_gathering_invitation_url( $token, $draft_token, $continue_to_rsvp );
+	$message = $continue_to_rsvp
+		? '<p>You have been invited to the Armstrong Thanksgiving gathering. Use the link below to set up your account and continue to your RSVP.</p><p><a href="' . esc_url( $url ) . '">Set up your account and continue to RSVP</a>. This link expires in two days and can be used once.</p>'
+		: '<p>You have been invited to join the Armstrong Thanksgiving gathering site.</p><p><a href="' . esc_url( $url ) . '">Set up your account</a>. This link expires in two days and can be used once.</p>';
+	$subject = $continue_to_rsvp ? 'Continue your Armstrong Thanksgiving RSVP' : 'Set up your Armstrong Thanksgiving account';
+	$sent = (bool) wp_mail( $email, $subject, $message, array( 'Content-Type: text/html; charset=UTF-8' ) );
 	if ( $sent ) {
 		$sent_at = current_time( 'mysql', true );
 		$wpdb->insert( at_gathering_invitation_sends_table(), array( 'guest_id' => (int) $guest->id, 'sent_at' => $sent_at ), array( '%d', '%s' ) );
@@ -209,30 +215,31 @@ function at_gathering_signup_shortcode() {
 	$token = sanitize_text_field( wp_unslash( $_GET['at_setup'] ?? '' ) );
 	$draft_token = at_gathering_rsvp_draft_token( wp_unslash( $_GET['at_rsvp_draft'] ?? '' ) );
 	$draft_return = at_gathering_rsvp_draft_return_url( $draft_token );
+	$continue_to_rsvp = 'rsvp' === sanitize_key( wp_unslash( $_GET['at_continue'] ?? '' ) );
 	$guest = '' !== $token && preg_match( '/\A[a-f0-9]{64}\z/', $token )
 		? $GLOBALS['wpdb']->get_row( $GLOBALS['wpdb']->prepare( 'SELECT * FROM ' . at_gathering_roster_table() . ' WHERE token_hash = %s AND claim_state = %s AND token_expires > %s LIMIT 1', hash( 'sha256', $token ), 'invited', current_time( 'mysql', true ) ) )
 		: null;
 	$existing = $guest ? get_user_by( 'email', $guest->email_normalized ) : false;
 	$notice = sanitize_key( wp_unslash( $_GET['at_setup_result'] ?? '' ) );
-	$login_return = $draft_return ? $draft_return : home_url( '/' );
+	$login_return = $draft_return ? $draft_return : ( $continue_to_rsvp ? home_url( '/rsvp/' ) : home_url( '/' ) );
 	ob_start();
 	?>
 	<div class="at-signup-app">
 		<?php if ( 'requested' === $notice ) : ?>
 			<div class="at-success" role="status">If an invitation can be set up for that address, we’ll email a link shortly. Check your inbox.</div>
 		<?php elseif ( 'claimed' === $notice ) : ?>
-			<div class="at-success" role="status"><strong>Your account is ready.</strong><br><a href="<?php echo esc_url( wp_login_url( $login_return ) ); ?>">Sign in with your password</a><?php echo $draft_return ? ' to continue your RSVP.' : ' to visit the gathering site.'; ?></div>
+			<div class="at-success" role="status"><strong><?php echo $continue_to_rsvp ? 'Your invitation is connected.' : 'Your account is ready.'; ?></strong><br><a href="<?php echo esc_url( wp_login_url( $login_return ) ); ?>">Sign in with your password</a><?php echo ( $draft_return || $continue_to_rsvp ) ? ' to continue your RSVP.' : ' to visit the gathering site.'; ?></div>
 		<?php elseif ( $guest ) : ?>
 			<?php if ( 'error' === $notice ) : ?><div class="at-success at-error" role="alert">We could not finish setting up your account. Check the details and try again.</div><?php endif; ?>
 			<form class="at-signup-form at-rsvp-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post">
-				<div class="at-rsvp-intro"><h2>Set up your account</h2><p><?php echo $existing ? 'Confirm your details to link your existing account to the invitation.' : 'Choose a password for your gathering account.'; ?></p></div>
-				<input type="hidden" name="action" value="at_claim_invitation"><input type="hidden" name="at_setup_token" value="<?php echo esc_attr( $token ); ?>"><input type="hidden" name="at_rsvp_draft" value="<?php echo esc_attr( $draft_token ); ?>">
+				<div class="at-rsvp-intro"><h2><?php echo $continue_to_rsvp ? 'Continue to your RSVP' : 'Set up your account'; ?></h2><p><?php echo $continue_to_rsvp ? ( $existing ? 'Confirm your details to link your invitation, then sign in to continue to your RSVP.' : 'Choose a password to set up your account and continue to your RSVP.' ) : ( $existing ? 'Confirm your details to link your existing account to the invitation.' : 'Choose a password for your gathering account.' ); ?></p></div>
+				<input type="hidden" name="action" value="at_claim_invitation"><input type="hidden" name="at_setup_token" value="<?php echo esc_attr( $token ); ?>"><input type="hidden" name="at_rsvp_draft" value="<?php echo esc_attr( $draft_token ); ?>"><input type="hidden" name="at_continue" value="<?php echo $continue_to_rsvp ? 'rsvp' : ''; ?>">
 				<?php wp_nonce_field( 'at_claim_invitation_' . hash( 'sha256', $token ), 'at_claim_nonce' ); ?>
 				<fieldset class="at-account-fields"><legend>Your details</legend><div class="at-rsvp-grid">
 					<label>Display name<input type="text" name="at_display_name" value="<?php echo esc_attr( $guest->display_name ); ?>" autocomplete="name" required></label>
 					<?php if ( $existing ) : ?><p>This address already has an account. Set up the invitation to link it without changing your password or access. You can sign in with your existing password afterward.</p>
 					<?php else : ?><label>Password<input type="password" name="at_password" autocomplete="new-password" minlength="10" required></label><label>Confirm password<input type="password" name="at_password_confirm" autocomplete="new-password" minlength="10" required></label><?php endif; ?>
-				</div></fieldset><p class="at-form-actions"><button class="at-button" type="submit">Set up account</button></p>
+				</div></fieldset><p class="at-form-actions"><button class="at-button" type="submit"><?php echo $continue_to_rsvp && ! $existing ? 'Set up account and continue' : 'Set up account'; ?></button></p>
 			</form>
 		<?php else : ?>
 			<?php if ( 'error' === $notice ) : ?><div class="at-success at-error" role="alert">That setup link is unavailable. Request a new link if you have an invitation.</div><?php endif; ?>
@@ -261,10 +268,24 @@ function at_gathering_request_invitation() {
 	exit;
 }
 
+/** Send an invitation setup link from the signed-out RSVP entry point. */
+function at_gathering_request_rsvp_link() {
+	if ( ! isset( $_POST['at_rsvp_request_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['at_rsvp_request_nonce'] ) ), 'at_rsvp_request_link' ) ) {
+		wp_die( 'Sorry, we could not process that request.' );
+	}
+	$email = sanitize_email( wp_unslash( $_POST['at_email'] ?? '' ) );
+	if ( ! at_gathering_invitation_rate_limited( $email ) ) {
+		at_gathering_send_claim_link( $email, '', true );
+	}
+	wp_safe_redirect( add_query_arg( 'at_setup_result', 'requested', home_url( '/rsvp/' ) ) );
+	exit;
+}
+
 function at_gathering_claim_invitation_post() {
 	$token = sanitize_text_field( wp_unslash( $_POST['at_setup_token'] ?? '' ) );
 	$nonce = sanitize_text_field( wp_unslash( $_POST['at_claim_nonce'] ?? '' ) );
 	$draft_token = at_gathering_rsvp_draft_token( wp_unslash( $_POST['at_rsvp_draft'] ?? '' ) );
+	$continue_to_rsvp = 'rsvp' === sanitize_key( wp_unslash( $_POST['at_continue'] ?? '' ) );
 	if ( ! $token || ! wp_verify_nonce( $nonce, 'at_claim_invitation_' . hash( 'sha256', $token ) ) ) {
 		wp_safe_redirect( add_query_arg( 'at_setup_result', 'error', home_url( '/signup/' ) ) );
 		exit;
@@ -284,22 +305,28 @@ function at_gathering_claim_invitation_post() {
 		if ( $draft_token ) {
 			$args['at_rsvp_draft'] = $draft_token;
 		}
+		if ( $continue_to_rsvp ) {
+			$args['at_continue'] = 'rsvp';
+		}
 		wp_safe_redirect( add_query_arg( $args, home_url( '/signup/' ) ) );
 		exit;
 	}
 	$draft_return = at_gathering_rsvp_draft_return_url( $draft_token );
-	if ( $draft_return && $new_account_id === (int) $user->ID ) {
+	if ( ( $draft_return || $continue_to_rsvp ) && $new_account_id === (int) $user->ID ) {
 		// The new guest has just selected this account password. Continue only
 		// this first setup session; later sign-ins still use the password form.
 		wp_set_current_user( $user->ID );
 		wp_set_auth_cookie( $user->ID );
 		do_action( 'wp_login', $user->user_login, $user );
-		wp_safe_redirect( $draft_return );
+		wp_safe_redirect( $draft_return ? $draft_return : home_url( '/rsvp/' ) );
 		exit;
 	}
 	$args = array( 'at_setup_result' => 'claimed' );
 	if ( $draft_token ) {
 		$args['at_rsvp_draft'] = $draft_token;
+	}
+	if ( $continue_to_rsvp ) {
+		$args['at_continue'] = 'rsvp';
 	}
 	wp_safe_redirect( add_query_arg( $args, home_url( '/signup/' ) ) );
 	exit;
@@ -461,6 +488,8 @@ function at_gathering_register_invitations() {
 	add_action( 'admin_post_nopriv_at_signup', 'at_gathering_reject_legacy_signup' );
 	add_action( 'admin_post_at_request_invitation', 'at_gathering_request_invitation' );
 	add_action( 'admin_post_nopriv_at_request_invitation', 'at_gathering_request_invitation' );
+	add_action( 'admin_post_at_rsvp_request_link', 'at_gathering_request_rsvp_link' );
+	add_action( 'admin_post_nopriv_at_rsvp_request_link', 'at_gathering_request_rsvp_link' );
 	add_action( 'admin_post_at_claim_invitation', 'at_gathering_claim_invitation_post' );
 	add_action( 'admin_post_nopriv_at_claim_invitation', 'at_gathering_claim_invitation_post' );
 	add_action( 'admin_post_at_save_invitation', 'at_gathering_save_invitation' );
