@@ -19,7 +19,7 @@ test('RSVP visual contract on desktop', async ({ page }) => {
   await logIn(page);
   await page.goto('/rsvp/');
   await page.evaluate(() => document.fonts.ready);
-  await expect(page).toHaveScreenshot('rsvp-desktop.png', { fullPage: true, mask: [page.locator('.at-food-list small')] });
+  await expect(page).toHaveScreenshot('rsvp-desktop.png', { fullPage: true, mask: [page.locator('.at-food-choice > small')] });
 });
 
 test('signed-in RSVP visual contract on mobile', async ({ page }) => {
@@ -28,14 +28,14 @@ test('signed-in RSVP visual contract on mobile', async ({ page }) => {
   await page.goto('/rsvp/?visual-test=member-mobile');
   await expect(page.getByRole('link', { name: 'Sign out' })).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
-  await expect(page).toHaveScreenshot('rsvp-member-mobile.png', { fullPage: true, mask: [page.locator('.at-food-list small')] });
+  await expect(page).toHaveScreenshot('rsvp-member-mobile.png', { fullPage: true, mask: [page.locator('.at-food-choice > small')] });
 });
 
 test('public signup and RSVP visual contract on mobile', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/rsvp/');
   await page.evaluate(() => document.fonts.ready);
-  await expect(page).toHaveScreenshot('rsvp-signup-mobile.png', { fullPage: true, mask: [page.locator('.at-food-list small')] });
+  await expect(page).toHaveScreenshot('rsvp-signup-mobile.png', { fullPage: true, mask: [page.locator('.at-food-choice > small')] });
 });
 
 test('RSVP visual contract on iPad', async ({ page }) => {
@@ -46,5 +46,5 @@ test('RSVP visual contract on iPad', async ({ page }) => {
   await page.goto('/rsvp/?visual-test=ipad');
   await expect(page.getByRole('link', { name: 'Sign out' })).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
-  await expect(page).toHaveScreenshot('rsvp-ipad.png', { fullPage: true, mask: [page.locator('.at-food-list small')] });
+  await expect(page).toHaveScreenshot('rsvp-ipad.png', { fullPage: true, mask: [page.locator('.at-food-choice > small')] });
 });
