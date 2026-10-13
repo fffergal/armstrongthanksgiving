@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { withWorktreeMappings } from './wp-env-config.mjs';
+import { normalizeDockerMountSource, withWorktreeMappings } from './wp-env-config.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const worktreeId = crypto.createHash('sha256').update(root).digest('hex').slice(0, 10);
@@ -120,7 +120,7 @@ function verifyProjectMappings() {
   for (const [source, destination] of expected) {
     const mounted = mounts.some(mount =>
       mount.Type === 'bind'
-      && path.resolve(mount.Source) === source
+		&& normalizeDockerMountSource(mount.Source) === path.resolve(source)
       && mount.Destination === destination
     );
     if (!mounted) {

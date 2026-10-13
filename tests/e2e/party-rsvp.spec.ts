@@ -29,36 +29,57 @@ test.describe('party RSVP assignments', () => {
     if (cleanup.status !== 0) throw new Error(cleanup.stderr || cleanup.stdout || 'Could not reset the local RSVP fixture.');
   });
 
-  test('anonymous visitors do not receive roster choices from page markup or the selector endpoint', async ({ page }) => {
+  test('signed-out RSVP entry asks for email and does not expose roster choices', async ({ page }) => {
     runWpEval("global $wpdb; $now = current_time('mysql'); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => 'private-roster@example.test')); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => 'private-roster@example.test', 'display_name' => 'Private roster choice', 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
     await page.goto('/rsvp/');
     await expect(page.locator('.at-party-roster')).toHaveCount(0);
-    await expect(page.locator('#at-rsvp-form')).not.toContainText('Private roster choice');
-    const nonce = await page.locator('#at-rsvp-form').getAttribute('data-party-roster-nonce');
+    await expect(page.getByRole('heading', { name: 'Continue to your RSVP' })).toBeVisible();
+    await expect(page.locator('input[name="at_rsvp_request_nonce"]')).toHaveCount(1);
+    await expect(page.locator('body')).not.toContainText('Private roster choice');
+    const nonce = await page.locator('input[name="at_rsvp_request_nonce"]').getAttribute('value');
     const response = await page.request.get(`/wp-admin/admin-ajax.php?action=at_gathering_party_roster_choices&nonce=${nonce}`);
     expect(response.status()).toBe(403);
     expect(await response.text()).not.toContain('Private roster choice');
   });
 
-  test('anonymous RSVP drafts go to invitation setup and survive the setup-link request', async ({ page }) => {
-    runWpEval("global $wpdb; $now = current_time('mysql'); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => 'guest@example.test')); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => 'guest@example.test', 'display_name' => 'RSVP owner', 'claim_state' => 'invited', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
-    await page.goto('/rsvp/');
+  test('homepage RSVP emails an invitation link before account setup and continues to the form', async ({ page }) => {
+    runWpEval("global $wpdb; $now = current_time('mysql'); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => 'new-rsvp@example.test')); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => 'new-rsvp@example.test', 'display_name' => 'RSVP owner', 'claim_state' => 'invited', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
+    await page.goto('/');
+    await page.getByRole('link', { name: 'RSVP', exact: true }).first().click();
+    await expect(page.getByRole('heading', { name: 'Continue to your RSVP' })).toBeVisible();
+    await page.getByLabel('Email').fill('new-rsvp@example.test');
+    await page.getByRole('button', { name: 'Email me a link' }).click();
+    await expect(page).toHaveURL(/\/rsvp\/\?at_setup_result=requested/);
+    await expect(page.getByRole('status')).toContainText('we’ll email a link to set up your account and continue to your RSVP');
+    const capturedMail = JSON.parse(runWpEval('echo wp_json_encode(get_transient("at_gathering_last_test_mail"));')) as { to: string; message: string };
+    expect(capturedMail.to).toBe('new-rsvp@example.test');
+    expect(capturedMail.message).toContain('at_continue=rsvp');
+    expect(capturedMail.message).toContain('continue to your RSVP');
+    const setupToken = capturedMail.message.match(/at_setup=([a-f0-9]{64})/)?.[1];
+    expect(setupToken).toBeTruthy();
+    await page.goto(`/signup/?at_setup=${setupToken}&at_continue=rsvp`);
+    await expect(page.getByRole('heading', { name: 'Continue to your RSVP' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Set up account and continue' })).toBeVisible();
+    await page.getByLabel('Password', { exact: true }).fill('guest-password-2026');
+    await page.getByLabel('Confirm password').fill('guest-password-2026');
+    await page.getByRole('button', { name: 'Set up account and continue' }).click();
+    await page.waitForURL(/\/rsvp\/$/);
+    await expect(page.getByRole('button', { name: 'Save my RSVP' })).toBeVisible();
     await page.getByLabel('Children (ages 0–17)').selectOption('2');
     await page.getByRole('button', { name: 'Save my RSVP' }).click();
-    await page.waitForURL(/\/signup\/\?at_rsvp_draft=[a-z0-9]+/);
-    const draft = new URL(page.url()).searchParams.get('at_rsvp_draft');
-    expect(draft).toMatch(/^[a-z0-9]+$/);
-    await expect(page.getByLabel('Email')).toBeVisible();
-    await expect(page.locator('input[name="at_rsvp_draft"]')).toHaveValue(draft!);
-    await page.getByLabel('Email').fill('guest@example.test');
-    await page.getByRole('button', { name: 'Request setup link' }).click();
-    await expect(page).toHaveURL(/\/signup\/\?at_setup_result=requested/);
-    await expect(page.getByRole('status')).toContainText('we’ll email a link shortly');
-    const capturedMail = JSON.parse(runWpEval('echo wp_json_encode(get_transient("at_gathering_last_test_mail"));')) as { to: string; message: string };
-    expect(capturedMail.to).toBe('guest@example.test');
-    expect(capturedMail.message).toContain(`at_rsvp_draft=${draft}`);
-    await page.goto(`/rsvp/?at_rsvp_draft=${draft}`);
-    await expect(page.getByLabel('Children (ages 0–17)')).toHaveValue('2');
+    await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
+    const saved = runWpEval("$user = get_user_by('email', 'new-rsvp@example.test'); echo at_gathering_get_rsvp($user->ID) ? 'saved' : 'missing';").trim();
+    expect(saved).toBe('saved');
+  });
+
+  test('RSVP email request gives the same response when no invitation matches', async ({ page }) => {
+    runWpEval("delete_transient('at_gathering_last_test_mail');");
+    await page.goto('/rsvp/');
+    await page.getByLabel('Email').fill('not-invited@example.test');
+    await page.getByRole('button', { name: 'Email me a link' }).click();
+    await expect(page).toHaveURL(/\/rsvp\/\?at_setup_result=requested/);
+    await expect(page.getByRole('status')).toContainText('If an invitation is available for that address');
+    expect(runWpEval('echo get_transient("at_gathering_last_test_mail") ? "sent" : "none";').trim()).toBe('none');
   });
 
   test('only claimed guests receive roster choices and the owner is reserved with the party', async ({ page }) => {
