@@ -293,8 +293,8 @@ function at_gathering_rsvp_shortcode() {
 										<label class="at-food-bringing"><input type="checkbox" name="at_food_offers[<?php echo esc_attr( $food_key ); ?>]" value="1" aria-label="Bringing <?php echo esc_attr( $food ); ?>" <?php checked( $amount > 0 ); ?>><span>Bringing</span></label>
 								</div>
 								<label class="at-food-amount" for="at-food-amount-<?php echo esc_attr( $food_key ); ?>">How many?</label>
-								<input id="at-food-amount-<?php echo esc_attr( $food_key ); ?>" type="number" name="at_food_amounts[<?php echo esc_attr( $food_key ); ?>]" aria-label="<?php echo esc_attr( $food ); ?>" min="0" max="9999" step="1" value="<?php echo esc_attr( $amount ); ?>">
-								<?php if ( ! empty( $units[ $food ] ) ) : ?><small class="at-food-unit-note"><?php echo esc_html( $units[ $food ] ); ?></small><?php endif; ?>
+								<input id="at-food-amount-<?php echo esc_attr( $food_key ); ?>" type="number" name="at_food_amounts[<?php echo esc_attr( $food_key ); ?>]" aria-label="<?php echo esc_attr( $food ); ?>" <?php if ( ! empty( $units[ $food ] ) ) : ?>aria-describedby="at-food-unit-<?php echo esc_attr( $food_key ); ?>" <?php endif; ?>min="0" max="9999" step="1" value="<?php echo esc_attr( $amount ); ?>">
+								<?php if ( ! empty( $units[ $food ] ) ) : ?><small id="at-food-unit-<?php echo esc_attr( $food_key ); ?>" class="at-food-unit-note"><?php echo esc_html( $units[ $food ] ); ?></small><?php endif; ?>
 							</div>
 							<small><span>Claimed: <?php echo esc_html( (int) ( $counts[ $food ] ?? 0 ) ); ?></span><span class="at-food-summary-divider" aria-hidden="true">·</span><span>Goal: <?php echo $goal ? esc_html( $goal ) : 'not set'; ?></span><?php if ( ! empty( $food_contributors[ $food ] ) ) : ?><span class="at-food-summary-divider" aria-hidden="true">·</span><?php if ( $can_view_contributors ) : ?><span>Bringing: <?php echo esc_html( implode( ', ', $food_contributors[ $food ] ) ); ?></span><?php else : ?><span><button class="at-link-button" type="submit" name="action" value="at_rsvp_signin" formnovalidate>Sign in to see who is bringing it</button></span><?php endif; ?><?php endif; ?></small>
 						</div>

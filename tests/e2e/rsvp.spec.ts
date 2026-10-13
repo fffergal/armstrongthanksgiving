@@ -140,8 +140,10 @@ test('a host can set a food goal and guests see offered amount over goal', async
     await expect(page.getByLabel('Unit or size for Mashed potato, shown on RSVP form')).toHaveValue('large bowl');
     await page.goto('/rsvp/');
     const foodCard = page.locator('.at-food-choice').filter({ has: page.getByText('Mashed potato', { exact: true }) });
-    await expect(foodCard.locator('.at-food-unit-note')).toHaveText('large bowl');
-    await expect(foodCard.locator('.at-food-unit-note')).toHaveCSS('grid-row', '3');
+    const unitNote = foodCard.locator('.at-food-unit-note');
+    await expect(unitNote).toHaveText('large bowl');
+    await expect(unitNote).toHaveCSS('grid-row', '3');
+    await expect(foodCard.locator('input[type="number"]')).toHaveAttribute('aria-describedby', await unitNote.getAttribute('id'));
     const summary = foodCard.locator(':scope > small');
     await expect(summary).toContainText('Claimed: 0');
     await expect(summary).toContainText('Goal: 7');
