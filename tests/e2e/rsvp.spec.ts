@@ -41,7 +41,7 @@ test('repeatable upgrades gate legacy count-only parties and detect changes to t
   runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); if (!$owner) { WP_CLI::error('The count-only migration fixture is missing.'); } $now = current_time('mysql'); $wpdb->replace(at_gathering_table(), array('user_id' => $owner->ID, 'status' => 'yes', 'guest_count' => 2, 'guest_names' => '', 'children_count' => 0, 'dietary' => '', 'foods' => '[]', 'food_amounts' => '{}', 'custom_food' => '', 'notes' => '', 'created_at' => $now, 'updated_at' => $now)); delete_option('at_gathering_party_reconciliation_complete'); delete_option('at_gathering_party_reconciliation_reviewed_at'); delete_option('at_gathering_party_reconciliation_review_hash'); at_gathering_ensure_schema(); at_gathering_ensure_schema(); if (at_gathering_party_rsvps_enabled()) { WP_CLI::error('A legacy RSVP with a count but no names bypassed reconciliation.'); } $snapshot = at_gathering_party_legacy_names_fingerprint(); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', $snapshot); $wpdb->update(at_gathering_table(), array('guest_count' => 3), array('user_id' => $owner->ID)); if (at_gathering_party_rsvps_enabled()) { WP_CLI::error('A changed legacy guest count did not invalidate the host review.'); } echo 'count-only legacy reconciliation checks passed';");
   await logInAsAdmin(page);
   await page.goto('/wp-admin/admin.php?page=at-gathering');
-  await expect(page.getByText('Names not recorded')).toBeVisible();
+  await expect(page.getByText('Names not recorded', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('Legacy guest count: 3')).toBeVisible();
   await expect(page.getByText(/Guest party saves are locked/)).toBeVisible();
 });
@@ -165,7 +165,7 @@ test('a host can remove an RSVP without deleting the member account', async ({ p
   runWpEval("if (! get_user_by('login', 'guest')) { WP_CLI::error('Removing an RSVP also removed the member account.'); }");
 });
 
-test('food contributor names are shown to claimed signed-in guests only', async ({ page, browser }) => {
+test('food contributor names are only shown after sign-in', async ({ page, browser }) => {
   runWpEval("global $wpdb; $user = get_user_by('login', 'guest'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => $user->user_email)); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $user->user_email, 'display_name' => 'RSVP owner', 'user_id' => $user->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
   await logIn(page);
   await page.goto('/rsvp/');
@@ -177,9 +177,8 @@ test('food contributor names are shown to claimed signed-in guests only', async 
   try {
     const observer = await observerContext.newPage();
     await observer.goto('/rsvp/');
-    const summary = observer.getByLabel('Gravy — vegetarian', { exact: true }).locator('..').locator('..').locator('small');
-    await expect(summary).toContainText('Claimed: 2');
-    await expect(summary).toContainText('Sign in to see who is bringing it');
+    await expect(observer.getByRole('heading', { name: 'Continue to your RSVP' })).toBeVisible();
+    await expect(observer.getByLabel('Gravy — vegetarian', { exact: true })).toHaveCount(0);
     await expect(observer.locator('.at-rsvp-app')).not.toContainText(contributorName);
   } finally { await observerContext.close(); }
   await page.goto('/rsvp/');
@@ -216,7 +215,7 @@ test('form controls only show the brown focus ring during keyboard navigation', 
   const coming = page.getByLabel('I’m coming');
   await coming.click();
   await coming.press('ArrowRight');
-  const maybe = page.getByLabel('Maybe');
+  const maybe = page.getByRole('radio', { name: 'Maybe', exact: true });
   await expect(maybe).toBeFocused();
   await expect(maybe).toHaveCSS('outline-style', 'solid');
   await expect(maybe).toHaveCSS('outline-width', '3px');
@@ -270,7 +269,7 @@ test('private album access redirects signed-out visitors', async ({ browser }) =
 
 
 test('food totals add the offered amount and an RSVP update does not double-count it', async ({ page }) => {
-  runWpEval("global $wpdb; $user = get_user_by('login', 'guest'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => $user->user_email)); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $user->user_email, 'display_name' => 'RSVP owner', 'user_id' => $user->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
+  runWpEval("global $wpdb; $user = get_user_by('login', 'guest'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->delete(at_gathering_table(), array('user_id' => $user->ID)); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => $user->user_email)); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $user->user_email, 'display_name' => 'RSVP owner', 'user_id' => $user->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
   await logIn(page);
   await page.goto('/rsvp/');
   const gravySummary = page.getByLabel('Gravy — vegetarian', { exact: true }).locator('..').locator('..').locator('small');
