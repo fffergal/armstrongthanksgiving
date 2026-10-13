@@ -11,3 +11,8 @@ export function withWorktreeMappings(config, root) {
     },
   };
 }
+
+/** Normalize the host path reported by Docker Desktop before comparing bind mounts. */
+export function normalizeDockerMountSource(source) {
+	return path.resolve(String(source).replace(/^\/host_mnt(?=\/)/, ''));
+}
