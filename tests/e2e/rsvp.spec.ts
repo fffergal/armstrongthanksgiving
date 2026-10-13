@@ -128,20 +128,28 @@ test('a host can set a food goal and guests see offered amount over goal', async
   await page.goto('/wp-admin/admin.php?page=at-gathering');
 
   const goal = page.getByLabel('Goal for Mashed potato');
+  const unit = page.getByLabel('Unit or size for Mashed potato, shown on RSVP form');
   await expect(goal).toBeVisible();
   const originalGoal = await goal.inputValue();
+  const originalUnit = await unit.inputValue();
   try {
     await goal.fill('7');
-    await page.getByRole('button', { name: 'Save food goals' }).click();
+    await unit.fill('large bowl');
+    await page.getByRole('button', { name: 'Save food settings' }).click();
     await expect(page.getByLabel('Goal for Mashed potato')).toHaveValue('7');
+    await expect(page.getByLabel('Unit or size for Mashed potato, shown on RSVP form')).toHaveValue('large bowl');
     await page.goto('/rsvp/');
-    const summary = page.getByLabel('Mashed potato', { exact: true }).locator('..').locator('..').locator('small');
+    const foodCard = page.locator('.at-food-choice').filter({ has: page.getByText('Mashed potato', { exact: true }) });
+    await expect(foodCard.locator('.at-food-unit-note')).toHaveText('large bowl');
+    await expect(foodCard.locator('.at-food-unit-note')).toHaveCSS('grid-row', '3');
+    const summary = foodCard.locator(':scope > small');
     await expect(summary).toContainText('Claimed: 0');
     await expect(summary).toContainText('Goal: 7');
   } finally {
     await page.goto('/wp-admin/admin.php?page=at-gathering');
     await page.getByLabel('Goal for Mashed potato').fill(originalGoal);
-    await page.getByRole('button', { name: 'Save food goals' }).click();
+    await page.getByLabel('Unit or size for Mashed potato, shown on RSVP form').fill(originalUnit);
+    await page.getByRole('button', { name: 'Save food settings' }).click();
   }
 });
 

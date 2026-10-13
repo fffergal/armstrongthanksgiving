@@ -41,6 +41,15 @@ function at_gathering_food_goals() {
 	return $goals;
 }
 
+function at_gathering_food_units() {
+	$stored = (array) get_option( 'at_gathering_food_units', array() );
+	$units = array();
+	foreach ( at_gathering_foods() as $food ) {
+		$units[ $food ] = sanitize_text_field( $stored[ $food ] ?? '' );
+	}
+	return $units;
+}
+
 function at_gathering_rsvp_food_amounts( $rsvp ) {
 	$amounts = json_decode( (string) ( $rsvp->food_amounts ?? '' ), true );
 	if ( is_array( $amounts ) && $amounts ) {
@@ -473,12 +482,16 @@ function at_gathering_save_food_goals() {
 		wp_die( 'Sorry, the food goals could not be saved.' );
 	}
 	$submitted = (array) wp_unslash( $_POST['at_food_goals'] ?? array() );
+	$submitted_units = (array) wp_unslash( $_POST['at_food_units'] ?? array() );
 	$goals = array();
+	$units = array();
 	foreach ( at_gathering_foods() as $food ) {
 		$key = md5( $food );
 		$goals[ $food ] = isset( $submitted[ $key ] ) ? min( 9999, absint( $submitted[ $key ] ) ) : 0;
+		$units[ $food ] = sanitize_text_field( $submitted_units[ $key ] ?? '' );
 	}
 	update_option( 'at_gathering_food_goals', $goals );
+	update_option( 'at_gathering_food_units', $units );
 	if ( function_exists( 'wp_cache_clear_cache' ) ) {
 		wp_cache_clear_cache();
 	}

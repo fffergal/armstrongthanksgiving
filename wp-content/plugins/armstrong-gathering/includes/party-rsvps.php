@@ -204,6 +204,7 @@ function at_gathering_rsvp_shortcode() {
 	$foods             = at_gathering_foods();
 	$counts            = at_gathering_food_counts();
 	$goals             = at_gathering_food_goals();
+	$units             = at_gathering_food_units();
 	$food_contributors = at_gathering_food_contributors();
 	$custom_food_counts = at_gathering_custom_food_counts( $foods );
 	$food_amounts      = $rsvp ? at_gathering_rsvp_food_amounts( $rsvp ) : array();
@@ -293,6 +294,7 @@ function at_gathering_rsvp_shortcode() {
 								</div>
 								<label class="at-food-amount" for="at-food-amount-<?php echo esc_attr( $food_key ); ?>">How many?</label>
 								<input id="at-food-amount-<?php echo esc_attr( $food_key ); ?>" type="number" name="at_food_amounts[<?php echo esc_attr( $food_key ); ?>]" aria-label="<?php echo esc_attr( $food ); ?>" min="0" max="9999" step="1" value="<?php echo esc_attr( $amount ); ?>">
+								<?php if ( ! empty( $units[ $food ] ) ) : ?><small class="at-food-unit-note"><?php echo esc_html( $units[ $food ] ); ?></small><?php endif; ?>
 							</div>
 							<small><span>Claimed: <?php echo esc_html( (int) ( $counts[ $food ] ?? 0 ) ); ?></span><span class="at-food-summary-divider" aria-hidden="true">·</span><span>Goal: <?php echo $goal ? esc_html( $goal ) : 'not set'; ?></span><?php if ( ! empty( $food_contributors[ $food ] ) ) : ?><span class="at-food-summary-divider" aria-hidden="true">·</span><?php if ( $can_view_contributors ) : ?><span>Bringing: <?php echo esc_html( implode( ', ', $food_contributors[ $food ] ) ); ?></span><?php else : ?><span><button class="at-link-button" type="submit" name="action" value="at_rsvp_signin" formnovalidate>Sign in to see who is bringing it</button></span><?php endif; ?><?php endif; ?></small>
 						</div>
@@ -578,6 +580,7 @@ function at_gathering_admin_page() {
 	$foods  = at_gathering_foods();
 	$counts = at_gathering_food_counts();
 	$goals  = at_gathering_food_goals();
+	$units  = at_gathering_food_units();
 	$admins = get_users( array( 'role' => 'administrator', 'orderby' => 'display_name', 'order' => 'ASC' ) );
 	$event  = at_gathering_event_details();
 	?>
@@ -649,12 +652,12 @@ function at_gathering_admin_page() {
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="at-food-goals">
 			<input type="hidden" name="action" value="at_save_food_goals">
 			<table class="widefat striped at-admin-foods">
-				<thead><tr><th scope="col">Food</th><th scope="col">Amount offered</th><th scope="col">Amount goal</th></tr></thead>
+				<thead><tr><th scope="col">Food</th><th scope="col">Unit or size</th><th scope="col">Amount offered</th><th scope="col">Amount goal</th></tr></thead>
 				<tbody>
-					<?php foreach ( $foods as $food ) : $food_key = md5( $food ); ?><tr><td><?php echo esc_html( $food ); ?></td><td><?php echo esc_html( (int) ( $counts[ $food ] ?? 0 ) ); ?></td><td><label class="screen-reader-text" for="at-food-goal-<?php echo esc_attr( $food_key ); ?>">Goal for <?php echo esc_html( $food ); ?></label><input id="at-food-goal-<?php echo esc_attr( $food_key ); ?>" type="number" min="0" max="9999" step="1" name="at_food_goals[<?php echo esc_attr( $food_key ); ?>]" value="<?php echo esc_attr( $goals[ $food ] ); ?>"></td></tr><?php endforeach; ?>
+					<?php foreach ( $foods as $food ) : $food_key = md5( $food ); ?><tr><td><?php echo esc_html( $food ); ?></td><td><label class="screen-reader-text" for="at-food-unit-<?php echo esc_attr( $food_key ); ?>">Unit or size for <?php echo esc_html( $food ); ?>, shown on RSVP form</label><input id="at-food-unit-<?php echo esc_attr( $food_key ); ?>" type="text" maxlength="80" name="at_food_units[<?php echo esc_attr( $food_key ); ?>]" value="<?php echo esc_attr( $units[ $food ] ?? '' ); ?>" placeholder="e.g. large tray"></td><td><?php echo esc_html( (int) ( $counts[ $food ] ?? 0 ) ); ?></td><td><label class="screen-reader-text" for="at-food-goal-<?php echo esc_attr( $food_key ); ?>">Goal for <?php echo esc_html( $food ); ?></label><input id="at-food-goal-<?php echo esc_attr( $food_key ); ?>" type="number" min="0" max="9999" step="1" name="at_food_goals[<?php echo esc_attr( $food_key ); ?>]" value="<?php echo esc_attr( $goals[ $food ] ); ?>"></td></tr><?php endforeach; ?>
 				</tbody>
 			</table>
-			<p><button class="button button-primary" type="submit">Save food goals</button> <span class="description">Leave a goal at 0 to show the current amount without a target.</span></p>
+			<p><button class="button button-primary" type="submit">Save food settings</button> <span class="description">Set an optional unit or size and leave a goal at 0 to show the current amount without a target.</span></p>
 			<?php wp_nonce_field( 'at_save_food_goals', 'at_food_goals_nonce' ); ?>
 		</form>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="at-add-food">
