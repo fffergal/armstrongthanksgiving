@@ -261,9 +261,10 @@ test('a standalone signup requests setup without creating an account', async ({ 
   await expect(page.getByRole('heading', { name: 'Set up your gathering account' })).toBeVisible();
   await page.getByLabel('Email').fill(email);
   await page.getByRole('button', { name: 'Request setup link' }).click();
-  await expect(page.getByRole('status')).toContainText('If an invitation can be set up for that address');
+  await expect(page.getByRole('status')).toContainText('If you don’t get an email straight away, we’ll send you one soon.');
   const accountExists = runWpEval(`echo email_exists('${email}') ? 'yes' : 'no';`).trim();
   expect(accountExists).toBe('no');
+  runWpEval(`global $wpdb; $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => '${email}'));`);
 });
 
 
