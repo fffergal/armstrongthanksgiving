@@ -44,19 +44,53 @@ function at_gathering_create_setup_token() {
 	}
 }
 
+/** Create a signed, unguessable review token that can retain an RSVP handoff. */
+function at_gathering_create_invitation_review_token( $draft_token = '', $continue_to_rsvp = false ) {
+	$nonce = at_gathering_create_setup_token();
+	if ( ! $nonce ) {
+		return '';
+	}
+	$payload = wp_json_encode(
+		array(
+			'nonce'    => $nonce,
+			'draft'    => at_gathering_rsvp_draft_token( $draft_token ),
+			'continue' => $continue_to_rsvp ? 1 : 0,
+		)
+	);
+	$encoded = rtrim( strtr( base64_encode( $payload ), '+/', '-_' ), '=' );
+	return $encoded . '.' . hash_hmac( 'sha256', $encoded, wp_salt( 'auth' ) );
+}
+
+/** Validate and decode an invitation-review bearer token. */
+function at_gathering_decode_invitation_review_token( $token ) {
+	if ( ! preg_match( '/\A([A-Za-z0-9_-]+)\.([a-f0-9]{64})\z/', (string) $token, $matches ) || ! hash_equals( hash_hmac( 'sha256', $matches[1], wp_salt( 'auth' ) ), $matches[2] ) ) {
+		return false;
+	}
+	$encoded = strtr( $matches[1], '-_', '+/' );
+	$encoded .= str_repeat( '=', ( 4 - strlen( $encoded ) % 4 ) % 4 );
+	$payload = json_decode( base64_decode( $encoded, true ), true );
+	if ( ! is_array( $payload ) || ! preg_match( '/\A[a-f0-9]{64}\z/', (string) ( $payload['nonce'] ?? '' ) ) ) {
+		return false;
+	}
+	return array(
+		'draft_token'      => at_gathering_rsvp_draft_token( $payload['draft'] ?? '' ),
+		'continue_to_rsvp' => 1 === (int) ( $payload['continue'] ?? 0 ),
+	);
+}
+
 /**
  * Rotate an invited guest's setup token and send the link.
  * This is also the shared entry point for RSVP account-claim handoffs.
  * Public callers must always return the same generic response.
  */
-function at_gathering_send_claim_link( $email, $draft_token = '', $continue_to_rsvp = false ) {
+function at_gathering_send_claim_link( $email, $draft_token = '', $continue_to_rsvp = false, $allow_blank_name = false ) {
 	global $wpdb;
 	$email = at_gathering_normalize_email( $email );
 	if ( ! is_email( $email ) ) {
 		return false;
 	}
 	$guest = at_gathering_roster_guest_by_email( $email );
-	if ( ! $guest || ! empty( $guest->user_id ) || '' === trim( (string) $guest->display_name ) ) {
+	if ( ! $guest || ! empty( $guest->user_id ) || ( ! $allow_blank_name && '' === trim( (string) $guest->display_name ) ) ) {
 		return false;
 	}
 	$token = at_gathering_create_setup_token();
@@ -226,7 +260,7 @@ function at_gathering_signup_shortcode() {
 	?>
 	<div class="at-signup-app">
 		<?php if ( 'requested' === $notice ) : ?>
-			<div class="at-success" role="status">If an invitation can be set up for that address, we’ll email a link shortly. Check your inbox.</div>
+			<div class="at-success" role="status">Thanks, we’ve received your request. If you don’t get an email straight away, we’ll send you one soon.</div>
 		<?php elseif ( 'claimed' === $notice ) : ?>
 			<div class="at-success" role="status"><strong><?php echo $continue_to_rsvp ? 'Your invitation is connected.' : 'Your account is ready.'; ?></strong><br><a href="<?php echo esc_url( wp_login_url( $login_return ) ); ?>">Sign in with your password</a><?php echo ( $draft_return || $continue_to_rsvp ) ? ' to continue your RSVP.' : ' to visit the gathering site.'; ?></div>
 		<?php elseif ( $guest ) : ?>
@@ -255,15 +289,188 @@ function at_gathering_signup_shortcode() {
 	return ob_get_clean();
 }
 
+/** Queue an invite request for hosts without revealing roster membership publicly. */
+function at_gathering_notify_admins_of_invitation_request( $email, $draft_token = '', $continue_to_rsvp = false ) {
+	global $wpdb;
+	$email = at_gathering_normalize_email( $email );
+	if ( ! is_email( $email ) ) {
+		return false;
+	}
+	$token = at_gathering_create_invitation_review_token( $draft_token, $continue_to_rsvp );
+	if ( ! $token ) {
+		return false;
+	}
+	$roster_table = at_gathering_roster_table();
+	$now = current_time( 'mysql', true );
+	$expires = gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS );
+	$wpdb->query( $wpdb->prepare( "DELETE FROM {$roster_table} WHERE claim_state = %s AND token_expires < %s", 'requested', $now ) );
+	$guest = at_gathering_roster_guest_by_email( $email );
+	if ( $guest && 'requested' !== $guest->claim_state ) {
+		return false;
+	}
+	$request_data = array(
+		'token_hash'             => hash( 'sha256', $token ),
+		'token_expires'          => $expires,
+		'updated_at'             => $now,
+	);
+	if ( $guest ) {
+		$stored = $wpdb->update( $roster_table, $request_data, array( 'id' => (int) $guest->id, 'claim_state' => 'requested' ) );
+	} else {
+		$request_data['email_normalized'] = $email;
+		$request_data['display_name'] = '';
+		$request_data['claim_state'] = 'requested';
+		$request_data['user_id'] = null;
+		$request_data['created_at'] = $now;
+		$stored = $wpdb->insert( $roster_table, $request_data );
+	}
+	if ( false === $stored || 0 === $stored ) {
+		return false;
+	}
+
+	$admin_users = get_users( array( 'role' => 'administrator', 'fields' => array( 'user_email' ) ) );
+	$recipients = array();
+	foreach ( $admin_users as $admin_user ) {
+		$admin_email = sanitize_email( is_object( $admin_user ) ? $admin_user->user_email : $admin_user );
+		if ( is_email( $admin_email ) ) {
+			$recipients[] = $admin_email;
+		}
+	}
+	$recipients = array_values( array_unique( $recipients ) );
+	if ( ! $recipients ) {
+		$fallback = sanitize_email( get_option( 'admin_email' ) );
+		if ( is_email( $fallback ) ) {
+			$recipients[] = $fallback;
+		}
+	}
+	$decision_url = static function ( $decision ) use ( $token ) {
+		return add_query_arg(
+			array(
+				'action'   => 'at_review_invitation_request',
+				'decision' => $decision,
+				'token'    => $token,
+			),
+			admin_url( 'admin-post.php' )
+		);
+	};
+	$message = '<p>Someone requested an invitation to the Armstrong Thanksgiving gathering.</p>'
+		. '<p>Email address: <strong>' . esc_html( $email ) . '</strong></p>'
+		. '<p><a href="' . esc_url( $decision_url( 'approve' ) ) . '">Yes, add them to the invite list and send an invitation</a></p>'
+		. '<p><a href="' . esc_url( $decision_url( 'decline' ) ) . '">No, decline this request</a></p>'
+		. '<p>These links expire in 24 hours. Opening a link will show a confirmation page; it will not make a change until you confirm.</p>';
+	$sent = $recipients && wp_mail( $recipients, 'Invitation request for Armstrong Thanksgiving', $message, array( 'Content-Type: text/html; charset=UTF-8' ) );
+	if ( ! $sent ) {
+		$wpdb->delete( $roster_table, array( 'email_normalized' => $email, 'claim_state' => 'requested', 'token_hash' => hash( 'sha256', $token ) ) );
+	}
+	return (bool) $sent;
+}
+
+/** Process an invitation request without disclosing whether the address is listed. */
+function at_gathering_process_invitation_request( $email, $draft_token = '', $continue_to_rsvp = false ) {
+	$email = at_gathering_normalize_email( $email );
+	if ( ! is_email( $email ) || at_gathering_invitation_rate_limited( $email ) ) {
+		return false;
+	}
+	$guest = at_gathering_roster_guest_by_email( $email );
+	if ( $guest && 'invited' === $guest->claim_state && empty( $guest->user_id ) ) {
+		return at_gathering_send_claim_link( $email, $draft_token, $continue_to_rsvp );
+	}
+	if ( ! $guest || 'requested' === $guest->claim_state ) {
+		return at_gathering_notify_admins_of_invitation_request( $email, $draft_token, $continue_to_rsvp );
+	}
+	return false;
+}
+
+/** Render a token-protected decision form, with no changes on the link GET. */
+function at_gathering_render_invitation_request_review( $decision, $token, $email ) {
+	$approve = 'approve' === $decision;
+	$label = $approve ? 'Yes, add them to the invite list and send an invitation' : 'No, decline this request';
+	$nonce_action = 'at_invitation_review_' . hash( 'sha256', $token . ':' . $decision );
+	status_header( 200 );
+	nocache_headers();
+	?>
+	<!doctype html><html <?php language_attributes(); ?>><head><meta charset="<?php bloginfo( 'charset' ); ?>"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Review invitation request</title><style>body{margin:0;padding:2rem;background:#f6ede1;color:#4c2518;font:16px/1.5 system-ui,sans-serif}main{max-width:38rem;margin:8vh auto;padding:2rem;border-radius:1rem;background:#fffaf4;box-shadow:0 18px 45px rgba(76,37,24,.12)}h1{font-family:Georgia,serif}button{padding:.8rem 1rem;border:0;border-radius:999px;background:#b33f31;color:white;font:inherit;font-weight:700;cursor:pointer}@media(max-width:600px){body{padding:1rem}main{margin:5vh auto;padding:1.25rem}}</style></head><body><main>
+	<h1>Review invitation request</h1>
+	<p><?php echo $approve ? 'Add this address to the invite list and send an invitation?' : 'Decline the invitation request for this address?'; ?></p>
+	<p><strong><?php echo esc_html( $email ); ?></strong></p>
+	<form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post">
+		<input type="hidden" name="action" value="at_review_invitation_request">
+		<input type="hidden" name="decision" value="<?php echo esc_attr( $decision ); ?>">
+		<input type="hidden" name="token" value="<?php echo esc_attr( $token ); ?>">
+		<?php wp_nonce_field( $nonce_action, 'at_invitation_review_nonce' ); ?>
+		<button type="submit"><?php echo esc_html( $label ); ?></button>
+	</form>
+	</main></body></html>
+	<?php
+	exit;
+}
+
+/** Handle a host's tokenized decision without requiring a WordPress login. */
+function at_gathering_review_invitation_request() {
+	global $wpdb;
+	$method = strtoupper( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) );
+	$input = 'POST' === $method ? $_POST : $_GET;
+	$token = sanitize_text_field( wp_unslash( $input['token'] ?? '' ) );
+	$decision = sanitize_key( wp_unslash( $input['decision'] ?? '' ) );
+	$review_payload = at_gathering_decode_invitation_review_token( $token );
+	if ( ! $review_payload || ! in_array( $decision, array( 'approve', 'decline' ), true ) ) {
+		wp_die( 'This invitation request link is invalid or has expired.', 'Invitation request', array( 'response' => 404 ) );
+	}
+	$token_hash = hash( 'sha256', $token );
+	$table = at_gathering_roster_table();
+	if ( 'GET' === $method ) {
+		$request = $wpdb->get_row( $wpdb->prepare( "SELECT email_normalized FROM {$table} WHERE token_hash = %s AND claim_state = %s AND token_expires > %s LIMIT 1", $token_hash, 'requested', current_time( 'mysql', true ) ) );
+		if ( ! $request ) {
+			wp_die( 'This invitation request link is invalid or has expired.', 'Invitation request', array( 'response' => 404 ) );
+		}
+		at_gathering_render_invitation_request_review( $decision, $token, $request->email_normalized );
+	}
+	$nonce = sanitize_text_field( wp_unslash( $_POST['at_invitation_review_nonce'] ?? '' ) );
+	$nonce_action = 'at_invitation_review_' . hash( 'sha256', $token . ':' . $decision );
+	if ( 'POST' !== $method || ! wp_verify_nonce( $nonce, $nonce_action ) ) {
+		wp_die( 'Please open the invitation request link again and confirm your choice.', 'Invitation request', array( 'response' => 403 ) );
+	}
+	$result = at_gathering_transaction(
+		static function () use ( $wpdb, $table, $token_hash, $decision ) {
+			$request = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE token_hash = %s AND claim_state = %s AND token_expires > %s LIMIT 1 FOR UPDATE", $token_hash, 'requested', current_time( 'mysql', true ) ) );
+			if ( ! $request ) {
+				return new WP_Error( 'at_invitation_request_expired', 'This invitation request link is invalid or has expired.' );
+			}
+			if ( 'approve' === $decision ) {
+				$updated = $wpdb->update(
+					$table,
+					array( 'claim_state' => 'invited', 'token_hash' => '', 'token_expires' => null, 'updated_at' => current_time( 'mysql', true ) ),
+					array( 'id' => (int) $request->id, 'claim_state' => 'requested', 'token_hash' => $token_hash ),
+					array( '%s', '%s', '%s', '%s' ),
+					array( '%d', '%s', '%s' )
+				);
+			} else {
+				$updated = $wpdb->delete( $table, array( 'id' => (int) $request->id, 'claim_state' => 'requested', 'token_hash' => $token_hash ) );
+			}
+			if ( 1 !== $updated ) {
+				return new WP_Error( 'at_invitation_request_resolved', 'This invitation request has already been handled.' );
+			}
+			return $request;
+		}
+	);
+	if ( is_wp_error( $result ) ) {
+		wp_die( esc_html( $result->get_error_message() ), 'Invitation request', array( 'response' => 409 ) );
+	}
+	if ( 'approve' === $decision ) {
+		$sent = at_gathering_send_claim_link( $result->email_normalized, $review_payload['draft_token'], $review_payload['continue_to_rsvp'], true );
+		$message = $sent ? 'The address was added to the invite list and an invitation email was sent.' : 'The address was added to the invite list, but the invitation email could not be sent. You can send it from the gathering admin page.';
+	} else {
+		$message = 'The invitation request was declined. The address was not added to the invite list.';
+	}
+	wp_die( '<p>' . esc_html( $message ) . '</p>', 'Invitation request', array( 'response' => 200 ) );
+}
+
 function at_gathering_request_invitation() {
 	if ( ! isset( $_POST['at_request_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['at_request_nonce'] ) ), 'at_request_invitation' ) ) {
 		wp_die( 'Sorry, we could not process that request.' );
 	}
 	$email = sanitize_email( wp_unslash( $_POST['at_email'] ?? '' ) );
 	$draft_token = at_gathering_rsvp_draft_token( wp_unslash( $_POST['at_rsvp_draft'] ?? '' ) );
-	if ( ! at_gathering_invitation_rate_limited( $email ) ) {
-		at_gathering_send_claim_link( $email, $draft_token );
-	}
+	at_gathering_process_invitation_request( $email, $draft_token );
 	wp_safe_redirect( add_query_arg( 'at_setup_result', 'requested', home_url( '/signup/' ) ) );
 	exit;
 }
@@ -274,9 +481,7 @@ function at_gathering_request_rsvp_link() {
 		wp_die( 'Sorry, we could not process that request.' );
 	}
 	$email = sanitize_email( wp_unslash( $_POST['at_email'] ?? '' ) );
-	if ( ! at_gathering_invitation_rate_limited( $email ) ) {
-		at_gathering_send_claim_link( $email, '', true );
-	}
+	at_gathering_process_invitation_request( $email, '', true );
 	wp_safe_redirect( add_query_arg( 'at_setup_result', 'requested', home_url( '/rsvp/' ) ) );
 	exit;
 }
@@ -393,7 +598,9 @@ function at_gathering_save_invitation() {
 	}
 	$name = sanitize_text_field( trim( wp_unslash( $_POST['at_invitation_name'] ?? '' ) ) );
 	$email = at_gathering_normalize_email( wp_unslash( $_POST['at_invitation_email'] ?? '' ) );
-	if ( ! is_email( $email ) || ( 'send' === $mode && ! $name ) ) {
+	$existing_guest = at_gathering_roster_guest_by_email( $email );
+	$can_send_without_name = $existing_guest && empty( $existing_guest->user_id ) && 'invited' === $existing_guest->claim_state;
+	if ( ! is_email( $email ) || ( 'send' === $mode && ! $name && ! $can_send_without_name ) ) {
 		wp_safe_redirect( add_query_arg( 'at_invitation', 'invalid', admin_url( 'admin.php?page=at-gathering' ) ) );
 		exit;
 	}
@@ -402,7 +609,7 @@ function at_gathering_save_invitation() {
 		wp_safe_redirect( add_query_arg( 'at_invitation', 'claimed', admin_url( 'admin.php?page=at-gathering' ) ) );
 		exit;
 	}
-	$sent = 'send' === $mode ? at_gathering_send_claim_link( $email ) : null;
+	$sent = 'send' === $mode ? at_gathering_send_claim_link( $email, '', false, true ) : null;
 	wp_safe_redirect( add_query_arg( 'at_invitation', true === $sent ? 'sent' : ( false === $sent ? 'failed' : 'saved' ), admin_url( 'admin.php?page=at-gathering' ) ) );
 	exit;
 }
@@ -455,7 +662,7 @@ function at_gathering_invitation_admin_section() {
 		return;
 	}
 	global $wpdb;
-	$guests = $wpdb->get_results( 'SELECT id, display_name, email_normalized, user_id, claim_state, invited_at, token_expires FROM ' . at_gathering_roster_table() . ' ORDER BY display_name ASC, id ASC' );
+	$guests = $wpdb->get_results( 'SELECT id, display_name, email_normalized, user_id, claim_state, invited_at, token_expires FROM ' . at_gathering_roster_table() . " WHERE claim_state <> 'requested' ORDER BY display_name ASC, id ASC" );
 	$send_history = $wpdb->get_results( 'SELECT guest_id, sent_at FROM ' . at_gathering_invitation_sends_table() . ' ORDER BY sent_at DESC, id DESC' );
 	$send_history_by_guest = array();
 	foreach ( $send_history as $send ) {
@@ -463,7 +670,7 @@ function at_gathering_invitation_admin_section() {
 	}
 	?>
 	<hr><h2>Guest invitations</h2>
-	<?php if ( isset( $_GET['at_invitation'] ) ) : $notice = sanitize_key( wp_unslash( $_GET['at_invitation'] ) ); ?><div class="notice notice-info"><p><?php echo esc_html( array( 'sent' => 'Invitation link sent.', 'failed' => 'Invitation saved, but its email could not be sent.', 'saved' => 'Guest added to the invite list. No email was sent.', 'deleted' => 'Pending invitation deleted.', 'delete_failed' => 'The pending invitation could not be deleted. Please try again.', 'claimed' => 'That invitation has already been claimed or is no longer available.', 'invalid' => 'Enter a name and valid email address. Sending needs a name; add one to the invite list first.', 'bulk_added' => sprintf( '%d guests added. %d lines skipped. No emails were sent.', absint( $_GET['at_added_count'] ?? 0 ), absint( $_GET['at_skipped_count'] ?? 0 ) ), 'all_sent' => sprintf( 'Invitation emails sent to %1$d of %2$d guests who have not signed up.', absint( $_GET['at_sent_count'] ?? 0 ), absint( $_GET['at_total_count'] ?? 0 ) ) )[ $notice ] ?? 'Invitation updated.' ); ?></p></div><?php endif; ?>
+	<?php if ( isset( $_GET['at_invitation'] ) ) : $notice = sanitize_key( wp_unslash( $_GET['at_invitation'] ) ); ?><div class="notice notice-info"><p><?php echo esc_html( array( 'sent' => 'Invitation link sent.', 'failed' => 'Invitation saved, but its email could not be sent.', 'saved' => 'Guest added to the invite list. No email was sent.', 'deleted' => 'Pending invitation deleted.', 'delete_failed' => 'The pending invitation could not be deleted. Please try again.', 'claimed' => 'That invitation has already been claimed or is no longer available.', 'invalid' => 'Enter a valid email address. New invitations need a name before sending.', 'bulk_added' => sprintf( '%d guests added. %d lines skipped. No emails were sent.', absint( $_GET['at_added_count'] ?? 0 ), absint( $_GET['at_skipped_count'] ?? 0 ) ), 'all_sent' => sprintf( 'Invitation emails sent to %1$d of %2$d guests who have not signed up.', absint( $_GET['at_sent_count'] ?? 0 ), absint( $_GET['at_total_count'] ?? 0 ) ) )[ $notice ] ?? 'Invitation updated.' ); ?></p></div><?php endif; ?>
 	<form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><input type="hidden" name="at_invitation_mode" value="save"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?>
 		<p><label>Name (optional) <input type="text" name="at_invitation_name"></label> <label>Email <input type="email" name="at_invitation_email" required></label> <button class="button button-primary" type="submit">Add to invite list</button></p>
 	</form>
@@ -471,7 +678,7 @@ function at_gathering_invitation_admin_section() {
 		<p><label for="at-invitation-emails">Paste guest names and emails</label><br><span class="description">Lines with an @ are emails. The previous nonblank line is the name; consecutive email lines leave the name blank.</span><br><textarea id="at-invitation-emails" name="at_invitation_emails" rows="5" class="large-text" required></textarea></p><p><button class="button" type="submit">Add emails to invite list</button></p>
 	</form>
 	<table class="widefat striped"><thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Invites sent</th><th>Action</th></tr></thead><tbody>
-	<?php if ( ! $guests ) : ?><tr><td colspan="5">No invited guests yet.</td></tr><?php else : foreach ( $guests as $guest ) : ?><tr><td><?php echo esc_html( $guest->display_name ?: 'Name needed' ); ?></td><td><?php echo esc_html( $guest->email_normalized ); ?></td><td><?php echo esc_html( $guest->claim_state ); ?></td><td><?php $history = $send_history_by_guest[ (int) $guest->id ] ?? array(); if ( ! $history && $guest->invited_at ) { $history[] = $guest->invited_at; } $history = array_map( static function ( $sent_at ) { return get_date_from_gmt( $sent_at, 'Y-m-d H:i' ); }, $history ); echo $history ? nl2br( esc_html( implode( "\n", $history ) ) ) : 'Not sent'; ?></td><td><?php if ( 'invited' === $guest->claim_state && empty( $guest->user_id ) ) : ?><form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><input type="hidden" name="at_invitation_mode" value="save"><input type="hidden" name="at_invitation_email" value="<?php echo esc_attr( $guest->email_normalized ); ?>"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?><label>Name <input type="text" name="at_invitation_name" value="<?php echo esc_attr( $guest->display_name ); ?>"></label> <button class="button" type="submit">Save name</button></form><?php if ( $guest->display_name ) : ?><form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><input type="hidden" name="at_invitation_mode" value="send"><input type="hidden" name="at_invitation_name" value="<?php echo esc_attr( $guest->display_name ); ?>"><input type="hidden" name="at_invitation_email" value="<?php echo esc_attr( $guest->email_normalized ); ?>"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?><button class="button" type="submit"><?php echo $guest->invited_at ? 'Send reminder' : 'Send invitation'; ?></button></form><?php endif; ?><form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><input type="hidden" name="at_invitation_mode" value="delete"><input type="hidden" name="at_invitation_id" value="<?php echo esc_attr( $guest->id ); ?>"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?><button class="button" type="submit">Delete invite</button></form><?php endif; ?></td></tr><?php endforeach; endif; ?>
+	<?php if ( ! $guests ) : ?><tr><td colspan="5">No invited guests yet.</td></tr><?php else : foreach ( $guests as $guest ) : ?><tr><td><?php echo esc_html( $guest->display_name ?: 'Name needed' ); ?></td><td><?php echo esc_html( $guest->email_normalized ); ?></td><td><?php echo esc_html( $guest->claim_state ); ?></td><td><?php $history = $send_history_by_guest[ (int) $guest->id ] ?? array(); if ( ! $history && $guest->invited_at ) { $history[] = $guest->invited_at; } $history = array_map( static function ( $sent_at ) { return get_date_from_gmt( $sent_at, 'Y-m-d H:i' ); }, $history ); echo $history ? nl2br( esc_html( implode( "\n", $history ) ) ) : 'Not sent'; ?></td><td><?php if ( 'invited' === $guest->claim_state && empty( $guest->user_id ) ) : ?><form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><input type="hidden" name="at_invitation_mode" value="save"><input type="hidden" name="at_invitation_email" value="<?php echo esc_attr( $guest->email_normalized ); ?>"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?><label>Name <input type="text" name="at_invitation_name" value="<?php echo esc_attr( $guest->display_name ); ?>"></label> <button class="button" type="submit">Save name</button></form><form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><input type="hidden" name="at_invitation_mode" value="send"><input type="hidden" name="at_invitation_name" value="<?php echo esc_attr( $guest->display_name ); ?>"><input type="hidden" name="at_invitation_email" value="<?php echo esc_attr( $guest->email_normalized ); ?>"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?><button class="button" type="submit"><?php echo $guest->invited_at ? 'Send reminder' : 'Send invitation'; ?></button></form><form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><input type="hidden" name="at_invitation_mode" value="delete"><input type="hidden" name="at_invitation_id" value="<?php echo esc_attr( $guest->id ); ?>"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?><button class="button" type="submit">Delete invite</button></form><?php endif; ?></td></tr><?php endforeach; endif; ?>
 	</tbody></table>
 	<form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><input type="hidden" name="at_invitation_mode" value="send_all"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?><p><button class="button" type="submit">Send to everyone on the invite list who hasn’t signed up</button></p></form>
 	<?php
@@ -488,6 +695,8 @@ function at_gathering_register_invitations() {
 	add_action( 'admin_post_nopriv_at_signup', 'at_gathering_reject_legacy_signup' );
 	add_action( 'admin_post_at_request_invitation', 'at_gathering_request_invitation' );
 	add_action( 'admin_post_nopriv_at_request_invitation', 'at_gathering_request_invitation' );
+	add_action( 'admin_post_at_review_invitation_request', 'at_gathering_review_invitation_request' );
+	add_action( 'admin_post_nopriv_at_review_invitation_request', 'at_gathering_review_invitation_request' );
 	add_action( 'admin_post_at_rsvp_request_link', 'at_gathering_request_rsvp_link' );
 	add_action( 'admin_post_nopriv_at_rsvp_request_link', 'at_gathering_request_rsvp_link' );
 	add_action( 'admin_post_at_claim_invitation', 'at_gathering_claim_invitation_post' );

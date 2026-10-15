@@ -205,7 +205,7 @@ function at_gathering_rsvp_shortcode() {
 		?>
 		<div class="at-rsvp-app at-signup-app">
 			<?php if ( 'requested' === sanitize_key( wp_unslash( $_GET['at_setup_result'] ?? '' ) ) ) : ?>
-				<div class="at-success" role="status">If an invitation is available for that address, we’ll email a link to set up your account and continue to your RSVP. Check your inbox.</div>
+				<div class="at-success" role="status">Thanks, we’ve received your request. If you don’t get an email straight away, we’ll send you one soon.</div>
 			<?php endif; ?>
 			<form class="at-signup-form at-rsvp-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post">
 				<div class="at-rsvp-intro"><h2>Continue to your RSVP</h2><p>Enter the email address on your invitation and we’ll send a secure link to continue.</p></div>

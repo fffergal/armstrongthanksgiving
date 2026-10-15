@@ -50,7 +50,7 @@ test.describe('party RSVP assignments', () => {
     await page.getByLabel('Email').fill('new-rsvp@example.test');
     await page.getByRole('button', { name: 'Email me a link' }).click();
     await expect(page).toHaveURL(/\/rsvp\/\?at_setup_result=requested/);
-    await expect(page.getByRole('status')).toContainText('we’ll email a link to set up your account and continue to your RSVP');
+    await expect(page.getByRole('status')).toContainText('If you don’t get an email straight away, we’ll send you one soon.');
     const capturedMail = JSON.parse(runWpEval('echo wp_json_encode(get_transient("at_gathering_last_test_mail"));')) as { to: string; message: string };
     expect(capturedMail.to).toBe('new-rsvp@example.test');
     expect(capturedMail.message).toContain('at_continue=rsvp');
@@ -72,14 +72,17 @@ test.describe('party RSVP assignments', () => {
     expect(saved).toBe('saved');
   });
 
-  test('RSVP email request gives the same response when no invitation matches', async ({ page }) => {
+  test('RSVP email request gives the same response and notifies hosts when no invitation matches', async ({ page }) => {
     runWpEval("delete_transient('at_gathering_last_test_mail');");
     await page.goto('/rsvp/');
     await page.getByLabel('Email').fill('not-invited@example.test');
     await page.getByRole('button', { name: 'Email me a link' }).click();
     await expect(page).toHaveURL(/\/rsvp\/\?at_setup_result=requested/);
-    await expect(page.getByRole('status')).toContainText('If an invitation is available for that address');
-    expect(runWpEval('echo get_transient("at_gathering_last_test_mail") ? "sent" : "none";').trim()).toBe('none');
+    await expect(page.getByRole('status')).toContainText('If you don’t get an email straight away, we’ll send you one soon.');
+    const adminMail = JSON.parse(runWpEval('echo wp_json_encode(get_transient("at_gathering_last_test_mail"));')) as { message: string };
+    expect(adminMail.message).toContain('not-invited@example.test');
+    expect(adminMail.message).toContain('Yes, add them to the invite list and send an invitation');
+    runWpEval("global $wpdb; $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => 'not-invited@example.test'));");
   });
 
   test('only claimed guests receive roster choices and the owner is reserved with the party', async ({ page }) => {

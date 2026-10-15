@@ -24,11 +24,16 @@ function clearInvitationFixtures(prefixes: string[]): void {
   runWpEval(`global $wpdb; $prefixes = ${prefixList}; $conditions = implode(' OR ', array_fill(0, count($prefixes), 'email_normalized LIKE %s')); $values = array_map(static function ($prefix) { return $prefix . '%'; }, $prefixes); $ids = $wpdb->get_col($wpdb->prepare('SELECT id FROM ' . at_gathering_roster_table() . ' WHERE ' . $conditions, $values)); foreach ($ids as $id) { $wpdb->delete(at_gathering_invitation_sends_table(), array('guest_id' => (int) $id)); } $wpdb->query($wpdb->prepare('DELETE FROM ' . at_gathering_roster_table() . ' WHERE ' . $conditions, $values));`);
 }
 
+function clearInvitationRateLimits(): void {
+  runWpEval('global $wpdb; $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE \'at_invite_rate_%\'");');
+}
+
 test('signup requests use the same public response and direct legacy posts cannot create accounts', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'rsvp', 'Run invitation coverage in the desktop RSVP project.');
   const suffix = `${testInfo.project.name.replace(/\W/g, '')}${Date.now()}`.toLowerCase();
   const invitedEmail = `invite-${suffix}@example.test`;
   const strangerEmail = `stranger-${suffix}@example.test`;
+  clearInvitationRateLimits();
   runWpEval(`global $wpdb; $now = current_time('mysql', true); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => ${php(invitedEmail)}, 'display_name' => 'Invited Friend', 'claim_state' => 'invited', 'created_at' => $now, 'updated_at' => $now));`);
 
   const responses: string[] = [];
@@ -36,10 +41,13 @@ test('signup requests use the same public response and direct legacy posts canno
     await page.goto('/signup/');
     await page.getByLabel('Email').fill(email);
     await page.getByRole('button', { name: 'Request setup link' }).click();
-    await expect(page.getByRole('status')).toContainText('If an invitation can be set up for that address');
+    await expect(page.getByRole('status')).toContainText('If you don’t get an email straight away, we’ll send you one soon.');
     responses.push(await page.getByRole('status').innerText());
   }
   expect(responses[0]).toBe(responses[1]);
+  const adminMail = JSON.parse(runWpEval('echo wp_json_encode(get_transient("at_gathering_last_test_mail"));')) as { message: string };
+  expect(adminMail.message).toContain('Yes, add them to the invite list and send an invitation');
+  expect(adminMail.message).toContain('No, decline this request');
 
   await page.goto('/wp-admin/admin-post.php');
   const directPost = await page.request.post('/wp-admin/admin-post.php', {
@@ -56,7 +64,67 @@ test('signup requests use the same public response and direct legacy posts canno
   expect(directPost.status()).toBe(302);
   const accountExists = runWpEval(`echo email_exists(${php(strangerEmail)}) ? 'yes' : 'no';`).trim();
   expect(accountExists).toBe('no');
-  runWpEval(`global $wpdb; $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(invitedEmail)}));`);
+  runWpEval(`global $wpdb; $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(invitedEmail)})); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(strangerEmail)}));`);
+});
+
+test('unlisted signup requests give admins tokenized approve and decline links', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'rsvp', 'Run invitation review coverage in the desktop RSVP project.');
+  const suffix = `review${Date.now()}`.toLowerCase();
+  const approvedEmail = `approved-${suffix}@example.test`;
+  const declinedEmail = `declined-${suffix}@example.test`;
+  clearInvitationFixtures(['approved-review', 'declined-review']);
+  clearInvitationRateLimits();
+  const request = async (email: string) => {
+    runWpEval('delete_transient("at_gathering_last_test_mail");');
+    await page.goto('/signup/');
+    await page.getByLabel('Email').fill(email);
+    await page.getByRole('button', { name: 'Request setup link' }).click();
+    await expect(page.getByRole('status')).toContainText('If you don’t get an email straight away, we’ll send you one soon.');
+    return JSON.parse(runWpEval('echo wp_json_encode(get_transient("at_gathering_last_test_mail"));')) as { to: string | string[]; message: string };
+  };
+  const linkFor = (mail: { message: string }, decision: 'approve' | 'decline') => {
+    const href = mail.message.match(new RegExp(`href="([^"]*decision=${decision}[^"]*)"`))?.[1];
+    expect(href).toBeTruthy();
+    return href!.replace(/&(?:amp|#0*38|#x0*26);/gi, '&');
+  };
+
+  const approvalMail = await request(approvedEmail);
+  const approvalLink = linkFor(approvalMail, 'approve');
+  expect(approvalMail.message).toContain('expire in 24 hours');
+  expect(approvalMail.message).toContain('Yes, add them to the invite list and send an invitation');
+  expect(approvalMail.message).toContain('No, decline this request');
+  await page.goto(approvalLink);
+  await expect(page.getByRole('button', { name: 'Yes, add them to the invite list and send an invitation' })).toBeVisible();
+  expect(runWpEval(`$guest = at_gathering_roster_guest_by_email(${php(approvedEmail)}); echo $guest && 'requested' === $guest->claim_state ? 'requested' : 'missing';`).trim()).toBe('requested');
+  await page.getByRole('button', { name: 'Yes, add them to the invite list and send an invitation' }).click();
+  await expect(page.locator('body')).toContainText('The address was added to the invite list and an invitation email was sent.');
+  const approvalState = runWpEval(`global $wpdb; $guest = at_gathering_roster_guest_by_email(${php(approvedEmail)}); $send = $guest ? (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . at_gathering_invitation_sends_table() . ' WHERE guest_id = %d AND sent_at = %s', (int) $guest->id, $guest->invited_at)) : 0; echo $guest && 'invited' === $guest->claim_state && '' === $guest->display_name && '' !== $guest->token_hash && 1 === $send ? 'approved-and-sent' : 'failed';`).trim();
+  expect(approvalState).toBe('approved-and-sent');
+  const invitationMail = JSON.parse(runWpEval('echo wp_json_encode(get_transient("at_gathering_last_test_mail"));')) as { to: string; message: string };
+  expect(invitationMail.to).toBe(approvedEmail);
+  expect(invitationMail.message).toContain('at_setup=');
+  await logInAsAdmin(page);
+  await page.goto('/wp-admin/admin.php?page=at-gathering');
+  const approvedRow = page.getByRole('row').filter({ hasText: approvedEmail });
+  await expect(approvedRow.getByRole('button', { name: 'Send reminder' })).toBeVisible();
+  await approvedRow.getByRole('button', { name: 'Send reminder' }).click();
+  await expect(page).toHaveURL(/at_invitation=sent/);
+  const resendMail = JSON.parse(runWpEval('echo wp_json_encode(get_transient("at_gathering_last_test_mail"));')) as { to: string; message: string };
+  expect(resendMail.to).toBe(approvedEmail);
+  expect(resendMail.message).toContain('at_setup=');
+  await page.goto(approvalLink);
+  await expect(page.locator('body')).toContainText('invalid or has expired');
+
+  const declineMail = await request(declinedEmail);
+  const declineLink = linkFor(declineMail, 'decline');
+  await page.goto(declineLink);
+  await expect(page.getByRole('button', { name: 'No, decline this request' })).toBeVisible();
+  expect(runWpEval(`$guest = at_gathering_roster_guest_by_email(${php(declinedEmail)}); echo $guest && 'requested' === $guest->claim_state ? 'requested' : 'missing';`).trim()).toBe('requested');
+  await page.getByRole('button', { name: 'No, decline this request' }).click();
+  await expect(page.locator('body')).toContainText('The invitation request was declined. The address was not added to the invite list.');
+  const declineState = runWpEval(`echo ! at_gathering_roster_guest_by_email(${php(declinedEmail)}) ? 'declined' : 'failed';`).trim();
+  expect(declineState).toBe('declined');
+  runWpEval(`global $wpdb; $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(approvedEmail)})); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(declinedEmail)}));`);
 });
 
 test('invitation rate limits enforce the per-email boundary', async ({}, testInfo) => {
@@ -138,7 +206,7 @@ test('RSVP draft survives invitation request and new-account setup', async ({ pa
   expect(decodeURIComponent(requestLoginHref || '')).toContain(`/rsvp/?at_rsvp_draft=${draftToken}`);
   await page.getByLabel('Email').fill(email);
   await page.getByRole('button', { name: 'Request setup link' }).click();
-  await expect(page.getByRole('status')).toContainText('If an invitation can be set up for that address');
+  await expect(page.getByRole('status')).toContainText('If you don’t get an email straight away, we’ll send you one soon.');
   const capturedMail = JSON.parse(runWpEval('echo wp_json_encode(get_transient("at_gathering_last_test_mail"));')) as { to: string; message: string };
   expect(capturedMail.to).toBe(email);
   expect(capturedMail.message).toContain(`at_rsvp_draft=${draftToken}`);
