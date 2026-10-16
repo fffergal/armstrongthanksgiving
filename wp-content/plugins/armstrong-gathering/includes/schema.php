@@ -67,6 +67,7 @@ function at_gathering_ensure_schema() {
 		display_name varchar(191) NOT NULL DEFAULT '',
 		user_id bigint(20) unsigned NULL DEFAULT NULL,
 		claim_state varchar(20) NOT NULL DEFAULT 'invited',
+		hidden_from_picker tinyint(1) unsigned NOT NULL DEFAULT 0,
 		token_hash char(64) NOT NULL DEFAULT '',
 		token_expires datetime NULL DEFAULT NULL,
 		invited_at datetime NULL DEFAULT NULL,
@@ -174,9 +175,10 @@ function at_gathering_roster_guest_by_email( $email ) {
 	return $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . at_gathering_roster_table() . ' WHERE email_normalized = %s', at_gathering_normalize_email( $email ) ) );
 }
 
-function at_gathering_roster_choices() {
+function at_gathering_roster_choices( $include_hidden = false ) {
 	global $wpdb;
-	return $wpdb->get_results( 'SELECT id, display_name FROM ' . at_gathering_roster_table() . " WHERE claim_state = 'claimed' ORDER BY display_name ASC, id ASC" );
+	$visibility = $include_hidden ? '' : ' AND hidden_from_picker = 0';
+	return $wpdb->get_results( 'SELECT id, display_name FROM ' . at_gathering_roster_table() . " WHERE claim_state = 'claimed'{$visibility} ORDER BY display_name ASC, id ASC" );
 }
 
 function at_gathering_party_assignment_for_guest( $guest_id ) {
