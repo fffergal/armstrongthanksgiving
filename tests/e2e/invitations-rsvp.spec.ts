@@ -315,6 +315,6 @@ test('host can bulk add email lines and send to everyone who has not signed up',
   const namedRow = page.getByRole('row').filter({ hasText: emails[1] });
   await namedRow.getByRole('button', { name: 'Send invitation' }).click();
   await expect(page).toHaveURL(/at_invitation=sent/);
-  await expect(namedRow.locator('td').nth(3)).toContainText(/\d{4}-\d{2}-\d{2}/);
+  await expect(namedRow.locator('td').nth(4)).toContainText(/\d{4}-\d{2}-\d{2}/);
   clearInvitationFixtures(['bulk-one-', 'bulk-two-']);
 });
