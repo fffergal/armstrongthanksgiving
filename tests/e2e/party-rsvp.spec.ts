@@ -29,6 +29,24 @@ test.describe('party RSVP assignments', () => {
     if (cleanup.status !== 0) throw new Error(cleanup.stderr || cleanup.stdout || 'Could not reset the local RSVP fixture.');
   });
 
+  test('tapping an available guest adds a selected pill', async ({ browser }, testInfo) => {
+    runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $other = get_user_by('login', 'admin'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); foreach (array(array($owner, 'RSVP owner'), array($other, 'Party friend')) as $entry) { $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $entry[0]->user_email, 'display_name' => $entry[1], 'user_id' => $entry[0]->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); } update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
+
+    const context = await browser.newContext({ baseURL: testInfo.project.use.baseURL as string, hasTouch: true, viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+    try {
+      await logIn(page);
+      await page.goto('/rsvp/');
+      const picker = page.getByRole('combobox', { name: 'Add an adult' });
+      await picker.tap();
+      await picker.fill('Party friend');
+      await page.getByRole('option', { name: 'Party friend', exact: true }).tap();
+      await expect(page.getByRole('button', { name: 'Remove Party friend' })).toBeVisible();
+    } finally {
+      await context.close();
+    }
+  });
+
   test('signed-out RSVP entry asks for email and does not expose roster choices', async ({ page }) => {
     runWpEval("global $wpdb; $now = current_time('mysql'); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => 'private-roster@example.test')); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => 'private-roster@example.test', 'display_name' => 'Private roster choice', 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
     await page.goto('/rsvp/');

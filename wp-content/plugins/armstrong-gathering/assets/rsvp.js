@@ -28,6 +28,7 @@
     message.setAttribute('role', 'status');
     var active = -1;
     var matches = [];
+    var touchStart = null;
     choices.forEach(function (choice) { choice.parentElement.hidden = true; });
     roster.classList.add('at-party-enhanced');
     roster.append(selected, search, list, message);
@@ -73,8 +74,25 @@
         option.setAttribute('aria-selected', 'false');
         if (choice.disabled) option.className = 'is-unavailable';
         option.textContent = choice.parentElement.textContent.trim();
-        option.addEventListener('pointerdown', function (event) { event.preventDefault(); });
         if (!choice.disabled) {
+          option.addEventListener('pointerdown', function (event) {
+            if (event.pointerType === 'mouse') {
+              event.preventDefault();
+              return;
+            }
+            touchStart = { id: choice.value, x: event.clientX, y: event.clientY };
+          });
+          option.addEventListener('pointerup', function (event) {
+            if (!touchStart || touchStart.id !== choice.value) return;
+            var moved = Math.hypot(event.clientX - touchStart.x, event.clientY - touchStart.y);
+            touchStart = null;
+            if (moved < 10) addChoice(choice);
+            else closeOptions();
+          });
+          option.addEventListener('pointercancel', function () {
+            touchStart = null;
+            closeOptions();
+          });
           option.addEventListener('click', function () { addChoice(choice); });
         }
         list.append(option);
@@ -85,7 +103,7 @@
       message.textContent = matches.length ? (availableCount ? '' : 'These guests already have an RSVP and can’t be added.') : 'No matching adults to add.';
     }
     function addChoice(choice) {
-      if (!choice || choice.disabled) return;
+      if (!choice || choice.disabled || choice.checked) return;
       choice.checked = true;
       choice.dispatchEvent(new Event('change', { bubbles: true }));
       search.value = '';
@@ -97,7 +115,9 @@
     search.addEventListener('focus', renderOptions);
     search.addEventListener('click', renderOptions);
     search.addEventListener('input', renderOptions);
-    search.addEventListener('blur', closeOptions);
+    search.addEventListener('blur', function () {
+      if (!touchStart) closeOptions();
+    });
     search.addEventListener('keydown', function (event) {
       if (event.key === 'Escape') { event.preventDefault(); closeOptions(); }
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
