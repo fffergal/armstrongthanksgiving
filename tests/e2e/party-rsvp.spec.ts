@@ -249,6 +249,30 @@ test.describe('party RSVP assignments', () => {
     runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); if (at_gathering_get_rsvp($owner->ID) || $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . at_gathering_assignments_table() . ' WHERE rsvp_user_id = %d', $owner->ID))) { WP_CLI::error('A conflicting party update partially saved.'); }");
   });
 
+  test('an RSVP owner without an assignment row stays reserved to their own party', async ({ page }) => {
+    runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $reserved_owner = get_user_by('login', 'admin'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); foreach (array(array($owner, 'RSVP owner'), array($reserved_owner, 'Reserved owner')) as $entry) { $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $entry[0]->user_email, 'display_name' => $entry[1], 'user_id' => $entry[0]->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); } $wpdb->replace(at_gathering_table(), array('user_id' => $reserved_owner->ID, 'status' => 'yes', 'guest_count' => 1, 'guest_names' => '', 'children_count' => 0, 'dietary' => '', 'foods' => '[]', 'food_amounts' => '{}', 'custom_food' => '', 'notes' => '', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
+    await logIn(page);
+    await page.goto('/rsvp/');
+    await page.getByRole('combobox', { name: 'Add an adult' }).fill('Reserved owner');
+    const reservedOption = page.getByRole('option', { name: /Reserved owner.*already RSVP/i });
+    await expect(reservedOption).toHaveAttribute('aria-disabled', 'true');
+    const nonce = await page.locator('input[name="at_rsvp_nonce"]').inputValue();
+    const reservedGuestId = Number(runWpEval("echo (int) at_gathering_roster_guest_by_user(get_user_by('login', 'admin')->ID)->id;"));
+    const response = await page.request.post('/wp-admin/admin-post.php', {
+      form: {
+        action: 'at_save_rsvp',
+        at_rsvp_nonce: nonce,
+        at_status: 'yes',
+        at_children_count: '4',
+        at_party_guest_ids: [String(reservedGuestId)],
+      },
+      maxRedirects: 0,
+    });
+    expect(response.status()).toBe(302);
+    expect(response.headers().location).toContain('at_rsvp=error');
+    runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $reserved_owner = get_user_by('login', 'admin'); if (at_gathering_get_rsvp($owner->ID) || $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . at_gathering_assignments_table() . ' WHERE rsvp_user_id = %d', $owner->ID))) { WP_CLI::error('The legacy RSVP owner was assigned to a second party.'); } if (!at_gathering_get_rsvp($reserved_owner->ID)) { WP_CLI::error('The original RSVP owner record was changed.'); }");
+  });
+
   test('genuinely overlapping party submissions reserve a shared adult for only one RSVP', async ({ browser, page }) => {
     runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $other_owner = get_user_by('login', 'admin'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_table() . ' WHERE user_id IN (' . (int) $owner->ID . ',' . (int) $other_owner->ID . ')'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); foreach (array(array($owner->user_email, 'First owner', $owner->ID), array($other_owner->user_email, 'Second owner', $other_owner->ID), array('shared-adult@example.test', 'Shared adult', null)) as $entry) { $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $entry[0], 'display_name' => $entry[1], 'user_id' => $entry[2], 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); } update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
     await logIn(page);

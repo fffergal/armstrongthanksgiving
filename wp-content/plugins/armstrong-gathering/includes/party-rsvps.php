@@ -98,6 +98,9 @@ function at_gathering_host_move_party_assignments( $target_user_id, $guest_ids )
 				if ( ! $guest || 'claimed' !== $guest->claim_state ) {
 					return new WP_Error( 'at_roster_guest_not_found', 'A selected adult is no longer available.' );
 				}
+				if ( at_gathering_party_guest_has_other_rsvp( $guest_id, $target_user_id ) ) {
+					return new WP_Error( 'at_party_assignment_conflict', 'An RSVP owner must stay assigned to their own party.', array( 'guest_id' => $guest_id ) );
+				}
 				$assignment = at_gathering_party_assignment_for_guest( $guest_id );
 				if ( $assignment && (int) $assignment->rsvp_user_id !== $target_user_id ) {
 					if ( (int) $assignment->is_owner ) {
@@ -248,7 +251,19 @@ function at_gathering_rsvp_shortcode() {
 	$unavailable_ids = array();
 	if ( at_gathering_party_choices_authorized() ) {
 		global $wpdb;
-		$unavailable_ids = array_map( 'intval', $wpdb->get_col( $wpdb->prepare( 'SELECT DISTINCT guest_id FROM ' . at_gathering_assignments_table() . ' WHERE rsvp_user_id <> %d', $user->ID ) ) );
+		$assignments_table = at_gathering_assignments_table();
+		$roster_table = at_gathering_roster_table();
+		$rsvps_table = at_gathering_table();
+		$unavailable_ids = array_map(
+			'intval',
+			$wpdb->get_col(
+				$wpdb->prepare(
+					"SELECT guest_id FROM {$assignments_table} WHERE rsvp_user_id <> %d UNION SELECT guest.id FROM {$roster_table} AS guest INNER JOIN {$rsvps_table} AS rsvp ON rsvp.user_id = guest.user_id WHERE guest.user_id <> %d",
+					$user->ID,
+					$user->ID
+				)
+			)
+		);
 	}
 	if ( ! array_key_exists( 'party_guest_ids', $values ) && $rsvp && at_gathering_party_choices_authorized() ) {
 		global $wpdb;

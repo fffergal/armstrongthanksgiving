@@ -186,6 +186,20 @@ function at_gathering_party_assignment_for_guest( $guest_id ) {
 	return $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . at_gathering_assignments_table() . ' WHERE guest_id = %d', absint( $guest_id ) ) );
 }
 
+/** A roster guest linked to another account with an RSVP is reserved to that party. */
+function at_gathering_party_guest_has_other_rsvp( $guest_id, $rsvp_user_id ) {
+	global $wpdb;
+	$roster = at_gathering_roster_table();
+	$rsvps = at_gathering_table();
+	return (bool) $wpdb->get_var(
+		$wpdb->prepare(
+			"SELECT 1 FROM {$roster} AS guest INNER JOIN {$rsvps} AS rsvp ON rsvp.user_id = guest.user_id WHERE guest.id = %d AND guest.user_id <> %d LIMIT 1",
+			absint( $guest_id ),
+			absint( $rsvp_user_id )
+		)
+	);
+}
+
 /**
  * Atomically replace all adult assignments for one party. Pass a callback to
  * persist RSVP fields in the same transaction. `$guest_ids` must include the
@@ -214,6 +228,9 @@ function at_gathering_replace_party_assignments( $rsvp_user_id, $guest_ids, $wri
 		function () use ( $wpdb, $rsvp_user_id, $guest_ids, $owner, $write_callback ) {
 			$table = at_gathering_assignments_table();
 			foreach ( $guest_ids as $guest_id ) {
+				if ( at_gathering_party_guest_has_other_rsvp( $guest_id, $rsvp_user_id ) ) {
+					return new WP_Error( 'at_party_assignment_conflict', 'A selected guest already owns an RSVP and must stay with their own party.', array( 'guest_id' => $guest_id ) );
+				}
 				$conflict = $wpdb->get_row( $wpdb->prepare( "SELECT rsvp_user_id FROM {$table} WHERE guest_id = %d AND rsvp_user_id <> %d LIMIT 1", $guest_id, $rsvp_user_id ) );
 				if ( $conflict ) {
 					return new WP_Error( 'at_party_assignment_conflict', 'A selected guest is already assigned to another party and needs host resolution.', array( 'guest_id' => $guest_id, 'rsvp_user_id' => (int) $conflict->rsvp_user_id ) );
