@@ -245,6 +245,16 @@ function at_gathering_invitation_rate_limited( $email ) {
 	return $email_count > 3 || $ip_count > 20;
 }
 
+/** Reject known automated test mailboxes and submissions that fill the trap field. */
+function at_gathering_invitation_request_is_spam( $email, $honeypot = '' ) {
+	if ( '' !== trim( (string) $honeypot ) ) {
+		return true;
+	}
+	$email  = at_gathering_normalize_email( $email );
+	$domain = substr( strrchr( $email, '@' ) ?: '', 1 );
+	return 'formtests.info' === $domain || ( strlen( $domain ) > strlen( '.formtests.info' ) && '.formtests.info' === substr( $domain, -strlen( '.formtests.info' ) ) );
+}
+
 function at_gathering_signup_shortcode() {
 	$token = sanitize_text_field( wp_unslash( $_GET['at_setup'] ?? '' ) );
 	$draft_token = at_gathering_rsvp_draft_token( wp_unslash( $_GET['at_rsvp_draft'] ?? '' ) );
@@ -280,6 +290,7 @@ function at_gathering_signup_shortcode() {
 			<form class="at-signup-form at-rsvp-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post">
 				<div class="at-rsvp-intro"><h2>Set up your gathering account</h2><p>Enter your email address and we’ll send a setup link if an invitation is available.</p></div>
 				<input type="hidden" name="action" value="at_request_invitation"><input type="hidden" name="at_return_url" value="<?php echo esc_url( home_url( '/signup/' ) ); ?>"><input type="hidden" name="at_rsvp_draft" value="<?php echo esc_attr( $draft_token ); ?>"><?php wp_nonce_field( 'at_request_invitation', 'at_request_nonce' ); ?>
+				<label class="at-spam-trap" aria-hidden="true">Leave this field empty<input type="text" name="at_website" value="" tabindex="-1" autocomplete="off"></label>
 				<p class="at-form-login-note">Already have an account? <a href="<?php echo esc_url( wp_login_url( $draft_return ? $draft_return : get_permalink() ) ); ?>">Sign in</a>.</p>
 				<label>Email<input type="email" name="at_email" autocomplete="email" required></label><p class="at-form-actions"><button class="at-button" type="submit">Request setup link</button></p>
 			</form>
@@ -470,7 +481,9 @@ function at_gathering_request_invitation() {
 	}
 	$email = sanitize_email( wp_unslash( $_POST['at_email'] ?? '' ) );
 	$draft_token = at_gathering_rsvp_draft_token( wp_unslash( $_POST['at_rsvp_draft'] ?? '' ) );
-	at_gathering_process_invitation_request( $email, $draft_token );
+	if ( ! at_gathering_invitation_request_is_spam( $email, wp_unslash( $_POST['at_website'] ?? '' ) ) ) {
+		at_gathering_process_invitation_request( $email, $draft_token );
+	}
 	wp_safe_redirect( add_query_arg( 'at_setup_result', 'requested', home_url( '/signup/' ) ) );
 	exit;
 }
@@ -481,7 +494,9 @@ function at_gathering_request_rsvp_link() {
 		wp_die( 'Sorry, we could not process that request.' );
 	}
 	$email = sanitize_email( wp_unslash( $_POST['at_email'] ?? '' ) );
-	at_gathering_process_invitation_request( $email, '', true );
+	if ( ! at_gathering_invitation_request_is_spam( $email, wp_unslash( $_POST['at_website'] ?? '' ) ) ) {
+		at_gathering_process_invitation_request( $email, '', true );
+	}
 	wp_safe_redirect( add_query_arg( 'at_setup_result', 'requested', home_url( '/rsvp/' ) ) );
 	exit;
 }
