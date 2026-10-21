@@ -9,6 +9,7 @@
 .at-rsvp-intro p { margin: 0; color: #fff8ed; font-weight: 700; }
 .at-rsvp-form fieldset { margin: 0; padding: 1.1rem; border: 1px solid #c8ad90; border-radius: 1rem; background: #f4e6d4; }
 .at-signup-form { max-width: 58rem; }
+.at-spam-trap { position: absolute !important; left: -10000px !important; width: 1px !important; height: 1px !important; overflow: hidden !important; }
 .at-signup-form .at-rsvp-intro { margin-bottom: .25rem; }
 .at-rsvp-form legend { padding: 0 .35rem; color: #4c2518; font-family: Georgia,serif; font-size: 1.35rem; font-weight: 700; }
 .at-rsvp-form label { display: grid; gap: .4rem; color: #4c2518; font-weight: 700; }

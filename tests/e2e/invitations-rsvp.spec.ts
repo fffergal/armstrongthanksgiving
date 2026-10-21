@@ -135,6 +135,29 @@ test('invitation rate limits enforce the per-email boundary', async ({}, testInf
   expect(results).toBe('allowed,allowed,allowed,limited');
 });
 
+test('invitation requests reject formtests.info addresses and filled honeypot fields', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'rsvp', 'Run invitation coverage in the desktop RSVP project.');
+  const spamEmail = `request-${Date.now()}@formtests.info`;
+  const honeypotEmail = `trap-${Date.now()}@example.test`;
+  clearInvitationRateLimits();
+  runWpEval('delete_transient("at_gathering_last_test_mail");');
+
+  await page.goto('/signup/');
+  await page.getByLabel('Email').fill(spamEmail);
+  await page.getByRole('button', { name: 'Request setup link' }).click();
+  await expect(page.getByRole('status')).toBeVisible();
+  expect(runWpEval(`echo at_gathering_roster_guest_by_email(${php(spamEmail)}) ? 'stored' : 'not-stored';`).trim()).toBe('not-stored');
+  expect(runWpEval('echo get_transient("at_gathering_last_test_mail") ? "sent" : "none";').trim()).toBe('none');
+
+  await page.goto('/signup/');
+  await page.getByLabel('Email').fill(honeypotEmail);
+  await page.locator('input[name="at_website"]').fill('automated submission');
+  await page.getByRole('button', { name: 'Request setup link' }).click();
+  await expect(page.getByRole('status')).toBeVisible();
+  expect(runWpEval(`echo at_gathering_roster_guest_by_email(${php(honeypotEmail)}) ? 'stored' : 'not-stored';`).trim()).toBe('not-stored');
+  expect(runWpEval('echo get_transient("at_gathering_last_test_mail") ? "sent" : "none";').trim()).toBe('none');
+});
+
 test('existing users become claimed invitees and earlier email invites are linked in place', async ({}, testInfo) => {
   test.skip(testInfo.project.name !== 'rsvp', 'Run invitation migration coverage in the desktop RSVP project.');
   const suffix = `${testInfo.project.name.replace(/\W/g, '')}${Date.now()}`.toLowerCase();

@@ -213,6 +213,7 @@ function at_gathering_rsvp_shortcode() {
 			<form class="at-signup-form at-rsvp-form" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post">
 				<div class="at-rsvp-intro"><h2>Continue to your RSVP</h2><p>Enter the email address on your invitation and we’ll send a secure link to continue.</p></div>
 				<input type="hidden" name="action" value="at_rsvp_request_link"><?php wp_nonce_field( 'at_rsvp_request_link', 'at_rsvp_request_nonce' ); ?>
+				<label class="at-spam-trap" aria-hidden="true">Leave this field empty<input type="text" name="at_website" value="" tabindex="-1" autocomplete="off"></label>
 				<p class="at-form-login-note">Already have an account? <a href="<?php echo esc_url( wp_login_url( home_url( '/rsvp/' ) ) ); ?>">Sign in</a>.</p>
 				<label>Email<input type="email" name="at_email" autocomplete="email" required></label>
 				<p class="at-form-actions"><button class="at-button" type="submit">Email me a link</button></p>
