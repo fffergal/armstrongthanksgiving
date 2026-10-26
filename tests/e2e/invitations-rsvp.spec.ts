@@ -281,7 +281,13 @@ test('host invitations can be sent and resent with the earlier link invalidated'
   await page.getByRole('button', { name: 'Add to invite list' }).click();
   await expect(page).toHaveURL(/at_invitation=saved/);
   expect(runWpEval('echo get_transient("at_gathering_last_test_mail") ? "sent" : "not-sent";').trim()).toBe('not-sent');
+  await page.setViewportSize({ width: 390, height: 844 });
   const invitationRow = page.getByRole('row').filter({ hasText: email });
+  const invitationActions = invitationRow.locator('td[data-label="Actions"]');
+  const invitationName = invitationRow.locator('td[data-label="Name"]');
+  await expect(invitationActions.getByRole('button', { name: 'Send invitation' })).toBeVisible();
+  expect(await invitationActions.evaluate((cell) => cell.getBoundingClientRect().top)).toBeLessThan(await invitationName.evaluate((cell) => cell.getBoundingClientRect().top));
+  expect(await page.locator('.at-invitation-admin-list').evaluate((table) => table.scrollWidth <= table.clientWidth)).toBe(true);
   await invitationRow.getByRole('button', { name: 'Send invitation' }).click();
   await expect(page).toHaveURL(/at_invitation=sent/);
   const firstMail = JSON.parse(runWpEval('echo wp_json_encode(get_transient("at_gathering_last_test_mail"));')) as { to: string; message: string };
