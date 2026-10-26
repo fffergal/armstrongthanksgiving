@@ -154,40 +154,23 @@ rewrite a shared or already published branch; preserve user-authored commits
 and ask before discarding uncommitted work.
 
 For production-scoped changes, deployment is part of closeout: run the
-relevant checks and tests first (or confirm they already passed), then deploy
-the verified theme/plugin changes and validate the canonical production site
-before removing the worktree. If deployment is not authorized or is blocked,
-state that explicitly instead of treating the worktree as finished.
+relevant checks and tests first (or confirm they already passed), then merge
+the verified changes through the pull request workflow. Let CI deploy the
+production changes after the merge, and validate the canonical production
+site before removing the worktree. Do not deploy production changes manually.
+If the CI deployment is blocked or fails, state that explicitly instead of
+treating the worktree as finished.
 
-## WordPress admin uploads and browser controls
+## Production deployment and WordPress browser controls
 
-For production theme or plugin changes, use the repository deployment command
-after verifying the relevant component and committing its source:
+Routine production theme or plugin releases happen through CI after the pull
+request merges. Do not manually deploy, upload, or install production changes
+through SSH, WP-CLI, the WordPress admin, or the deployment script. Use those
+paths only for an explicitly requested recovery or operational intervention.
+Do not use the online Theme File Editor for repository changes.
 
-```sh
-npm run deploy:production -- plugin --confirm
-npm run deploy:production -- theme --confirm --activate
-npm run verify:production
-```
-
-The production prerequisites are the WP Super Cache plugin and the WP-CLI
-package `wp-cli/wp-super-cache-cli`; recreate the CLI package with:
-
-```sh
-ssh dh_mbpyvr@armstrongthanksgiving.com 'wp package install wp-cli/wp-super-cache-cli'
-```
-
-The command builds the ZIP from committed source, uploads it over SSH, exports
-the production database, archives the previous component, replaces the
-component with WP-CLI, preserves its current activation state, flushes the
-WordPress object cache and WP Super Cache page cache, and verifies the
-production WordPress identity and archive digest. Pass `--activate` when a
-component should be activated explicitly. Run with `--dry-run` to build the
-archive without changing production. The WordPress admin installer remains
-the fallback when the CLI workflow is unavailable. Do not use the online Theme
-File Editor for repository changes.
-
-If WordPress says the component is already installed, follow the
+During an explicitly requested WordPress recovery or operational intervention,
+if WordPress says the component is already installed, follow the
 **Replace current with uploaded** link and verify the success notice. WordPress
 may show a JavaScript confirmation dialog during replacement or deletion. A
 browser agent should inspect for an active page dialog and accept it only when
@@ -195,9 +178,9 @@ it is the confirmation for the user-requested operation; otherwise dismiss it.
 Never repeatedly click while a dialog is open, because the page is blocked
 until the dialog is handled.
 
-After a production upload, purge WP Super Cache before validating the public
-site. Prefer a fresh public URL check (including an HTTP status check for 404s)
-over relying on a stale browser tab.
+After the CI deployment completes, validate the public site with a fresh URL
+check (including an HTTP status check for 404s) rather than relying on a stale
+browser tab.
 
 ## Email testing
 
