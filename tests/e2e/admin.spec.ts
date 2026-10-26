@@ -55,6 +55,27 @@ test('an administrator can save event details from Gathering RSVPs', async ({ pa
   }
 });
 
+test('food settings remain labeled and fit phone, tablet, and desktop viewports', async ({ page }) => {
+  await logInAsAdmin(page);
+  await page.goto('/wp-admin/admin.php?page=at-gathering');
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  const table = page.locator('.at-admin-foods');
+  const cells = table.locator('tbody tr').first().locator('td');
+  await expect(cells.nth(0)).toHaveAttribute('data-label', 'Food');
+  await expect(cells.nth(1)).toHaveAttribute('data-label', 'Unit or size');
+  await expect(cells.nth(2)).toHaveAttribute('data-label', 'Amount offered');
+  await expect(cells.nth(3)).toHaveAttribute('data-label', 'Amount goal');
+  await expect(cells.nth(1).locator('input')).toBeVisible();
+  await expect(cells.nth(3).locator('input')).toBeVisible();
+  expect(await table.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+
+  for (const width of [390, 768, 1024]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
+});
+
 test('an administrator can hide a claimed guest from the RSVP picker without deleting their RSVP', async ({ page }) => {
   runWpEval("global $wpdb; $email = 'picker-test@example.test'; $user_id = wp_insert_user(array('user_login' => 'picker-test', 'user_pass' => wp_generate_password(), 'user_email' => $email, 'display_name' => 'Picker Test Guest', 'role' => 'subscriber')); if (is_wp_error($user_id)) { WP_CLI::error($user_id->get_error_message()); } $now = current_time('mysql'); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $email, 'display_name' => 'Picker Test Guest', 'user_id' => $user_id, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); $wpdb->replace(at_gathering_table(), array('user_id' => $user_id, 'status' => 'yes', 'guest_count' => 1, 'guest_names' => '', 'children_count' => 0, 'dietary' => '', 'foods' => '[]', 'food_amounts' => '{}', 'custom_food' => '', 'notes' => '', 'created_at' => $now, 'updated_at' => $now));");
   try {

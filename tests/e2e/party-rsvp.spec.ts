@@ -188,6 +188,12 @@ test.describe('party RSVP assignments', () => {
     const party = row.getByLabel('Adults assigned to this RSVP');
     await expect(party).toHaveCSS('min-width', '256px');
     await expect(party.locator('option:checked')).toHaveText('Party friend');
+    await page.setViewportSize({ width: 390, height: 844 });
+    const actions = row.locator('td[data-label="Actions"]');
+    const friend = row.locator('td[data-label="Friend"]');
+    await expect(actions.getByRole('button', { name: 'Remove RSVP' })).toBeVisible();
+    expect(await actions.evaluate((cell) => cell.getBoundingClientRect().top)).toBeLessThan(await friend.evaluate((cell) => cell.getBoundingClientRect().top));
+    expect(await page.locator('.at-rsvp-admin-list').evaluate((table) => table.scrollWidth <= table.clientWidth)).toBe(true);
     await row.getByRole('button', { name: 'Save party' }).click();
     await expect(page.getByText('Party assignments updated.')).toBeVisible();
     runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $assignments = $wpdb->get_col($wpdb->prepare('SELECT guest_id FROM ' . at_gathering_assignments_table() . ' WHERE rsvp_user_id = %d ORDER BY guest_id', $owner->ID)); if (count($assignments) !== 2) { WP_CLI::error('An unchanged host save removed an existing adult assignment.'); }");

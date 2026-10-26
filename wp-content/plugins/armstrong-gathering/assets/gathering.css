@@ -90,6 +90,91 @@
   .at-gathering-admin .at-sample-rsvp-form button { grid-column: 2; justify-self: start; }
 }
 
+/* Make host tables readable and actionable without horizontal scrolling. */
+@media (max-width: 782px) {
+  .at-gathering-admin :is(.at-rsvp-admin-list, .at-invitation-admin-list, .at-legacy-party-list, .at-admin-foods) {
+    display: block !important;
+    width: 100% !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  .at-gathering-admin :is(.at-rsvp-admin-list, .at-invitation-admin-list, .at-legacy-party-list, .at-admin-foods) thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .at-gathering-admin :is(.at-rsvp-admin-list, .at-invitation-admin-list, .at-legacy-party-list, .at-admin-foods) tbody {
+    display: grid;
+    gap: .85rem;
+  }
+  .at-gathering-admin :is(.at-rsvp-admin-list, .at-invitation-admin-list, .at-legacy-party-list, .at-admin-foods) tr {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr);
+    overflow: hidden;
+    border: 1px solid #c8ad90;
+    border-radius: .65rem;
+    background: #fff;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+  }
+  .at-gathering-admin :is(.at-rsvp-admin-list, .at-invitation-admin-list, .at-legacy-party-list, .at-admin-foods) td {
+    display: block !important;
+    min-width: 0;
+    width: auto !important;
+    padding: .7rem .8rem !important;
+    border: 0 !important;
+    border-bottom: 1px solid #e2e2e2 !important;
+    overflow-wrap: anywhere;
+  }
+  .at-gathering-admin :is(.at-rsvp-admin-list, .at-invitation-admin-list, .at-legacy-party-list, .at-admin-foods) td::before {
+    display: block;
+    margin-bottom: .2rem;
+    color: #50575e;
+    content: attr(data-label);
+    font-size: .75rem;
+    font-weight: 600;
+    line-height: 1.3;
+    text-transform: uppercase;
+    letter-spacing: .035em;
+  }
+  .at-gathering-admin .at-rsvp-admin-list td:last-child,
+  .at-gathering-admin .at-invitation-admin-list td:last-child,
+  .at-gathering-admin .at-legacy-party-list td:nth-child(3) {
+    order: -1;
+    padding-top: .85rem !important;
+    padding-bottom: .85rem !important;
+    border-bottom: 2px solid #c8ad90 !important;
+    background: #f6f0e8;
+  }
+  .at-gathering-admin .at-rsvp-admin-list td:last-child::before,
+  .at-gathering-admin .at-invitation-admin-list td:last-child::before,
+  .at-gathering-admin .at-legacy-party-list td:nth-child(3)::before { content: none; }
+  .at-gathering-admin .at-rsvp-admin-list td:last-child .button,
+  .at-gathering-admin .at-invitation-admin-list td:last-child > .at-invitation-actions > form:first-child .button,
+  .at-gathering-admin .at-legacy-party-list td:nth-child(3) button { min-height: 2.75rem; }
+  .at-gathering-admin .at-rsvp-admin-list td:nth-child(3) select { box-sizing: border-box; width: 100%; min-width: 0 !important; }
+  .at-gathering-admin .at-rsvp-admin-list td:nth-child(3) form { display: grid; gap: .5rem; margin-top: .65rem; }
+  .at-gathering-admin .at-invitation-admin-list .at-invitation-actions { display: grid; gap: .65rem; }
+  .at-gathering-admin .at-invitation-admin-list .at-invitation-actions form { display: flex; flex-wrap: wrap; align-items: end; gap: .5rem; }
+  .at-gathering-admin .at-legacy-party-list td:nth-child(3) form { display: grid; gap: .65rem; }
+  .at-gathering-admin .at-legacy-party-list td:nth-child(3) :is(select, input[type="email"]) { box-sizing: border-box; width: 100%; max-width: 100%; }
+  .at-gathering-admin .at-admin-foods td:nth-child(2) input { box-sizing: border-box; width: 100%; }
+  .at-gathering-admin .at-invitation-send-all .button { box-sizing: border-box; max-width: 100%; white-space: normal; height: auto; min-height: 2.75rem; text-align: left; }
+  .at-gathering-admin :is(.at-rsvp-admin-list, .at-invitation-admin-list, .at-legacy-party-list) td:last-child[colspan] { order: 0; }
+  .at-gathering-admin :is(.at-rsvp-admin-list, .at-invitation-admin-list, .at-legacy-party-list) td:last-child[colspan]::before { content: none; }
+  .at-gathering-admin .at-sample-rsvp-form { grid-template-columns: auto minmax(0, 1fr); align-items: end; column-gap: .75rem; row-gap: 1rem; }
+  .at-gathering-admin .at-sample-recipient { display: contents; }
+  .at-gathering-admin .at-sample-recipient label { grid-column: 1; align-self: center; }
+  .at-gathering-admin .at-sample-recipient select { grid-column: 2; min-width: 0; width: 100%; }
+  .at-gathering-admin .at-sample-rsvp-form button { grid-column: 2; justify-self: start; }
+}
+
 /* Invitation setup and party assignment states. */
 .at-rsvp-form {
   --at-form-ink: #4c2518;
