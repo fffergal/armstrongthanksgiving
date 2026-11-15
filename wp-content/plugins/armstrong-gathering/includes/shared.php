@@ -327,21 +327,35 @@ function at_gathering_food_counts() {
 	return $counts;
 }
 
+function at_gathering_party_display_names( $rsvp_user_id ) {
+	global $wpdb;
+
+	return array_map(
+		'strval',
+		$wpdb->get_col(
+			$wpdb->prepare(
+				'SELECT guest.display_name FROM ' . at_gathering_assignments_table() . ' AS assignment INNER JOIN ' . at_gathering_roster_table() . ' AS guest ON guest.id = assignment.guest_id WHERE assignment.rsvp_user_id = %d ORDER BY assignment.is_owner DESC, guest.display_name ASC',
+				absint( $rsvp_user_id )
+			)
+		)
+	);
+}
+
 function at_gathering_food_contributors() {
 	global $wpdb;
 
 	$contributors = array();
 	$rows         = $wpdb->get_results(
-		"SELECT r.foods, r.food_amounts, r.guest_names, u.display_name
+		"SELECT r.user_id, r.foods, r.food_amounts, u.display_name
 		FROM " . at_gathering_table() . ' AS r
 		LEFT JOIN ' . $wpdb->users . " AS u ON u.ID = r.user_id
 		WHERE r.status IN ('yes','maybe')"
 	);
 
 	foreach ( $rows as $row ) {
-		$name  = trim( (string) $row->guest_names );
-		$name  = $name ? $name : ( trim( (string) $row->display_name ) ?: 'Unknown friend' );
-		$foods = array_unique( array_map( 'sanitize_text_field', (array) json_decode( $row->foods, true ) ) );
+		$party_names = at_gathering_party_display_names( $row->user_id );
+		$name        = $party_names ? implode( ', ', $party_names ) : ( trim( (string) $row->display_name ) ?: 'Unknown friend' );
+		$foods       = array_unique( array_map( 'sanitize_text_field', (array) json_decode( $row->foods, true ) ) );
 		$amounts = at_gathering_rsvp_food_amounts( $row );
 
 		foreach ( $foods as $food ) {
@@ -378,7 +392,7 @@ function at_gathering_custom_food_counts( $listed_foods = null ) {
 	$listed_foods = null === $listed_foods ? at_gathering_foods() : (array) $listed_foods;
 	$counts       = array();
 	$rows         = $wpdb->get_results(
-		"SELECT r.custom_food, r.foods, r.food_amounts, r.guest_names, u.display_name
+		"SELECT r.user_id, r.custom_food, r.foods, r.food_amounts, u.display_name
 		FROM " . at_gathering_table() . ' AS r
 		LEFT JOIN ' . $wpdb->users . " AS u ON u.ID = r.user_id
 		WHERE r.status IN ('yes','maybe')"
@@ -404,9 +418,9 @@ function at_gathering_custom_food_counts( $listed_foods = null ) {
 			);
 		}
 		$counts[ $key ]['count'] += $amount;
-		$name = trim( (string) $row->guest_names );
+		$party_names = at_gathering_party_display_names( $row->user_id );
 		$counts[ $key ]['names'][] = array(
-			'name'   => $name ? $name : ( trim( (string) $row->display_name ) ?: 'Unknown friend' ),
+			'name'   => $party_names ? implode( ', ', $party_names ) : ( trim( (string) $row->display_name ) ?: 'Unknown friend' ),
 			'amount' => $amount,
 		);
 	}
