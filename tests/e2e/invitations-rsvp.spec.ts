@@ -115,6 +115,30 @@ test('unlisted signup requests give admins tokenized approve and decline links',
   await page.goto(approvalLink);
   await expect(page.locator('body')).toContainText('invalid or has expired');
 
+  const adminApprovedEmail = `admin-approved-${suffix}@example.test`;
+  await request(adminApprovedEmail);
+  runWpEval(`global $wpdb; $wpdb->update(at_gathering_roster_table(), array('token_expires' => gmdate('Y-m-d H:i:s', time() - DAY_IN_SECONDS)), array('email_normalized' => ${php(adminApprovedEmail)}, 'claim_state' => 'requested'));`);
+  const adminDeclinedEmail = `admin-declined-${suffix}@example.test`;
+  await request(adminDeclinedEmail);
+  runWpEval(`global $wpdb; $wpdb->update(at_gathering_roster_table(), array('token_expires' => gmdate('Y-m-d H:i:s', time() - DAY_IN_SECONDS)), array('email_normalized' => ${php(adminDeclinedEmail)}, 'claim_state' => 'requested'));`);
+  await page.goto('/wp-admin/admin.php?page=at-gathering');
+  const requestRow = page.getByRole('row').filter({ hasText: adminApprovedEmail });
+  await expect(requestRow).toContainText('Expired');
+  await requestRow.getByRole('button', { name: 'Approve and send setup email' }).click();
+  await expect(page).toHaveURL(/at_invitation=request_approved/);
+  const adminApprovalState = runWpEval(`$guest = at_gathering_roster_guest_by_email(${php(adminApprovedEmail)}); echo $guest && 'invited' === $guest->claim_state && '' !== $guest->token_hash ? 'approved' : 'failed';`).trim();
+  expect(adminApprovalState).toBe('approved');
+  const adminInvitationMail = JSON.parse(runWpEval('echo wp_json_encode(get_transient("at_gathering_last_test_mail"));')) as { to: string; message: string };
+  expect(adminInvitationMail.to).toBe(adminApprovedEmail);
+  expect(adminInvitationMail.message).toContain('at_setup=');
+
+  await page.goto('/wp-admin/admin.php?page=at-gathering');
+  const declinedRequestRow = page.getByRole('row').filter({ hasText: adminDeclinedEmail });
+  await expect(declinedRequestRow).toContainText('Expired');
+  await declinedRequestRow.getByRole('button', { name: 'Decline' }).click();
+  await expect(page).toHaveURL(/at_invitation=request_declined/);
+  expect(runWpEval(`echo ! at_gathering_roster_guest_by_email(${php(adminDeclinedEmail)}) ? 'declined' : 'failed';`).trim()).toBe('declined');
+
   const declineMail = await request(declinedEmail);
   const declineLink = linkFor(declineMail, 'decline');
   await page.goto(declineLink);
@@ -124,7 +148,7 @@ test('unlisted signup requests give admins tokenized approve and decline links',
   await expect(page.locator('body')).toContainText('The invitation request was declined. The address was not added to the invite list.');
   const declineState = runWpEval(`echo ! at_gathering_roster_guest_by_email(${php(declinedEmail)}) ? 'declined' : 'failed';`).trim();
   expect(declineState).toBe('declined');
-  runWpEval(`global $wpdb; $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(approvedEmail)})); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(declinedEmail)}));`);
+  runWpEval(`global $wpdb; $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(approvedEmail)})); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(adminApprovedEmail)})); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(adminDeclinedEmail)})); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(declinedEmail)}));`);
 });
 
 test('invitation rate limits enforce the per-email boundary', async ({}, testInfo) => {
