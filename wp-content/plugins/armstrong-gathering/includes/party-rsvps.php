@@ -222,6 +222,7 @@ function at_gathering_rsvp_shortcode() {
 	$counts            = at_gathering_food_counts();
 	$goals             = at_gathering_food_goals();
 	$units             = at_gathering_food_units();
+	$unit_plurals      = at_gathering_food_unit_plurals();
 	$food_contributors = at_gathering_food_contributors();
 	$custom_food_counts = at_gathering_custom_food_counts( $foods );
 	$food_amounts      = $rsvp ? at_gathering_rsvp_food_amounts( $rsvp ) : array();
@@ -322,13 +323,31 @@ function at_gathering_rsvp_shortcode() {
 							<div class="at-food-choice-controls">
 								<div class="at-food-heading">
 									<strong id="at-food-<?php echo esc_attr( $food_key ); ?>"><?php echo esc_html( $food ); ?></strong>
+									<span class="at-food-total">Total: <?php echo esc_html( (int) ( $counts[ $food ] ?? 0 ) ); ?></span>
 										<label class="at-food-bringing"><input type="checkbox" name="at_food_offers[<?php echo esc_attr( $food_key ); ?>]" value="1" aria-label="Bringing <?php echo esc_attr( $food ); ?>" <?php checked( $amount > 0 ); ?>><span>Bringing</span></label>
 								</div>
 								<label class="at-food-amount" for="at-food-amount-<?php echo esc_attr( $food_key ); ?>">How many?</label>
 								<input id="at-food-amount-<?php echo esc_attr( $food_key ); ?>" type="number" name="at_food_amounts[<?php echo esc_attr( $food_key ); ?>]" aria-label="<?php echo esc_attr( $food ); ?>" <?php if ( ! empty( $units[ $food ] ) ) : ?>aria-describedby="at-food-unit-<?php echo esc_attr( $food_key ); ?>" <?php endif; ?>min="0" max="9999" step="1" value="<?php echo esc_attr( $amount ); ?>">
 								<?php if ( ! empty( $units[ $food ] ) ) : ?><small id="at-food-unit-<?php echo esc_attr( $food_key ); ?>" class="at-food-unit-note"><?php echo esc_html( $units[ $food ] ); ?></small><?php endif; ?>
 							</div>
-							<small><span>Claimed: <?php echo esc_html( (int) ( $counts[ $food ] ?? 0 ) ); ?></span><span class="at-food-summary-divider" aria-hidden="true">·</span><span>Goal: <?php echo $goal ? esc_html( $goal ) : 'not set'; ?></span><?php if ( ! empty( $food_contributors[ $food ] ) ) : ?><span class="at-food-summary-divider" aria-hidden="true">·</span><?php if ( $can_view_contributors ) : ?><span>Bringing: <?php echo esc_html( implode( ', ', $food_contributors[ $food ] ) ); ?></span><?php else : ?><span><button class="at-link-button" type="submit" name="action" value="at_rsvp_signin" formnovalidate>Sign in to see who is bringing it</button></span><?php endif; ?><?php endif; ?></small>
+							<div class="at-food-summary">
+								<span>Goal: <?php echo $goal ? esc_html( $goal ) : 'not set'; ?></span>
+								<?php if ( ! empty( $food_contributors[ $food ] ) ) : ?>
+									<div class="at-food-contributors">
+										<?php if ( $can_view_contributors ) : ?>
+											<span>Bringing:</span>
+											<ul class="at-party-flow" role="list" aria-label="Parties bringing <?php echo esc_attr( $food ); ?>">
+												<?php foreach ( $food_contributors[ $food ] as $party_index => $contributor ) : ?>
+													<?php $amount_parts = at_gathering_food_amount_parts( $contributor['amount'], $units[ $food ] ?? '', $unit_plurals[ $food ] ?? '' ); ?>
+													<li><span><?php echo esc_html( $contributor['label'] ); ?></span><span class="at-party-amount">&nbsp;(<span class="at-party-amount-quantity"><?php echo esc_html( $amount_parts['quantity'] ); ?></span><?php if ( $amount_parts['unit'] ) : ?>&nbsp;<span class="at-party-amount-unit"><?php echo esc_html( $amount_parts['unit'] ); ?></span><?php endif; ?>)</span></li>
+												<?php endforeach; ?>
+											</ul>
+										<?php else : ?>
+											<span><button class="at-link-button" type="submit" name="action" value="at_rsvp_signin" formnovalidate>Sign in to see who is bringing it</button></span>
+										<?php endif; ?>
+									</div>
+								<?php endif; ?>
+							</div>
 						</div>
 					<?php endforeach; ?>
 				</div>
@@ -337,7 +356,22 @@ function at_gathering_rsvp_shortcode() {
 						<p class="at-field-help">Other things people are bringing</p>
 						<ul>
 							<?php foreach ( $custom_food_counts as $item ) : ?>
-							<li><span><?php echo esc_html( $item['label'] ); ?></span><small><?php echo esc_html( (int) $item['count'] ); ?><?php if ( $can_view_contributors ) : ?> from <?php echo esc_html( implode( ', ', $item['names'] ) ); ?><?php else : ?> · <button class="at-link-button" type="submit" name="action" value="at_rsvp_signin" formnovalidate>Sign in to see who</button><?php endif; ?></small></li>
+								<li>
+									<span><?php echo esc_html( $item['label'] ); ?></span><span class="at-custom-food-total">Total: <?php echo esc_html( (int) $item['count'] ); ?></span>
+									<div class="at-custom-food-meta">
+										<?php if ( $can_view_contributors ) : ?>
+											<span>Bringing:</span>
+											<ul class="at-party-flow" role="list" aria-label="Parties bringing <?php echo esc_attr( $item['label'] ); ?>">
+												<?php foreach ( $item['names'] as $party_index => $contributor ) : ?>
+													<?php $amount_parts = at_gathering_food_amount_parts( $contributor['amount'] ); ?>
+													<li><span><?php echo esc_html( $contributor['label'] ); ?></span><span class="at-party-amount">&nbsp;(<span class="at-party-amount-quantity"><?php echo esc_html( $amount_parts['quantity'] ); ?></span>)</span></li>
+												<?php endforeach; ?>
+											</ul>
+										<?php else : ?>
+											<small><button class="at-link-button" type="submit" name="action" value="at_rsvp_signin" formnovalidate>Sign in to see who</button></small>
+										<?php endif; ?>
+									</div>
+								</li>
 							<?php endforeach; ?>
 						</ul>
 					</div>
@@ -368,8 +402,7 @@ function at_gathering_rsvp_confirmation_shortcode() {
 	$rsvp = $user->exists() ? at_gathering_get_rsvp( $user->ID ) : null;
 	$party_names = array();
 	if ( $saved && $rsvp ) {
-		global $wpdb;
-		$party_names = $wpdb->get_col( $wpdb->prepare( 'SELECT g.display_name FROM ' . at_gathering_assignments_table() . ' a JOIN ' . at_gathering_roster_table() . ' g ON g.id = a.guest_id WHERE a.rsvp_user_id = %d ORDER BY a.is_owner DESC, g.display_name ASC', $user->ID ) );
+		$party_names = at_gathering_party_display_names( $user->ID );
 	}
 
 	ob_start();
@@ -619,6 +652,7 @@ function at_gathering_admin_page() {
 	$counts = at_gathering_food_counts();
 	$goals  = at_gathering_food_goals();
 	$units  = at_gathering_food_units();
+	$unit_plurals = at_gathering_food_unit_plurals();
 	$admins = get_users( array( 'role' => 'administrator', 'orderby' => 'display_name', 'order' => 'ASC' ) );
 	$event  = at_gathering_event_details();
 	?>
@@ -659,7 +693,7 @@ function at_gathering_admin_page() {
 			else :
 				foreach ( $legacy_rows as $legacy_row ) :
 					$legacy_owner = at_gathering_roster_guest_by_user( $legacy_row->user_id );
-					?><tr><td data-label="RSVP owner"><?php echo esc_html( $legacy_row->display_name ?: 'Unknown account #' . absint( $legacy_row->user_id ) ); ?> (user ID <?php echo esc_html( $legacy_row->user_id ); ?>)</td><td data-label="Legacy party names"><?php echo esc_html( $legacy_row->guest_names ?: 'Names not recorded' ); ?><br><small>Legacy guest count: <?php echo esc_html( $legacy_row->guest_count ); ?></small></td><td data-label="Owner roster link"><?php if ( $legacy_owner ) : ?><strong><?php echo esc_html( $legacy_owner->display_name ); ?></strong> (linked)<?php else : ?><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><input type="hidden" name="action" value="at_legacy_owner_link"><input type="hidden" name="at_legacy_user_id" value="<?php echo esc_attr( $legacy_row->user_id ); ?>"><?php wp_nonce_field( 'at_legacy_owner_' . absint( $legacy_row->user_id ), 'at_legacy_owner_nonce' ); ?><label><span class="screen-reader-text">Roster guest for <?php echo esc_html( $legacy_row->display_name ); ?></span><select name="at_legacy_guest_id" required><option value="">Select roster guest</option><?php foreach ( $wpdb->get_results( 'SELECT id, display_name, email_normalized FROM ' . at_gathering_roster_table() . ' ORDER BY display_name ASC, id ASC' ) as $roster_guest ) : ?><option value="<?php echo esc_attr( $roster_guest->id ); ?>"><?php echo esc_html( $roster_guest->display_name . ' · ' . $roster_guest->email_normalized ); ?></option><?php endforeach; ?></select></label><label><span class="screen-reader-text">Confirm current email for <?php echo esc_html( $legacy_row->display_name ); ?></span><input type="email" name="at_legacy_confirmed_email" value="<?php echo esc_attr( $legacy_row->user_email ); ?>" required></label><button class="button" type="submit">Link owner</button></form><?php endif; ?></td><td data-label="Updated"><?php echo esc_html( mysql2date( 'j M Y, H:i', $legacy_row->updated_at ) ); ?></td></tr><?php
+					?><tr><td data-label="RSVP owner"><?php echo esc_html( $legacy_row->display_name ?: 'Unknown account #' . absint( $legacy_row->user_id ) ); ?> (user ID <?php echo esc_html( $legacy_row->user_id ); ?>)</td><td data-label="Legacy party names"><?php echo esc_html( $legacy_row->guest_names ?: 'Names not recorded' ); ?><br><small>Legacy guest count: <?php echo esc_html( $legacy_row->guest_count ); ?></small></td><td data-label="Owner roster link"><?php if ( $legacy_owner ) : ?><strong><?php echo esc_html( $legacy_owner->display_name ); ?></strong> (linked)<?php else : ?><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><input type="hidden" name="action" value="at_legacy_owner_link"><input type="hidden" name="at_legacy_user_id" value="<?php echo esc_attr( $legacy_row->user_id ); ?>"><?php wp_nonce_field( 'at_legacy_owner_' . absint( $legacy_row->user_id ), 'at_legacy_owner_nonce' ); ?><label><span class="screen-reader-text">Roster guest for <?php echo esc_html( $legacy_row->display_name ); ?></span><select name="at_legacy_guest_id" required><option value="">Select roster guest</option><?php foreach ( $wpdb->get_results( "SELECT guest.id, CASE WHEN guest.user_id IS NOT NULL THEN account.display_name ELSE guest.display_name END AS display_name, guest.email_normalized FROM " . at_gathering_roster_table() . ' AS guest LEFT JOIN ' . $wpdb->users . " AS account ON account.ID = guest.user_id ORDER BY CASE WHEN guest.user_id IS NOT NULL THEN account.display_name ELSE guest.display_name END ASC, guest.id ASC" ) as $roster_guest ) : ?><option value="<?php echo esc_attr( $roster_guest->id ); ?>"><?php echo esc_html( $roster_guest->display_name . ' · ' . $roster_guest->email_normalized ); ?></option><?php endforeach; ?></select></label><label><span class="screen-reader-text">Confirm current email for <?php echo esc_html( $legacy_row->display_name ); ?></span><input type="email" name="at_legacy_confirmed_email" value="<?php echo esc_attr( $legacy_row->user_email ); ?>" required></label><button class="button" type="submit">Link owner</button></form><?php endif; ?></td><td data-label="Updated"><?php echo esc_html( mysql2date( 'j M Y, H:i', $legacy_row->updated_at ) ); ?></td></tr><?php
 				endforeach;
 			endif;
 			?>
@@ -690,12 +724,12 @@ function at_gathering_admin_page() {
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="at-food-goals">
 			<input type="hidden" name="action" value="at_save_food_goals">
 			<table class="widefat striped at-admin-foods">
-				<thead><tr><th scope="col">Food</th><th scope="col">Unit or size</th><th scope="col">Amount offered</th><th scope="col">Amount goal</th></tr></thead>
+				<thead><tr><th scope="col">Food</th><th scope="col">Unit or size (singular)</th><th scope="col">Plural form</th><th scope="col">Amount offered</th><th scope="col">Amount goal</th></tr></thead>
 				<tbody>
-					<?php foreach ( $foods as $food ) : $food_key = md5( $food ); ?><tr><td data-label="Food"><?php echo esc_html( $food ); ?></td><td data-label="Unit or size"><label class="screen-reader-text" for="at-food-unit-<?php echo esc_attr( $food_key ); ?>">Unit or size for <?php echo esc_html( $food ); ?>, shown on RSVP form</label><input id="at-food-unit-<?php echo esc_attr( $food_key ); ?>" type="text" maxlength="80" name="at_food_units[<?php echo esc_attr( $food_key ); ?>]" value="<?php echo esc_attr( $units[ $food ] ?? '' ); ?>" placeholder="e.g. large tray"></td><td data-label="Amount offered"><?php echo esc_html( (int) ( $counts[ $food ] ?? 0 ) ); ?></td><td data-label="Amount goal"><label class="screen-reader-text" for="at-food-goal-<?php echo esc_attr( $food_key ); ?>">Goal for <?php echo esc_html( $food ); ?></label><input id="at-food-goal-<?php echo esc_attr( $food_key ); ?>" type="number" min="0" max="9999" step="1" name="at_food_goals[<?php echo esc_attr( $food_key ); ?>]" value="<?php echo esc_attr( $goals[ $food ] ); ?>"></td></tr><?php endforeach; ?>
+					<?php foreach ( $foods as $food ) : $food_key = md5( $food ); ?><tr><td data-label="Food"><?php echo esc_html( $food ); ?></td><td data-label="Unit or size (singular)"><label class="screen-reader-text" for="at-food-unit-<?php echo esc_attr( $food_key ); ?>">Unit or size in singular form for <?php echo esc_html( $food ); ?>, shown on RSVP form</label><input id="at-food-unit-<?php echo esc_attr( $food_key ); ?>" type="text" maxlength="80" name="at_food_units[<?php echo esc_attr( $food_key ); ?>]" value="<?php echo esc_attr( $units[ $food ] ?? '' ); ?>" placeholder="e.g. large tray"></td><td data-label="Plural form"><label class="screen-reader-text" for="at-food-unit-plural-<?php echo esc_attr( $food_key ); ?>">Plural form for <?php echo esc_html( $food ); ?>, shown when amount exceeds one</label><input id="at-food-unit-plural-<?php echo esc_attr( $food_key ); ?>" type="text" maxlength="80" name="at_food_unit_plurals[<?php echo esc_attr( $food_key ); ?>]" value="<?php echo esc_attr( $unit_plurals[ $food ] ?? '' ); ?>" placeholder="optional"></td><td data-label="Amount offered"><?php echo esc_html( (int) ( $counts[ $food ] ?? 0 ) ); ?></td><td data-label="Amount goal"><label class="screen-reader-text" for="at-food-goal-<?php echo esc_attr( $food_key ); ?>">Goal for <?php echo esc_html( $food ); ?></label><input id="at-food-goal-<?php echo esc_attr( $food_key ); ?>" type="number" min="0" max="9999" step="1" name="at_food_goals[<?php echo esc_attr( $food_key ); ?>]" value="<?php echo esc_attr( $goals[ $food ] ); ?>"></td></tr><?php endforeach; ?>
 				</tbody>
 			</table>
-			<p><button class="button button-primary" type="submit">Save food settings</button> <span class="description">Set an optional unit or size and leave a goal at 0 to show the current amount without a target.</span></p>
+			<p><button class="button button-primary" type="submit">Save food settings</button> <span class="description">Set an optional unit or size. The RSVP amount uses a simple English plural by default; enter a plural form for irregular words. Leave both unit fields blank for a labeled amount.</span></p>
 			<?php wp_nonce_field( 'at_save_food_goals', 'at_food_goals_nonce' ); ?>
 		</form>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="at-add-food">

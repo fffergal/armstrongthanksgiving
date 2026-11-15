@@ -10,9 +10,15 @@ or columns from a feature module.
 - `{$wpdb->prefix}at_rsvps` keeps the legacy `guest_count` and `guest_names`
   columns and gains `children_count` (unsigned, non-negative, default `0`).
 - `{$wpdb->prefix}at_invited_adults` stores a stable roster ID, unique
-  normalized email, display name, optional unique WordPress user ID, claim
+  normalized email, provisional invite display name, optional unique WordPress user ID, claim
   state, hashed setup token and expiry, invitation/claim timestamps, and
   creation/update timestamps.
+- The roster `display_name` is only a pre-account invite label. Once `user_id`
+  links a WordPress account, the account's current `wp_users.display_name` is
+  authoritative everywhere a person is displayed. Never sync the account name
+  back into the roster or fall back to the roster name for a linked account;
+  the roster value may remain stale and is then ignored for display. Do not
+  add another profile-name field.
 - `{$wpdb->prefix}at_party_assignments` stores `(rsvp_user_id, guest_id,
   is_owner)`. `guest_id` is unique across parties, so the owner and every
   selected adult use the same one-party-only assignment relation. An owner
@@ -38,7 +44,19 @@ assignment in one transaction. It returns `true` or `WP_Error`.
   `at_gathering_roster_guest_by_user( $user_id )`, and
   `at_gathering_roster_guest_by_email( $email )` return one row or `null`.
 - `at_gathering_roster_choices()` returns only `id` and `display_name` for
-  claimed guests; callers must authorize before exposing the choices.
+  claimed guests. For linked accounts the helper resolves `display_name` from
+  the current WordPress account; it uses the provisional roster label only
+  before an account is linked. Callers must authorize before exposing choices.
+- Food contributor summaries preserve RSVP parties as separate list items.
+  Keep each party's adults grouped in one item and visually separate parties
+  in a wrapped text flow; do not flatten all adults and parties into a
+  comma-joined string or use separators that can dangle at a line break. Show
+  each party's current display names with its amount kept beside the names.
+  Place an explicit total beside the food name. When a food has a configured
+  singular unit or size, show it with the party amount and use its plural form
+  above one; when no unit is configured, label the number as `amount: N` so it
+  cannot read like a headcount. Common English plurals are inferred; the admin
+  can enter the plural form for irregular words.
 - `at_gathering_party_assignment_for_guest( $guest_id )` returns its
   assignment row or `null`.
 - `at_gathering_replace_party_assignments( $rsvp_user_id, $guest_ids,

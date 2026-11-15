@@ -41,7 +41,7 @@ test('repeatable upgrades gate legacy count-only parties and detect changes to t
   runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); if (!$owner) { WP_CLI::error('The count-only migration fixture is missing.'); } $now = current_time('mysql'); $wpdb->replace(at_gathering_table(), array('user_id' => $owner->ID, 'status' => 'yes', 'guest_count' => 2, 'guest_names' => '', 'children_count' => 0, 'dietary' => '', 'foods' => '[]', 'food_amounts' => '{}', 'custom_food' => '', 'notes' => '', 'created_at' => $now, 'updated_at' => $now)); delete_option('at_gathering_party_reconciliation_complete'); delete_option('at_gathering_party_reconciliation_reviewed_at'); delete_option('at_gathering_party_reconciliation_review_hash'); at_gathering_ensure_schema(); at_gathering_ensure_schema(); if (at_gathering_party_rsvps_enabled()) { WP_CLI::error('A legacy RSVP with a count but no names bypassed reconciliation.'); } $snapshot = at_gathering_party_legacy_names_fingerprint(); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', $snapshot); $wpdb->update(at_gathering_table(), array('guest_count' => 3), array('user_id' => $owner->ID)); if (at_gathering_party_rsvps_enabled()) { WP_CLI::error('A changed legacy guest count did not invalidate the host review.'); } echo 'count-only legacy reconciliation checks passed';");
   await logInAsAdmin(page);
   await page.goto('/wp-admin/admin.php?page=at-gathering');
-  const legacyPartyNames = page.getByRole('row').filter({ hasText: 'guest (user ID' }).locator('td').nth(1);
+  const legacyPartyNames = page.locator('.at-legacy-party-list tbody tr').first().locator('td').nth(1);
   await expect(legacyPartyNames).toContainText('Names not recorded');
   await expect(page.getByText('Legacy guest count: 3')).toBeVisible();
   await expect(page.getByText(/Guest party saves are locked/)).toBeVisible();
@@ -129,29 +129,34 @@ test('a host can set a food goal and guests see offered amount over goal', async
   await page.goto('/wp-admin/admin.php?page=at-gathering');
 
   const goal = page.getByLabel('Goal for Mashed potato');
-  const unit = page.getByLabel('Unit or size for Mashed potato, shown on RSVP form');
+  const unit = page.getByLabel('Unit or size in singular form for Mashed potato, shown on RSVP form');
+  const plural = page.getByLabel('Plural form for Mashed potato, shown when amount exceeds one');
   await expect(goal).toBeVisible();
   const originalGoal = await goal.inputValue();
   const originalUnit = await unit.inputValue();
+  const originalPlural = await plural.inputValue();
   try {
     await goal.fill('7');
     await unit.fill('large bowl');
+    await plural.fill('large bowls');
     await page.getByRole('button', { name: 'Save food settings' }).click();
     await expect(page.getByLabel('Goal for Mashed potato')).toHaveValue('7');
-    await expect(page.getByLabel('Unit or size for Mashed potato, shown on RSVP form')).toHaveValue('large bowl');
+    await expect(page.getByLabel('Unit or size in singular form for Mashed potato, shown on RSVP form')).toHaveValue('large bowl');
+    await expect(page.getByLabel('Plural form for Mashed potato, shown when amount exceeds one')).toHaveValue('large bowls');
     await page.goto('/rsvp/');
     const foodCard = page.locator('.at-food-choice').filter({ has: page.getByText('Mashed potato', { exact: true }) });
     const unitNote = foodCard.locator('.at-food-unit-note');
     await expect(unitNote).toHaveText('large bowl');
     await expect(unitNote).toHaveCSS('grid-row', '3');
     await expect(foodCard.locator('input[type="number"]')).toHaveAttribute('aria-describedby', await unitNote.getAttribute('id'));
-    const summary = foodCard.locator(':scope > small');
-    await expect(summary).toContainText('Claimed: 0');
+    const summary = foodCard.locator(':scope > .at-food-summary');
+    await expect(foodCard.locator('.at-food-total')).toHaveText('Total: 0');
     await expect(summary).toContainText('Goal: 7');
   } finally {
     await page.goto('/wp-admin/admin.php?page=at-gathering');
     await page.getByLabel('Goal for Mashed potato').fill(originalGoal);
-    await page.getByLabel('Unit or size for Mashed potato, shown on RSVP form').fill(originalUnit);
+    await page.getByLabel('Unit or size in singular form for Mashed potato, shown on RSVP form').fill(originalUnit);
+    await page.getByLabel('Plural form for Mashed potato, shown when amount exceeds one').fill(originalPlural);
     await page.getByRole('button', { name: 'Save food settings' }).click();
   }
 });
@@ -177,7 +182,7 @@ test('a host can remove an RSVP without deleting the member account', async ({ p
 });
 
 test('food contributor names are only shown after sign-in', async ({ page, browser }) => {
-  runWpEval("global $wpdb; $user = get_user_by('login', 'guest'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => $user->user_email)); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $user->user_email, 'display_name' => 'RSVP owner', 'user_id' => $user->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
+  runWpEval("global $wpdb; $user = get_user_by('login', 'guest'); update_option('at_test_original_party_display_names', array($user->ID => $user->display_name)); wp_update_user(array('ID' => $user->ID, 'display_name' => 'RSVP owner')); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => $user->user_email)); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $user->user_email, 'display_name' => 'Stale roster label', 'user_id' => $user->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
   await logIn(page);
   await page.goto('/rsvp/');
   await page.getByLabel('Gravy — vegetarian', { exact: true }).fill('2');
@@ -193,7 +198,7 @@ test('food contributor names are only shown after sign-in', async ({ page, brows
     await expect(observer.locator('.at-rsvp-app')).not.toContainText(contributorName);
   } finally { await observerContext.close(); }
   await page.goto('/rsvp/');
-  const summary = page.getByLabel('Gravy — vegetarian', { exact: true }).locator('..').locator('..').locator('small');
+  const summary = page.getByLabel('Gravy — vegetarian', { exact: true }).locator('..').locator('..').locator('.at-food-summary');
   await expect(summary).toContainText(contributorName);
   await expect(summary).not.toContainText('×');
 });
@@ -284,16 +289,17 @@ test('food totals add the offered amount and an RSVP update does not double-coun
   runWpEval("global $wpdb; $user = get_user_by('login', 'guest'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->delete(at_gathering_table(), array('user_id' => $user->ID)); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => $user->user_email)); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $user->user_email, 'display_name' => 'RSVP owner', 'user_id' => $user->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
   await logIn(page);
   await page.goto('/rsvp/');
-  const gravySummary = page.getByLabel('Gravy — vegetarian', { exact: true }).locator('..').locator('..').locator('small');
-  const before = Number.parseInt((await gravySummary.innerText()).match(/Claimed: (\d+)/)?.[1] ?? '0', 10);
+  const gravyFood = page.locator('.at-food-choice').filter({ has: page.getByText('Gravy — vegetarian', { exact: true }) });
+  const gravyTotal = gravyFood.locator('.at-food-total');
+  const before = Number.parseInt((await gravyTotal.innerText()).match(/Total: (\d+)/)?.[1] ?? '0', 10);
   await page.getByLabel('Gravy — vegetarian', { exact: true }).fill('4');
   await page.getByRole('button', { name: 'Save my RSVP' }).click();
   await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
   await page.goto('/rsvp/');
-  await expect(gravySummary).toContainText(`Claimed: ${before + 4}`);
+  await expect(gravyTotal).toHaveText(`Total: ${before + 4}`);
   await page.getByLabel('Gravy — vegetarian', { exact: true }).fill('4');
   await page.getByRole('button', { name: 'Update my RSVP' }).click();
   await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
   await page.goto('/rsvp/');
-  await expect(gravySummary).toContainText(`Claimed: ${before + 4}`);
+  await expect(gravyTotal).toHaveText(`Total: ${before + 4}`);
 });

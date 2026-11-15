@@ -32,7 +32,15 @@
 .at-food-choice-controls > input[type="number"] { grid-column: 2; grid-row: 2; }
 .at-food-choice-controls > .at-food-unit-note { grid-column: 2; grid-row: 3; display: block; color: #4c2518; font-size: .72rem; font-weight: 600; line-height: 1.2; text-align: center; }
 .at-rsvp-form input[type="number"] { box-sizing: border-box; width: 5rem; min-width: 0; border: 1px solid #9b7967; border-radius: .5rem; background: #fffaf3; color: #2f201a; font: inherit; padding: .4rem; }
-.at-food-list small { display: flex; flex-wrap: wrap; gap: .2rem .85rem; color: #4c2518; font-size: .78rem; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.at-food-summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .85rem; color: #4c2518; font-size: .78rem; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.at-food-contributors { display: block; flex: 1 1 100%; min-width: 0; }
+.at-food-contributors > span { display: block; margin-bottom: .1rem; }
+.at-food-total, .at-custom-food-total { color: #79513b; font-size: .78rem; font-weight: 600; }
+.at-party-flow { display: inline; margin: 0; padding: 0; list-style: none; }
+.at-party-flow > li { display: inline; margin-inline-end: .85em; overflow-wrap: anywhere; }
+.at-party-amount { white-space: normal; }
+.at-party-amount-quantity { white-space: nowrap; }
+.at-party-amount-unit { overflow-wrap: anywhere; }
 .at-custom-food-fields { display: grid; grid-template-columns: minmax(0,1fr) 8rem; align-items: end; gap: 1rem; }
 .at-rsvp-form .at-custom-food-fields input[type="number"] { width: 100%; padding: .7rem .8rem; }
 .at-default-submit { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
@@ -40,9 +48,10 @@
 .at-link-button:focus-visible { outline: 3px solid #7a4816; outline-offset: 2px; }
 .at-custom-food-list { margin: 0 0 1rem; padding: .8rem 1rem; border: 1px solid #c8ad90; border-radius: .75rem; background: #fff8ef; }
 .at-custom-food-list .at-field-help { margin: 0 0 .4rem; font-weight: 700; }
-.at-custom-food-list ul { display: grid; gap: .35rem; margin: 0; padding: 0; list-style: none; }
-.at-custom-food-list li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .25rem 1rem; color: #4c2518; }
-.at-custom-food-list small { flex: 1 1 100%; color: #4c2518; font-size: .8rem; font-weight: 700; overflow-wrap: anywhere; text-align: right; }
+.at-custom-food-list > ul { display: grid; gap: .35rem; margin: 0; padding: 0; list-style: none; }
+.at-custom-food-list > ul > li { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: flex-start; gap: .2rem .7rem; color: #4c2518; }
+.at-custom-food-meta { display: block; flex: 1 1 100%; min-width: 0; color: #4c2518; font-size: .8rem; font-weight: 700; overflow-wrap: anywhere; }
+.at-custom-food-meta > span { display: block; margin-bottom: .1rem; }
 .at-form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .9rem; }
 .at-form-login-note { color: #4c2518; font-size: .95rem; }
 .at-form-login-note-top { margin: 0; padding: .9rem 1rem; border-left: .3rem solid #706e3d; border-radius: .6rem; background: #fff8ef; }
@@ -63,8 +72,8 @@
 .at-gathering-admin .at-admin-foods { margin: 1.25rem 0 1.5rem; }
 .at-gathering-admin .at-admin-foods th:last-child, .at-gathering-admin .at-admin-foods td:last-child { width: 12rem; }
 .at-gathering-admin .at-admin-foods td:last-child input { width: 6rem; }
-.at-gathering-admin .at-admin-foods th:nth-child(2), .at-gathering-admin .at-admin-foods td:nth-child(2) { width: 18rem; }
-.at-gathering-admin .at-admin-foods td:nth-child(2) input { box-sizing: border-box; width: 100%; }
+.at-gathering-admin .at-admin-foods th:nth-child(2), .at-gathering-admin .at-admin-foods td:nth-child(2), .at-gathering-admin .at-admin-foods th:nth-child(3), .at-gathering-admin .at-admin-foods td:nth-child(3) { width: 16rem; }
+.at-gathering-admin .at-admin-foods td:nth-child(2) input, .at-gathering-admin .at-admin-foods td:nth-child(3) input { box-sizing: border-box; width: 100%; }
 .at-gathering-admin .at-food-goals > p { margin: 0 0 1.5rem; }
 .at-gathering-admin .at-add-food { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem; margin: 1rem 0 1.75rem; }
 .at-gathering-admin .at-sample-rsvp-form { display: grid; grid-template-columns: max-content max-content; align-items: end; justify-content: start; gap: .75rem; margin: 1rem 0 1.75rem; }

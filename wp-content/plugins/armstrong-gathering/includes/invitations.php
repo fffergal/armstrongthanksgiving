@@ -190,6 +190,9 @@ function at_gathering_claim_guest( $token, $display_name, $password = '', $passw
 			$now = current_time( 'mysql', true );
 			$guest_update = array( 'user_id' => (int) $account_id, 'claim_state' => 'claimed', 'token_hash' => '', 'token_expires' => null, 'claimed_at' => $now, 'updated_at' => $now );
 			$guest_formats = array( '%d', '%s', '%s', '%s', '%s', '%s' );
+			// Seed the roster label from the name chosen for a new account. For an
+			// existing account, preserve its current WordPress display name; the
+			// roster label is not a second name and must not be synchronized to it.
 			if ( ! $existing_user ) {
 				$guest_update['display_name'] = $display_name;
 				$guest_formats[] = '%s';
@@ -280,8 +283,8 @@ function at_gathering_signup_shortcode() {
 				<input type="hidden" name="action" value="at_claim_invitation"><input type="hidden" name="at_setup_token" value="<?php echo esc_attr( $token ); ?>"><input type="hidden" name="at_rsvp_draft" value="<?php echo esc_attr( $draft_token ); ?>"><input type="hidden" name="at_continue" value="<?php echo $continue_to_rsvp ? 'rsvp' : ''; ?>">
 				<?php wp_nonce_field( 'at_claim_invitation_' . hash( 'sha256', $token ), 'at_claim_nonce' ); ?>
 				<fieldset class="at-account-fields"><legend>Your details</legend><div class="at-rsvp-grid">
-					<label>Display name<input type="text" name="at_display_name" value="<?php echo esc_attr( $guest->display_name ); ?>" autocomplete="name" required></label>
-					<?php if ( $existing ) : ?><p>This address already has an account. Set up the invitation to link it without changing your password or access. You can sign in with your existing password afterward.</p>
+					<label>Display name<input type="text" name="at_display_name" value="<?php echo esc_attr( $existing ? $existing->display_name : $guest->display_name ); ?>" autocomplete="name" required <?php echo $existing ? 'readonly' : ''; ?>></label>
+					<?php if ( $existing ) : ?><p>This address already has an account. Its current display name will be used. Set up the invitation to link it without changing your password or access. You can sign in with your existing password afterward.</p>
 					<?php else : ?><label>Password<input type="password" name="at_password" autocomplete="new-password" minlength="10" required></label><label>Confirm password<input type="password" name="at_password_confirm" autocomplete="new-password" minlength="10" required></label><?php endif; ?>
 				</div></fieldset><p class="at-form-actions"><button class="at-button" type="submit"><?php echo $continue_to_rsvp && ! $existing ? 'Set up account and continue' : 'Set up account'; ?></button></p>
 			</form>
@@ -715,7 +718,9 @@ function at_gathering_invitation_admin_section() {
 	}
 	global $wpdb;
 	$requests = $wpdb->get_results( 'SELECT id, email_normalized, created_at, token_expires FROM ' . at_gathering_roster_table() . " WHERE claim_state = 'requested' ORDER BY created_at ASC, id ASC" );
-	$guests = $wpdb->get_results( 'SELECT id, display_name, email_normalized, user_id, claim_state, invited_at, token_expires, hidden_from_picker FROM ' . at_gathering_roster_table() . " WHERE claim_state <> 'requested' ORDER BY display_name ASC, id ASC" );
+	$guests = $wpdb->get_results(
+		"SELECT guest.id, CASE WHEN guest.user_id IS NOT NULL THEN account.display_name ELSE guest.display_name END AS display_name, guest.email_normalized, guest.user_id, guest.claim_state, guest.invited_at, guest.token_expires, guest.hidden_from_picker FROM " . at_gathering_roster_table() . ' AS guest LEFT JOIN ' . $wpdb->users . " AS account ON account.ID = guest.user_id WHERE guest.claim_state <> 'requested' ORDER BY CASE WHEN guest.user_id IS NOT NULL THEN account.display_name ELSE guest.display_name END ASC, guest.id ASC"
+	);
 	$send_history = $wpdb->get_results( 'SELECT guest_id, sent_at FROM ' . at_gathering_invitation_sends_table() . ' ORDER BY sent_at DESC, id DESC' );
 	$send_history_by_guest = array();
 	foreach ( $send_history as $send ) {

@@ -61,6 +61,8 @@ function at_gathering_ensure_schema() {
 	) ENGINE=InnoDB {$collate};";
 	$roster = at_gathering_roster_table();
 	$assignments = at_gathering_assignments_table();
+	// This is a provisional invite label only. Once user_id is linked, use the
+	// WordPress account's current display_name and never sync it back here.
 	$roster_sql = "CREATE TABLE {$roster} (
 		id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 		email_normalized varchar(191) NOT NULL,
@@ -162,23 +164,37 @@ function at_gathering_normalize_email( $email ) {
  */
 function at_gathering_roster_guest( $guest_id ) {
 	global $wpdb;
-	return $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . at_gathering_roster_table() . ' WHERE id = %d', absint( $guest_id ) ) );
+	return at_gathering_roster_current_display_name( $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . at_gathering_roster_table() . ' WHERE id = %d', absint( $guest_id ) ) ) );
 }
 
 function at_gathering_roster_guest_by_user( $user_id ) {
 	global $wpdb;
-	return $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . at_gathering_roster_table() . ' WHERE user_id = %d', absint( $user_id ) ) );
+	return at_gathering_roster_current_display_name( $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . at_gathering_roster_table() . ' WHERE user_id = %d', absint( $user_id ) ) ) );
 }
 
 function at_gathering_roster_guest_by_email( $email ) {
 	global $wpdb;
-	return $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . at_gathering_roster_table() . ' WHERE email_normalized = %s', at_gathering_normalize_email( $email ) ) );
+	return at_gathering_roster_current_display_name( $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . at_gathering_roster_table() . ' WHERE email_normalized = %s', at_gathering_normalize_email( $email ) ) ) );
+}
+
+/** Resolve linked roster adults from the live account name; never sync it back. */
+function at_gathering_roster_current_display_name( $guest ) {
+	if ( ! $guest ) {
+		return null;
+	}
+	if ( ! empty( $guest->user_id ) ) {
+		$user = get_userdata( (int) $guest->user_id );
+		$guest->display_name = $user ? $user->display_name : '';
+	}
+	return $guest;
 }
 
 function at_gathering_roster_choices( $include_hidden = false ) {
 	global $wpdb;
-	$visibility = $include_hidden ? '' : ' AND hidden_from_picker = 0';
-	return $wpdb->get_results( 'SELECT id, display_name FROM ' . at_gathering_roster_table() . " WHERE claim_state = 'claimed'{$visibility} ORDER BY display_name ASC, id ASC" );
+	$visibility = $include_hidden ? '' : ' AND guest.hidden_from_picker = 0';
+	return $wpdb->get_results(
+		"SELECT guest.id, CASE WHEN guest.user_id IS NOT NULL THEN account.display_name ELSE guest.display_name END AS display_name FROM " . at_gathering_roster_table() . ' AS guest LEFT JOIN ' . $wpdb->users . " AS account ON account.ID = guest.user_id WHERE guest.claim_state = 'claimed'{$visibility} ORDER BY CASE WHEN guest.user_id IS NOT NULL THEN account.display_name ELSE guest.display_name END ASC, guest.id ASC"
+	);
 }
 
 function at_gathering_party_assignment_for_guest( $guest_id ) {
