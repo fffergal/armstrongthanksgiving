@@ -148,7 +148,7 @@
   function markRsvpTouched(event) {
     var field = event.target;
     if (!touched || !field || !field.matches('input, select, textarea') || field.type === 'hidden') return;
-	if (!/^(at_status|at_children_count|at_guest_count|at_guest_names|at_dietary|at_custom_food|at_custom_food_amount|at_notes)$/.test(field.name) && field.name !== 'at_party_guest_ids[]' && field.name.indexOf('at_food_amounts[') !== 0 && field.name.indexOf('at_food_offers[') !== 0) return;
+	if (!/^(at_status|at_children_count|at_dietary|at_custom_food|at_custom_food_amount|at_notes)$/.test(field.name) && field.name !== 'at_party_guest_ids[]' && field.name.indexOf('at_food_amounts[') !== 0 && field.name.indexOf('at_food_offers[') !== 0) return;
     touched.value = '1';
   }
   form.addEventListener('input', markRsvpTouched);
@@ -173,16 +173,4 @@
   form.addEventListener('input', syncFoodOffer);
   form.addEventListener('change', syncFoodOffer);
 
-  var guestCount = form.querySelector('[name="at_guest_count"]');
-  var guestNames = form.querySelector('[name="at_guest_names"]');
-  var groupSignupHint = form.querySelector('[data-at-rsvp-group-hint]');
-  function updateGroupSignupHint() {
-    if (!guestCount || !guestNames || !groupSignupHint) return;
-    var hasMultiplePeople = Number(guestCount.value) > 1;
-    var namesMentionMultiplePeople = /\band\b/i.test(guestNames.value);
-    groupSignupHint.hidden = !(hasMultiplePeople || namesMentionMultiplePeople);
-  }
-  if (guestCount) guestCount.addEventListener('change', updateGroupSignupHint);
-  if (guestNames) guestNames.addEventListener('input', updateGroupSignupHint);
-  updateGroupSignupHint();
 }());

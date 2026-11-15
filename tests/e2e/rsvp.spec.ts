@@ -164,7 +164,7 @@ test('a host can remove an RSVP without deleting the member account', async ({ p
   await logInAsAdmin(page);
   await page.goto('/wp-admin/admin.php?page=at-gathering');
 
-  const rsvpRow = page.locator('.at-rsvp-admin-list').getByRole('row').filter({ hasText: 'Beta cleanup test RSVP' });
+  const rsvpRow = page.locator('.at-rsvp-admin-list').getByRole('row').filter({ hasText: 'guest@example.test' });
   await expect(rsvpRow).toBeVisible();
   await rsvpRow.scrollIntoViewIfNeeded();
   await page.screenshot({ path: testInfo.outputPath('admin-rsvp-removal.png') });
@@ -172,7 +172,7 @@ test('a host can remove an RSVP without deleting the member account', async ({ p
   await rsvpRow.getByRole('button', { name: 'Remove RSVP' }).click();
 
   await expect(page.getByText('RSVP removed.')).toBeVisible();
-  await expect(page.getByText('Beta cleanup test RSVP')).toHaveCount(0);
+  await expect(page.locator('.at-rsvp-admin-list').getByRole('row').filter({ hasText: 'guest@example.test' })).toHaveCount(0);
   runWpEval("if (! get_user_by('login', 'guest')) { WP_CLI::error('Removing an RSVP also removed the member account.'); }");
 });
 
@@ -183,7 +183,7 @@ test('food contributor names are only shown after sign-in', async ({ page, brows
   await page.getByLabel('Gravy — vegetarian', { exact: true }).fill('2');
   await page.getByRole('button', { name: 'Save my RSVP' }).click();
   await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
-  const contributorName = runWpEval("$user = get_user_by('login', 'guest'); echo esc_html($user->display_name);").trim();
+  const contributorName = 'RSVP owner';
   const observerContext = await browser.newContext();
   try {
     const observer = await observerContext.newPage();

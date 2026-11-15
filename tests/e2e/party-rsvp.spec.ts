@@ -29,6 +29,20 @@ test.describe('party RSVP assignments', () => {
     if (cleanup.status !== 0) throw new Error(cleanup.stderr || cleanup.stdout || 'Could not reset the local RSVP fixture.');
   });
 
+  test('food contributor summaries use party display names instead of legacy RSVP names', async ({ page }) => {
+    runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $friend = get_user_by('login', 'admin'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); foreach (array(array($owner, 'Roster Owner'), array($friend, 'Roster Friend')) as $entry) { $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $entry[0]->user_email, 'display_name' => $entry[1], 'user_id' => $entry[0]->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); } $owner_guest = at_gathering_roster_guest_by_user($owner->ID); $friend_guest = at_gathering_roster_guest_by_user($friend->ID); foreach (array(array($owner_guest->id, 1), array($friend_guest->id, 0)) as $assignment) { $wpdb->insert(at_gathering_assignments_table(), array('rsvp_user_id' => $owner->ID, 'guest_id' => $assignment[0], 'is_owner' => $assignment[1], 'created_at' => $now)); } $food = at_gathering_foods()[0]; $wpdb->replace(at_gathering_table(), array('user_id' => $owner->ID, 'status' => 'yes', 'guest_count' => 2, 'guest_names' => 'Old Legacy Names', 'children_count' => 0, 'dietary' => '', 'foods' => wp_json_encode(array($food)), 'food_amounts' => wp_json_encode(array($food => 1, 'Secret Dish' => 1)), 'custom_food' => 'Secret Dish', 'notes' => '', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
+    await logIn(page);
+    await page.goto('/rsvp/');
+    await expect(page.locator('.at-food-list')).toContainText('Roster Owner, Roster Friend');
+    await expect(page.locator('.at-custom-food-list')).toContainText('Roster Owner, Roster Friend');
+    await expect(page.locator('.at-food-list')).not.toContainText('Old Legacy Names');
+    await expect(page.locator('.at-custom-food-list')).not.toContainText('Old Legacy Names');
+
+    await logInAsAdmin(page);
+    await page.goto('/wp-admin/admin.php?page=at-gathering');
+    await expect(page.locator('.at-rsvp-admin-list')).not.toContainText('Old Legacy Names');
+  });
+
   test('tapping an available guest adds a selected pill', async ({ browser }, testInfo) => {
     runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $other = get_user_by('login', 'admin'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); foreach (array(array($owner, 'RSVP owner'), array($other, 'Party friend')) as $entry) { $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $entry[0]->user_email, 'display_name' => $entry[1], 'user_id' => $entry[0]->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); } update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
 
