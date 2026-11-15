@@ -259,6 +259,7 @@ test.describe('party RSVP assignments', () => {
 
   test('an unclaimed signed-in guest is handed to setup with the RSVP draft intact', async ({ page }) => {
     test.setTimeout(90000);
+    setTestDisplayNames([['guest', 'RSVP owner current name']]);
     runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->delete(at_gathering_table(), array('user_id' => $owner->ID)); $wpdb->query(\"DELETE FROM {$wpdb->options} WHERE option_name LIKE 'at_invite_rate_%'\"); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => $owner->user_email)); $now = current_time('mysql', true); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $owner->user_email, 'display_name' => 'RSVP owner', 'claim_state' => 'invited', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
     await logIn(page);
     await page.goto('/rsvp/');
@@ -278,7 +279,7 @@ test.describe('party RSVP assignments', () => {
 
     await page.goto(`/signup/?at_setup=${setupToken}&at_rsvp_draft=${draft}`);
     await expect(page.getByText('Confirm your details to link your existing account to the invitation.')).toBeVisible();
-    await expect(page.getByLabel('Display name')).toHaveValue('guest');
+    await expect(page.getByLabel('Display name')).toHaveValue('RSVP owner current name');
     await expect(page.getByLabel('Display name')).toHaveAttribute('readonly', '');
     await page.getByRole('button', { name: 'Set up account' }).click();
     await expect(page.getByRole('status')).toContainText('Your account is ready');

@@ -115,6 +115,30 @@ test('unlisted signup requests give admins tokenized approve and decline links',
   await page.goto(approvalLink);
   await expect(page.locator('body')).toContainText('invalid or has expired');
 
+  const adminApprovedEmail = `admin-approved-${suffix}@example.test`;
+  await request(adminApprovedEmail);
+  runWpEval(`global $wpdb; $wpdb->update(at_gathering_roster_table(), array('token_expires' => gmdate('Y-m-d H:i:s', time() - DAY_IN_SECONDS)), array('email_normalized' => ${php(adminApprovedEmail)}, 'claim_state' => 'requested'));`);
+  const adminDeclinedEmail = `admin-declined-${suffix}@example.test`;
+  await request(adminDeclinedEmail);
+  runWpEval(`global $wpdb; $wpdb->update(at_gathering_roster_table(), array('token_expires' => gmdate('Y-m-d H:i:s', time() - DAY_IN_SECONDS)), array('email_normalized' => ${php(adminDeclinedEmail)}, 'claim_state' => 'requested'));`);
+  await page.goto('/wp-admin/admin.php?page=at-gathering');
+  const requestRow = page.getByRole('row').filter({ hasText: adminApprovedEmail });
+  await expect(requestRow).toContainText('Expired');
+  await requestRow.getByRole('button', { name: 'Approve and send setup email' }).click();
+  await expect(page).toHaveURL(/at_invitation=request_approved/);
+  const adminApprovalState = runWpEval(`$guest = at_gathering_roster_guest_by_email(${php(adminApprovedEmail)}); echo $guest && 'invited' === $guest->claim_state && '' !== $guest->token_hash ? 'approved' : 'failed';`).trim();
+  expect(adminApprovalState).toBe('approved');
+  const adminInvitationMail = JSON.parse(runWpEval('echo wp_json_encode(get_transient("at_gathering_last_test_mail"));')) as { to: string; message: string };
+  expect(adminInvitationMail.to).toBe(adminApprovedEmail);
+  expect(adminInvitationMail.message).toContain('at_setup=');
+
+  await page.goto('/wp-admin/admin.php?page=at-gathering');
+  const declinedRequestRow = page.getByRole('row').filter({ hasText: adminDeclinedEmail });
+  await expect(declinedRequestRow).toContainText('Expired');
+  await declinedRequestRow.getByRole('button', { name: 'Decline' }).click();
+  await expect(page).toHaveURL(/at_invitation=request_declined/);
+  expect(runWpEval(`echo ! at_gathering_roster_guest_by_email(${php(adminDeclinedEmail)}) ? 'declined' : 'failed';`).trim()).toBe('declined');
+
   const declineMail = await request(declinedEmail);
   const declineLink = linkFor(declineMail, 'decline');
   await page.goto(declineLink);
@@ -124,7 +148,7 @@ test('unlisted signup requests give admins tokenized approve and decline links',
   await expect(page.locator('body')).toContainText('The invitation request was declined. The address was not added to the invite list.');
   const declineState = runWpEval(`echo ! at_gathering_roster_guest_by_email(${php(declinedEmail)}) ? 'declined' : 'failed';`).trim();
   expect(declineState).toBe('declined');
-  runWpEval(`global $wpdb; $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(approvedEmail)})); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(declinedEmail)}));`);
+  runWpEval(`global $wpdb; $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(approvedEmail)})); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(adminApprovedEmail)})); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(adminDeclinedEmail)})); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(declinedEmail)}));`);
 });
 
 test('invitation rate limits enforce the per-email boundary', async ({}, testInfo) => {
@@ -166,7 +190,7 @@ test('existing users become claimed invitees and earlier email invites are linke
   const setupToken = `${'d'.repeat(55)}${Date.now().toString(16)}`.padEnd(64, 'd').slice(0, 64);
   runWpEval(`global $wpdb; $now = current_time('mysql', true); $expires = gmdate('Y-m-d H:i:s', time() + DAY_IN_SECONDS); $pre_invited_id = wp_insert_user(array('user_login' => at_gathering_unique_login(${php(preInvitedEmail)}), 'user_pass' => 'existing-password-2026', 'user_email' => ${php(preInvitedEmail)}, 'display_name' => 'Pre-invited Member', 'role' => 'subscriber')); $existing_id = wp_insert_user(array('user_login' => at_gathering_unique_login(${php(existingEmail)}), 'user_pass' => 'existing-password-2026', 'user_email' => ${php(existingEmail)}, 'display_name' => 'Existing Member', 'role' => 'subscriber')); if (is_wp_error($pre_invited_id) || is_wp_error($existing_id)) { WP_CLI::error('Could not create migration fixtures.'); } $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => ${php(preInvitedEmail)}, 'display_name' => 'Host supplied name', 'claim_state' => 'invited', 'token_hash' => hash('sha256', ${php(setupToken)}), 'token_expires' => $expires, 'created_at' => $now, 'updated_at' => $now)); $pre_invited_guest_id = (int) $wpdb->insert_id; $wpdb->insert(at_gathering_invitation_sends_table(), array('guest_id' => $pre_invited_guest_id, 'sent_at' => $now)); at_gathering_migrate_existing_users_to_roster();`);
 
-  const migrated = runWpEval(`global $wpdb; $pre = at_gathering_roster_guest_by_email(${php(preInvitedEmail)}); $existing = at_gathering_roster_guest_by_email(${php(existingEmail)}); $pre_user = get_user_by('email', ${php(preInvitedEmail)}); $existing_user = get_user_by('email', ${php(existingEmail)}); $stored_label = $wpdb->get_var($wpdb->prepare('SELECT display_name FROM ' . at_gathering_roster_table() . ' WHERE email_normalized = %s', ${php(preInvitedEmail)})); $send_count = (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . at_gathering_invitation_sends_table() . ' WHERE guest_id = %d', (int) $pre->id)); $guest_count = (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . at_gathering_roster_table() . ' WHERE email_normalized = %s', ${php(preInvitedEmail)})); echo $pre && $existing && (int) $pre->user_id === (int) $pre_user->ID && (int) $existing->user_id === (int) $existing_user->ID && 'claimed' === $pre->claim_state && 'claimed' === $existing->claim_state && '' === $pre->token_hash && null === $pre->token_expires && 'Pre-invited Member' === $pre->display_name && 'Host supplied name' === $stored_label && 1 === $send_count && 1 === $guest_count ? 'linked' : 'failed';`).trim();
+  const migrated = runWpEval(`global $wpdb; $pre = at_gathering_roster_guest_by_email(${php(preInvitedEmail)}); $existing = at_gathering_roster_guest_by_email(${php(existingEmail)}); $pre_user = get_user_by('email', ${php(preInvitedEmail)}); $existing_user = get_user_by('email', ${php(existingEmail)}); $stored_label = $wpdb->get_var($wpdb->prepare('SELECT display_name FROM ' . at_gathering_roster_table() . ' WHERE email_normalized = %s', ${php(preInvitedEmail)})); $send_count = (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . at_gathering_invitation_sends_table() . ' WHERE guest_id = %d', (int) $pre->id)); $guest_count = (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . at_gathering_roster_table() . ' WHERE email_normalized = %s', ${php(preInvitedEmail)})); echo $pre && $existing && (int) $pre->user_id === (int) $pre_user->ID && (int) $existing->user_id === (int) $existing_user->ID && 'claimed' === $pre->claim_state && 'claimed' === $existing->claim_state && '' === $pre->token_hash && null === $pre->token_expires && 'Pre-invited Member' === $pre_user->display_name && 'Host supplied name' === $stored_label && 1 === $send_count && 1 === $guest_count ? 'linked' : 'failed';`).trim();
   expect(migrated).toBe('linked');
   const idempotent = runWpEval(`at_gathering_migrate_existing_users_to_roster(); global $wpdb; echo (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . at_gathering_roster_table() . ' WHERE email_normalized IN (%s, %s)', ${php(preInvitedEmail)}, ${php(existingEmail)}));`).trim();
   expect(idempotent).toBe('2');
@@ -212,7 +236,7 @@ test('setup token creates one password account, is consumed once, and leaves exi
   await expect(page.getByRole('status')).toContainText('Your account is ready');
   const existingClaimLoginHref = await page.getByRole('link', { name: 'Sign in with your password' }).getAttribute('href');
   expect(decodeURIComponent(existingClaimLoginHref || '')).toContain(`/rsvp/?at_rsvp_draft=${existingDraftToken}`);
-  const preserved = runWpEval(`global $wpdb; $user = get_user_by('email', ${php(existingEmail)}); $guest = at_gathering_roster_guest_by_email(${php(existingEmail)}); $roster_label = $wpdb->get_var($wpdb->prepare('SELECT display_name FROM ' . at_gathering_roster_table() . ' WHERE email_normalized = %s', ${php(existingEmail)})); echo $user && $guest && (int) $guest->user_id === (int) $user->ID && 'Existing account' === $guest->display_name && 'Existing Guest' === $roster_label && 'editor' === $user->roles[0] && wp_check_password('existing-password-2026', $user->user_pass, $user->ID) ? 'preserved' : 'changed';`).trim();
+  const preserved = runWpEval(`global $wpdb; $user = get_user_by('email', ${php(existingEmail)}); $guest = at_gathering_roster_guest_by_email(${php(existingEmail)}); $roster_label = $wpdb->get_var($wpdb->prepare('SELECT display_name FROM ' . at_gathering_roster_table() . ' WHERE email_normalized = %s', ${php(existingEmail)})); echo $user && $guest && (int) $guest->user_id === (int) $user->ID && 'Existing account' === $user->display_name && 'Existing Guest' === $roster_label && 'editor' === $user->roles[0] && wp_check_password('existing-password-2026', $user->user_pass, $user->ID) ? 'preserved' : 'changed';`).trim();
   expect(preserved).toBe('preserved');
 
   runWpEval(`global $wpdb; $guest = at_gathering_roster_guest_by_email(${php(newEmail)}); if ($guest && $guest->user_id) { require_once ABSPATH . 'wp-admin/includes/user.php'; wp_delete_user((int) $guest->user_id); } $guest = at_gathering_roster_guest_by_email(${php(existingEmail)}); if ($guest && $guest->user_id) { require_once ABSPATH . 'wp-admin/includes/user.php'; wp_delete_user((int) $guest->user_id); } $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(newEmail)})); $wpdb->delete(at_gathering_roster_table(), array('email_normalized' => ${php(existingEmail)})); delete_transient('at_gathering_rsvp_draft_' . ${php(existingDraftToken)});`);
