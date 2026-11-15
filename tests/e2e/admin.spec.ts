@@ -63,11 +63,13 @@ test('food settings remain labeled and fit phone, tablet, and desktop viewports'
   const table = page.locator('.at-admin-foods');
   const cells = table.locator('tbody tr').first().locator('td');
   await expect(cells.nth(0)).toHaveAttribute('data-label', 'Food');
-  await expect(cells.nth(1)).toHaveAttribute('data-label', 'Unit or size');
-  await expect(cells.nth(2)).toHaveAttribute('data-label', 'Amount offered');
-  await expect(cells.nth(3)).toHaveAttribute('data-label', 'Amount goal');
+  await expect(cells.nth(1)).toHaveAttribute('data-label', 'Unit or size (singular)');
+  await expect(cells.nth(2)).toHaveAttribute('data-label', 'Plural form');
+  await expect(cells.nth(3)).toHaveAttribute('data-label', 'Amount offered');
+  await expect(cells.nth(4)).toHaveAttribute('data-label', 'Amount goal');
   await expect(cells.nth(1).locator('input')).toBeVisible();
-  await expect(cells.nth(3).locator('input')).toBeVisible();
+  await expect(cells.nth(2).locator('input')).toBeVisible();
+  await expect(cells.nth(4).locator('input')).toBeVisible();
   expect(await table.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
 
   for (const width of [390, 768, 1024]) {
