@@ -50,6 +50,75 @@ function at_gathering_food_units() {
 	return $units;
 }
 
+function at_gathering_food_unit_plurals() {
+	$stored = (array) get_option( 'at_gathering_food_unit_plurals', array() );
+	$plurals = array();
+	foreach ( at_gathering_foods() as $food ) {
+		$plurals[ $food ] = sanitize_text_field( $stored[ $food ] ?? '' );
+	}
+	return $plurals;
+}
+
+function at_gathering_food_amount_parts( $amount, $unit = '', $plural_unit = '' ) {
+	$amount = absint( $amount );
+	$unit   = trim( sanitize_text_field( $unit ) );
+	if ( '' === $unit ) {
+		return array(
+			'quantity' => 'amount: ' . number_format_i18n( $amount ),
+			'unit'     => '',
+		);
+	}
+
+	if ( 1 === $amount ) {
+		return array(
+			'quantity' => number_format_i18n( $amount ),
+			'unit'     => $unit,
+		);
+	}
+
+	$plural_unit = trim( sanitize_text_field( $plural_unit ) );
+	if ( '' === $plural_unit ) {
+		$plural_unit = preg_replace_callback(
+			'/[^\s]+$/u',
+			static function ( $matches ) {
+				$word = $matches[0];
+				if ( preg_match( '/^(?:kg|g|mg|lb|oz|l|ml|cl|dl|tsp|tbsp)$/i', $word ) ) {
+					return $word;
+				}
+				// Leave existing plural or invariant labels alone instead of
+				// producing forms such as "cupses" or "kgs".
+				if ( preg_match( '/ss$/i', $word ) ) {
+					return $word . 'es';
+				}
+				if ( preg_match( '/(?:bus|gas|alias|canvas|status|virus)$/i', $word ) ) {
+					return $word . 'es';
+				}
+				if ( preg_match( '/s$/i', $word ) ) {
+					return $word;
+				}
+				if ( preg_match( '/[^aeiou]y$/i', $word ) ) {
+					return substr( $word, 0, -1 ) . 'ies';
+				}
+				if ( preg_match( '/(?:s|x|z|ch|sh)$/i', $word ) ) {
+					return $word . 'es';
+				}
+				return $word . 's';
+			},
+			$unit
+		);
+	}
+
+	return array(
+		'quantity' => number_format_i18n( $amount ),
+		'unit'     => $plural_unit,
+	);
+}
+
+function at_gathering_food_amount_label( $amount, $unit = '', $plural_unit = '' ) {
+	$parts = at_gathering_food_amount_parts( $amount, $unit, $plural_unit );
+	return '' === $parts['unit'] ? $parts['quantity'] : $parts['quantity'] . ' ' . $parts['unit'];
+}
+
 function at_gathering_rsvp_food_amounts( $rsvp ) {
 	$amounts = json_decode( (string) ( $rsvp->food_amounts ?? '' ), true );
 	if ( is_array( $amounts ) && $amounts ) {
@@ -330,15 +399,40 @@ function at_gathering_food_counts() {
 function at_gathering_party_display_names( $rsvp_user_id ) {
 	global $wpdb;
 
+	// Linked accounts supply the current display name. The roster value is only
+	// a pre-account invite label and must not be used as a stale fallback.
 	return array_map(
 		'strval',
 		$wpdb->get_col(
 			$wpdb->prepare(
-				'SELECT guest.display_name FROM ' . at_gathering_assignments_table() . ' AS assignment INNER JOIN ' . at_gathering_roster_table() . ' AS guest ON guest.id = assignment.guest_id WHERE assignment.rsvp_user_id = %d ORDER BY assignment.is_owner DESC, guest.display_name ASC',
+				"SELECT CASE WHEN guest.user_id IS NOT NULL THEN user.display_name ELSE guest.display_name END FROM " . at_gathering_assignments_table() . ' AS assignment INNER JOIN ' . at_gathering_roster_table() . ' AS guest ON guest.id = assignment.guest_id LEFT JOIN ' . $wpdb->users . " AS user ON user.ID = guest.user_id WHERE assignment.rsvp_user_id = %d ORDER BY assignment.is_owner DESC, CASE WHEN guest.user_id IS NOT NULL THEN user.display_name ELSE guest.display_name END ASC",
 				absint( $rsvp_user_id )
 			)
 		)
 	);
+}
+
+function at_gathering_party_display_label( $names ) {
+	$names = array_values(
+		array_filter(
+			array_map(
+				static function ( $name ) {
+					return trim( (string) $name );
+				},
+				(array) $names
+			),
+			static function ( $name ) {
+				return '' !== $name;
+			}
+		)
+	);
+
+	if ( count( $names ) < 2 ) {
+		return $names[0] ?? '';
+	}
+
+	$last_name = array_pop( $names );
+	return implode( ', ', $names ) . ' and ' . $last_name;
 }
 
 function at_gathering_food_contributors() {
@@ -354,14 +448,14 @@ function at_gathering_food_contributors() {
 
 	foreach ( $rows as $row ) {
 		$party_names = at_gathering_party_display_names( $row->user_id );
-		$name        = $party_names ? implode( ', ', $party_names ) : ( trim( (string) $row->display_name ) ?: 'Unknown friend' );
+		$party_names = $party_names ? $party_names : array( trim( (string) $row->display_name ) ?: 'Unknown friend' );
 		$foods       = array_unique( array_map( 'sanitize_text_field', (array) json_decode( $row->foods, true ) ) );
 		$amounts = at_gathering_rsvp_food_amounts( $row );
 
 		foreach ( $foods as $food ) {
 			if ( $food ) {
 				$contributors[ $food ][] = array(
-					'name'   => $name,
+					'names'  => $party_names,
 					'amount' => max( 1, absint( $amounts[ $food ] ?? 1 ) ),
 				);
 			}
@@ -369,14 +463,10 @@ function at_gathering_food_contributors() {
 	}
 
 	foreach ( $contributors as &$food_contributors ) {
-		if ( 1 === count( $food_contributors ) ) {
-			$food_contributors[0] = $food_contributors[0]['name'];
-			continue;
-		}
-
 		$food_contributors = array_map(
 			static function ( $contributor ) {
-				return $contributor['name'] . ' × ' . $contributor['amount'];
+				$contributor['label'] = at_gathering_party_display_label( $contributor['names'] );
+				return $contributor;
 			},
 			$food_contributors
 		);
@@ -419,21 +509,20 @@ function at_gathering_custom_food_counts( $listed_foods = null ) {
 		}
 		$counts[ $key ]['count'] += $amount;
 		$party_names = at_gathering_party_display_names( $row->user_id );
+		$party_names = $party_names ? $party_names : array( trim( (string) $row->display_name ) ?: 'Unknown friend' );
 		$counts[ $key ]['names'][] = array(
-			'name'   => $party_names ? implode( ', ', $party_names ) : ( trim( (string) $row->display_name ) ?: 'Unknown friend' ),
+			'party'  => $party_names,
 			'amount' => $amount,
 		);
 	}
 
 	foreach ( $counts as &$item ) {
-		if ( 1 === count( $item['names'] ) ) {
-			$item['names'][0] = $item['names'][0]['name'];
-			continue;
-		}
-
 		$item['names'] = array_map(
 			static function ( $contributor ) {
-				return $contributor['name'] . ' × ' . $contributor['amount'];
+				return array(
+					'label'       => at_gathering_party_display_label( $contributor['party'] ),
+					'amount'      => $contributor['amount'],
+				);
 			},
 			$item['names']
 		);
@@ -497,15 +586,19 @@ function at_gathering_save_food_goals() {
 	}
 	$submitted = (array) wp_unslash( $_POST['at_food_goals'] ?? array() );
 	$submitted_units = (array) wp_unslash( $_POST['at_food_units'] ?? array() );
+	$submitted_unit_plurals = (array) wp_unslash( $_POST['at_food_unit_plurals'] ?? array() );
 	$goals = array();
 	$units = array();
+	$unit_plurals = array();
 	foreach ( at_gathering_foods() as $food ) {
 		$key = md5( $food );
 		$goals[ $food ] = isset( $submitted[ $key ] ) ? min( 9999, absint( $submitted[ $key ] ) ) : 0;
 		$units[ $food ] = sanitize_text_field( $submitted_units[ $key ] ?? '' );
+		$unit_plurals[ $food ] = sanitize_text_field( $submitted_unit_plurals[ $key ] ?? '' );
 	}
 	update_option( 'at_gathering_food_goals', $goals );
 	update_option( 'at_gathering_food_units', $units );
+	update_option( 'at_gathering_food_unit_plurals', $unit_plurals );
 	if ( function_exists( 'wp_cache_clear_cache' ) ) {
 		wp_cache_clear_cache();
 	}

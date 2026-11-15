@@ -36,6 +36,22 @@ relying on the workflow in production.
    an RSVP, the host must remove that RSVP before assigning them to another
    party.
 
+## Name source of truth
+
+The roster `display_name` is a provisional invite label. Hosts can supply it
+before an account exists, and the account-claim form can use it as the starting
+value for a new account's WordPress display name. Once an adult has a linked
+WordPress account, that account's current `display_name` is the only name to
+use in user-facing RSVP, party, and roster displays.
+
+Do not copy a linked account's display name back into the roster, treat the
+roster label as a second editable profile name, or use the roster label as a
+fallback when the linked account has a display name. The roster value may be
+old after account claim or a later profile change; at that point it is unused
+for display. Do not add another name field to avoid that staleness. Before an
+account is linked, use the roster label where a name is needed for the pending
+invitation; after linking, use the current WordPress account display name.
+
 ## Invitation administration
 
 Hosts use **Gathering RSVPs → Guest invitations** to add adults, review claim

@@ -7,6 +7,8 @@ const wrapper = path.join(root, 'scripts/wp-env.mjs');
 const cleanup = [
 	'global $wpdb;',
 	"require_once ABSPATH . 'wp-admin/includes/user.php';",
+	"$original_party_names = get_option('at_test_original_party_display_names', array()); foreach ($original_party_names as $user_id => $display_name) { if (get_user_by('id', (int) $user_id)) { wp_update_user(array('ID' => (int) $user_id, 'display_name' => $display_name)); } } delete_option('at_test_original_party_display_names');",
+	"foreach (array(array('at_test_original_food_units', 'at_gathering_food_units'), array('at_test_original_food_unit_plurals', 'at_gathering_food_unit_plurals')) as $options) { $original = get_option($options[0], null); if (null !== $original) { if (false === $original) { delete_option($options[1]); } else { update_option($options[1], $original); } delete_option($options[0]); } }",
 	"$test_user = getenv('WP_TEST_USER') ?: 'guest';",
 	"foreach (get_users(array('fields' => 'all')) as $user) { if ($user->user_login !== $test_user && ! in_array('administrator', (array) $user->roles, true)) { wp_delete_user($user->ID); } }",
 	"$table = $wpdb->prefix . 'at_rsvps'; if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table)) === $table) { $wpdb->query('TRUNCATE TABLE ' . $table); }",

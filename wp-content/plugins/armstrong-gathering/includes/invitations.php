@@ -190,6 +190,9 @@ function at_gathering_claim_guest( $token, $display_name, $password = '', $passw
 			$now = current_time( 'mysql', true );
 			$guest_update = array( 'user_id' => (int) $account_id, 'claim_state' => 'claimed', 'token_hash' => '', 'token_expires' => null, 'claimed_at' => $now, 'updated_at' => $now );
 			$guest_formats = array( '%d', '%s', '%s', '%s', '%s', '%s' );
+			// Seed the roster label from the name chosen for a new account. For an
+			// existing account, preserve its current WordPress display name; the
+			// roster label is not a second name and must not be synchronized to it.
 			if ( ! $existing_user ) {
 				$guest_update['display_name'] = $display_name;
 				$guest_formats[] = '%s';
@@ -280,8 +283,8 @@ function at_gathering_signup_shortcode() {
 				<input type="hidden" name="action" value="at_claim_invitation"><input type="hidden" name="at_setup_token" value="<?php echo esc_attr( $token ); ?>"><input type="hidden" name="at_rsvp_draft" value="<?php echo esc_attr( $draft_token ); ?>"><input type="hidden" name="at_continue" value="<?php echo $continue_to_rsvp ? 'rsvp' : ''; ?>">
 				<?php wp_nonce_field( 'at_claim_invitation_' . hash( 'sha256', $token ), 'at_claim_nonce' ); ?>
 				<fieldset class="at-account-fields"><legend>Your details</legend><div class="at-rsvp-grid">
-					<label>Display name<input type="text" name="at_display_name" value="<?php echo esc_attr( $guest->display_name ); ?>" autocomplete="name" required></label>
-					<?php if ( $existing ) : ?><p>This address already has an account. Set up the invitation to link it without changing your password or access. You can sign in with your existing password afterward.</p>
+					<label>Display name<input type="text" name="at_display_name" value="<?php echo esc_attr( $existing ? $existing->display_name : $guest->display_name ); ?>" autocomplete="name" required <?php echo $existing ? 'readonly' : ''; ?>></label>
+					<?php if ( $existing ) : ?><p>This address already has an account. Its current display name will be used. Set up the invitation to link it without changing your password or access. You can sign in with your existing password afterward.</p>
 					<?php else : ?><label>Password<input type="password" name="at_password" autocomplete="new-password" minlength="10" required></label><label>Confirm password<input type="password" name="at_password_confirm" autocomplete="new-password" minlength="10" required></label><?php endif; ?>
 				</div></fieldset><p class="at-form-actions"><button class="at-button" type="submit"><?php echo $continue_to_rsvp && ! $existing ? 'Set up account and continue' : 'Set up account'; ?></button></p>
 			</form>
@@ -314,6 +317,7 @@ function at_gathering_notify_admins_of_invitation_request( $email, $draft_token 
 	$roster_table = at_gathering_roster_table();
 	$now = current_time( 'mysql', true );
 	$expires = gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS );
+	$wpdb->query( $wpdb->prepare( "DELETE FROM {$roster_table} WHERE claim_state = %s AND token_expires < %s", 'requested', $now ) );
 	$guest = at_gathering_roster_guest_by_email( $email );
 	if ( $guest && 'requested' !== $guest->claim_state ) {
 		return false;
@@ -556,36 +560,6 @@ function at_gathering_save_invitation() {
 		wp_die( 'Sorry, the invitation could not be saved.' );
 	}
 	$mode = sanitize_key( wp_unslash( $_POST['at_invitation_mode'] ?? 'save' ) );
-	if ( in_array( $mode, array( 'approve_request', 'decline_request' ), true ) ) {
-		global $wpdb;
-		$guest_id = absint( $_POST['at_invitation_id'] ?? 0 );
-		$table = at_gathering_roster_table();
-		$guest = $guest_id ? $wpdb->get_row( $wpdb->prepare( "SELECT id, email_normalized FROM {$table} WHERE id = %d AND claim_state = %s", $guest_id, 'requested' ) ) : null;
-		if ( ! $guest ) {
-			wp_safe_redirect( add_query_arg( 'at_invitation', 'request_unavailable', admin_url( 'admin.php?page=at-gathering' ) ) );
-			exit;
-		}
-		if ( 'approve_request' === $mode ) {
-			$updated = $wpdb->update(
-				$table,
-				array( 'claim_state' => 'invited', 'token_hash' => '', 'token_expires' => null, 'updated_at' => current_time( 'mysql', true ) ),
-				array( 'id' => $guest_id, 'claim_state' => 'requested' ),
-				array( '%s', '%s', '%s', '%s' ),
-				array( '%d', '%s' )
-			);
-			if ( 1 !== $updated ) {
-				wp_safe_redirect( add_query_arg( 'at_invitation', 'request_unavailable', admin_url( 'admin.php?page=at-gathering' ) ) );
-				exit;
-			}
-			$sent = at_gathering_send_claim_link( $guest->email_normalized, '', false, true );
-			$notice = $sent ? 'request_approved' : 'request_approved_email_failed';
-		} else {
-			$deleted = $wpdb->delete( $table, array( 'id' => $guest_id, 'claim_state' => 'requested' ), array( '%d', '%s' ) );
-			$notice = 1 === $deleted ? 'request_declined' : 'request_unavailable';
-		}
-		wp_safe_redirect( add_query_arg( 'at_invitation', $notice, admin_url( 'admin.php?page=at-gathering' ) ) );
-		exit;
-	}
 	if ( 'visibility' === $mode ) {
 		global $wpdb;
 		$guest_id = absint( $_POST['at_invitation_id'] ?? 0 );
@@ -714,8 +688,9 @@ function at_gathering_invitation_admin_section() {
 		return;
 	}
 	global $wpdb;
-	$requests = $wpdb->get_results( 'SELECT id, email_normalized, created_at, token_expires FROM ' . at_gathering_roster_table() . " WHERE claim_state = 'requested' ORDER BY created_at ASC, id ASC" );
-	$guests = $wpdb->get_results( 'SELECT id, display_name, email_normalized, user_id, claim_state, invited_at, token_expires, hidden_from_picker FROM ' . at_gathering_roster_table() . " WHERE claim_state <> 'requested' ORDER BY display_name ASC, id ASC" );
+	$guests = $wpdb->get_results(
+		"SELECT guest.id, CASE WHEN guest.user_id IS NOT NULL THEN account.display_name ELSE guest.display_name END AS display_name, guest.email_normalized, guest.user_id, guest.claim_state, guest.invited_at, guest.token_expires, guest.hidden_from_picker FROM " . at_gathering_roster_table() . ' AS guest LEFT JOIN ' . $wpdb->users . " AS account ON account.ID = guest.user_id WHERE guest.claim_state <> 'requested' ORDER BY CASE WHEN guest.user_id IS NOT NULL THEN account.display_name ELSE guest.display_name END ASC, guest.id ASC"
+	);
 	$send_history = $wpdb->get_results( 'SELECT guest_id, sent_at FROM ' . at_gathering_invitation_sends_table() . ' ORDER BY sent_at DESC, id DESC' );
 	$send_history_by_guest = array();
 	foreach ( $send_history as $send ) {
@@ -723,13 +698,7 @@ function at_gathering_invitation_admin_section() {
 	}
 	?>
 	<hr><h2>Guest invitations</h2>
-	<?php if ( isset( $_GET['at_invitation'] ) ) : $notice = sanitize_key( wp_unslash( $_GET['at_invitation'] ) ); ?><div class="notice notice-info"><p><?php echo esc_html( array( 'sent' => 'Invitation link sent.', 'failed' => 'Invitation saved, but its email could not be sent.', 'saved' => 'Guest added to the invite list. No email was sent.', 'deleted' => 'Pending invitation deleted.', 'delete_failed' => 'The pending invitation could not be deleted. Please try again.', 'claimed' => 'That invitation has already been claimed or is no longer available.', 'hidden' => 'Guest hidden from the RSVP adult picker. Their account and RSVP are unchanged.', 'shown' => 'Guest shown in the RSVP adult picker again.', 'visibility_failed' => 'Guest visibility could not be updated.', 'invalid' => 'Enter a valid email address. New invitations need a name before sending.', 'request_approved' => 'Request approved and invitation email sent.', 'request_approved_email_failed' => 'Request approved, but the invitation email could not be sent. You can resend it below.', 'request_declined' => 'Invitation request declined.', 'request_unavailable' => 'That request has already been handled or is no longer available.', 'bulk_added' => sprintf( '%d guests added. %d lines skipped. No emails were sent.', absint( $_GET['at_added_count'] ?? 0 ), absint( $_GET['at_skipped_count'] ?? 0 ) ), 'all_sent' => sprintf( 'Invitation emails sent to %1$d of %2$d guests who have not signed up.', absint( $_GET['at_sent_count'] ?? 0 ), absint( $_GET['at_total_count'] ?? 0 ) ) )[ $notice ] ?? 'Invitation updated.' ); ?></p></div><?php endif; ?>
-	<h3>Pending signup requests</h3>
-	<p class="description">Review requests here at any time. The email links expire after 24 hours; this admin review remains available until you approve or decline the request.</p>
-	<table class="widefat striped at-invitation-requests"><thead><tr><th>Email</th><th>Requested</th><th>Email link</th><th>Actions</th></tr></thead><tbody>
-	<?php if ( ! $requests ) : ?><tr><td colspan="4">No pending signup requests.</td></tr><?php else : foreach ( $requests as $request ) : ?><tr><td data-label="Email"><?php echo esc_html( $request->email_normalized ); ?></td><td data-label="Requested"><?php echo esc_html( get_date_from_gmt( $request->created_at, 'Y-m-d H:i' ) ); ?></td><td data-label="Email link"><?php echo $request->token_expires && strtotime( $request->token_expires . ' UTC' ) > time() ? 'Valid for 24 hours' : 'Expired'; ?></td><td data-label="Actions"><div class="at-invitation-actions"><form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><input type="hidden" name="at_invitation_mode" value="approve_request"><input type="hidden" name="at_invitation_id" value="<?php echo esc_attr( $request->id ); ?>"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?><button class="button button-primary" type="submit">Approve and send setup email</button></form><form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><input type="hidden" name="at_invitation_mode" value="decline_request"><input type="hidden" name="at_invitation_id" value="<?php echo esc_attr( $request->id ); ?>"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?><button class="button" type="submit">Decline</button></form></div></td></tr><?php endforeach; endif; ?>
-	</tbody></table>
-	<h3>Add guests to invite list</h3>
+	<?php if ( isset( $_GET['at_invitation'] ) ) : $notice = sanitize_key( wp_unslash( $_GET['at_invitation'] ) ); ?><div class="notice notice-info"><p><?php echo esc_html( array( 'sent' => 'Invitation link sent.', 'failed' => 'Invitation saved, but its email could not be sent.', 'saved' => 'Guest added to the invite list. No email was sent.', 'deleted' => 'Pending invitation deleted.', 'delete_failed' => 'The pending invitation could not be deleted. Please try again.', 'claimed' => 'That invitation has already been claimed or is no longer available.', 'hidden' => 'Guest hidden from the RSVP adult picker. Their account and RSVP are unchanged.', 'shown' => 'Guest shown in the RSVP adult picker again.', 'visibility_failed' => 'Guest visibility could not be updated.', 'invalid' => 'Enter a valid email address. New invitations need a name before sending.', 'bulk_added' => sprintf( '%d guests added. %d lines skipped. No emails were sent.', absint( $_GET['at_added_count'] ?? 0 ), absint( $_GET['at_skipped_count'] ?? 0 ) ), 'all_sent' => sprintf( 'Invitation emails sent to %1$d of %2$d guests who have not signed up.', absint( $_GET['at_sent_count'] ?? 0 ), absint( $_GET['at_total_count'] ?? 0 ) ) )[ $notice ] ?? 'Invitation updated.' ); ?></p></div><?php endif; ?>
 	<form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post"><input type="hidden" name="action" value="at_save_invitation"><input type="hidden" name="at_invitation_mode" value="save"><?php wp_nonce_field( 'at_save_invitation', 'at_invitation_nonce' ); ?>
 		<p><label>Name (optional) <input type="text" name="at_invitation_name"></label> <label>Email <input type="email" name="at_invitation_email" required></label> <button class="button button-primary" type="submit">Add to invite list</button></p>
 	</form>

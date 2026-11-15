@@ -15,6 +15,11 @@ function runWpEval(code: string): string {
   return result.stdout;
 }
 
+function setTestDisplayNames(entries: Array<[string, string]>): void {
+  const phpEntries = entries.map(([login, name]) => `array('${login}', '${name.replaceAll("'", "\\'")}')`).join(', ');
+  runWpEval(`$entries = array(${phpEntries}); $originals = array(); foreach ($entries as $entry) { $user = get_user_by('login', $entry[0]); $originals[$user->ID] = $user->display_name; wp_update_user(array('ID' => $user->ID, 'display_name' => $entry[1])); } update_option('at_test_original_party_display_names', $originals);`);
+}
+
 test.describe('party RSVP assignments', () => {
   test.beforeEach(({}, testInfo) => {
     test.skip(testInfo.project.name !== 'rsvp', 'Run party RSVP workflows in the desktop RSVP project.');
@@ -29,21 +34,58 @@ test.describe('party RSVP assignments', () => {
     if (cleanup.status !== 0) throw new Error(cleanup.stderr || cleanup.stdout || 'Could not reset the local RSVP fixture.');
   });
 
-  test('food contributor summaries use party display names instead of legacy RSVP names', async ({ page }) => {
-    runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $friend = get_user_by('login', 'admin'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); foreach (array(array($owner, 'Roster Owner'), array($friend, 'Roster Friend')) as $entry) { $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $entry[0]->user_email, 'display_name' => $entry[1], 'user_id' => $entry[0]->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); } $owner_guest = at_gathering_roster_guest_by_user($owner->ID); $friend_guest = at_gathering_roster_guest_by_user($friend->ID); foreach (array(array($owner_guest->id, 1), array($friend_guest->id, 0)) as $assignment) { $wpdb->insert(at_gathering_assignments_table(), array('rsvp_user_id' => $owner->ID, 'guest_id' => $assignment[0], 'is_owner' => $assignment[1], 'created_at' => $now)); } $food = at_gathering_foods()[0]; $wpdb->replace(at_gathering_table(), array('user_id' => $owner->ID, 'status' => 'yes', 'guest_count' => 2, 'guest_names' => 'Old Legacy Names', 'children_count' => 0, 'dietary' => '', 'foods' => wp_json_encode(array($food)), 'food_amounts' => wp_json_encode(array($food => 1, 'Secret Dish' => 1)), 'custom_food' => 'Secret Dish', 'notes' => '', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
+  test('food contributor summaries use current account display names instead of roster or legacy names', async ({ page }) => {
+    runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $friend = get_user_by('login', 'admin'); update_option('at_test_original_party_display_names', array($owner->ID => $owner->display_name, $friend->ID => $friend->display_name)); wp_update_user(array('ID' => $owner->ID, 'display_name' => 'Aaron & Louisa')); wp_update_user(array('ID' => $friend->ID, 'display_name' => 'Current Friend')); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); foreach (array(array($owner, 'Aaronius Stevaryan'), array($friend, 'Old Roster Friend')) as $entry) { $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $entry[0]->user_email, 'display_name' => $entry[1], 'user_id' => $entry[0]->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); } wp_update_user(array('ID' => $owner->ID, 'display_name' => 'Aaron & Louisa')); wp_update_user(array('ID' => $friend->ID, 'display_name' => 'Current Friend')); $owner_guest = at_gathering_roster_guest_by_user($owner->ID); $friend_guest = at_gathering_roster_guest_by_user($friend->ID); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => 'party-friend@example.test', 'display_name' => 'Party Friend', 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); $party_friend_id = $wpdb->insert_id; foreach (array(array($owner->ID, $owner_guest->id, 1), array($owner->ID, $party_friend_id, 0), array($friend->ID, $friend_guest->id, 1)) as $assignment) { $wpdb->insert(at_gathering_assignments_table(), array('rsvp_user_id' => $assignment[0], 'guest_id' => $assignment[1], 'is_owner' => $assignment[2], 'created_at' => $now)); } $food = at_gathering_foods()[0]; foreach (array($owner->ID, $friend->ID) as $rsvp_user_id) { $wpdb->replace(at_gathering_table(), array('user_id' => $rsvp_user_id, 'status' => 'yes', 'guest_count' => 1, 'guest_names' => 'Old Legacy Names', 'children_count' => 0, 'dietary' => '', 'foods' => wp_json_encode(array($food)), 'food_amounts' => wp_json_encode(array($food => 1, 'Secret Dish' => 1)), 'custom_food' => 'Secret Dish', 'notes' => '', 'created_at' => $now, 'updated_at' => $now)); } update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
+    runWpEval("$food = at_gathering_foods()[0]; update_option('at_test_original_food_units', get_option('at_gathering_food_units', false)); update_option('at_test_original_food_unit_plurals', get_option('at_gathering_food_unit_plurals', false)); $units = at_gathering_food_units(); $units[$food] = 'large tray'; update_option('at_gathering_food_units', $units); $plurals = at_gathering_food_unit_plurals(); $plurals[$food] = 'large trays'; update_option('at_gathering_food_unit_plurals', $plurals);");
+    expect(runWpEval("echo at_gathering_food_amount_label(2, 'tray');").trim()).toBe('2 trays');
+    expect(runWpEval("echo at_gathering_food_amount_label(2, 'city');").trim()).toBe('2 cities');
+    expect(runWpEval("echo at_gathering_food_amount_label(2, 'glass');").trim()).toBe('2 glasses');
+    expect(runWpEval("echo at_gathering_food_amount_label(2, 'cups');").trim()).toBe('2 cups');
+    expect(runWpEval("echo at_gathering_food_amount_label(2, 'kg');").trim()).toBe('2 kg');
+    expect(runWpEval("echo at_gathering_food_amount_label(2, 'loaf', 'loaves');").trim()).toBe('2 loaves');
     await logIn(page);
     await page.goto('/rsvp/');
-    await expect(page.locator('.at-food-list')).toContainText('Roster Owner, Roster Friend');
-    await expect(page.locator('.at-custom-food-list')).toContainText('Roster Owner, Roster Friend');
+    await expect(page.getByRole('list', { name: 'Parties bringing Stuffing — vegetarian' })).toHaveCount(1);
+    const standardFoodParties = page.locator('.at-food-list .at-party-flow li');
+    await expect(standardFoodParties).toHaveCount(2);
+    await expect(standardFoodParties.nth(0)).toContainText('Aaron & Louisa and Party Friend');
+    await expect(standardFoodParties.nth(0)).toContainText('(1 large tray)');
+    await expect(standardFoodParties.nth(1)).toContainText('Current Friend');
+    await expect(standardFoodParties.nth(1)).toContainText('(1 large tray)');
+    await expect(page.locator('.at-food-choice').first().locator('.at-food-total')).toHaveText('Total: 2');
+    const customFoodParties = page.locator('.at-custom-food-list .at-party-flow li');
+    await expect(customFoodParties).toHaveCount(2);
+    await expect(customFoodParties.nth(0)).toContainText('Aaron & Louisa and Party Friend');
+    await expect(customFoodParties.nth(0)).toContainText('(amount: 1)');
+    await expect(customFoodParties.nth(1)).toContainText('Current Friend');
+    await expect(customFoodParties.nth(1)).toContainText('(amount: 1)');
+    await expect(page.locator('.at-custom-food-total')).toHaveText('Total: 2');
+    await expect(page.locator('.at-food-list')).not.toContainText('Aaronius Stevaryan');
+    await expect(page.locator('.at-custom-food-list')).not.toContainText('Aaronius Stevaryan');
     await expect(page.locator('.at-food-list')).not.toContainText('Old Legacy Names');
     await expect(page.locator('.at-custom-food-list')).not.toContainText('Old Legacy Names');
+    await expect(page.locator('.at-party-selected')).toContainText('Aaron & Louisa');
+    await expect(page.getByRole('button', { name: 'Remove Party Friend' })).toBeVisible();
+    await expect(page.locator('.at-party-selected')).not.toContainText('Aaronius Stevaryan');
+    await page.getByRole('combobox', { name: 'Add an adult' }).fill('Aaron & Louisa');
+    await expect(page.getByRole('option', { name: 'Aaron & Louisa', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Remove Party Friend' }).click();
+    await page.getByRole('combobox', { name: 'Add an adult' }).fill('Party Friend');
+    await expect(page.getByRole('option', { name: 'Party Friend', exact: true })).toBeVisible();
+    await page.goto('/rsvp-confirmation/?at_rsvp=saved');
+    await expect(page.locator('.at-confirmation-box')).toContainText('Adults reserved: Aaron & Louisa, Party Friend');
+    await expect(page.locator('.at-confirmation-box')).not.toContainText('Aaronius Stevaryan');
 
     await logInAsAdmin(page);
     await page.goto('/wp-admin/admin.php?page=at-gathering');
     await expect(page.locator('.at-rsvp-admin-list')).not.toContainText('Old Legacy Names');
+    await expect(page.locator('.at-invitation-admin-list')).toContainText('Aaron & Louisa');
+    await expect(page.locator('.at-invitation-admin-list')).not.toContainText('Aaronius Stevaryan');
+    await expect(page.getByRole('option', { name: 'Current Friend', exact: true })).toBeVisible();
   });
 
   test('tapping an available guest adds a selected pill', async ({ browser }, testInfo) => {
+    setTestDisplayNames([['admin', 'Party friend']]);
     runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $other = get_user_by('login', 'admin'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); foreach (array(array($owner, 'RSVP owner'), array($other, 'Party friend')) as $entry) { $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $entry[0]->user_email, 'display_name' => $entry[1], 'user_id' => $entry[0]->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); } update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
 
     const context = await browser.newContext({ baseURL: testInfo.project.use.baseURL as string, hasTouch: true, viewport: { width: 390, height: 844 } });
@@ -118,6 +160,7 @@ test.describe('party RSVP assignments', () => {
   });
 
   test('only claimed guests receive roster choices and the owner is reserved with the party', async ({ page }) => {
+    setTestDisplayNames([['guest', 'RSVP owner'], ['admin', 'Party friend']]);
     runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $other = get_user_by('login', 'admin'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); foreach (array(array($owner, 'RSVP owner'), array($other, 'Party friend')) as $entry) { $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $entry[0]->user_email, 'display_name' => $entry[1], 'user_id' => $entry[0]->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); } update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
     runWpEval("global $wpdb; $now = current_time('mysql'); for ($i = 0; $i < 40; $i++) { $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => 'picker-' . $i . '@example.test', 'display_name' => 'Browse adult ' . $i, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); }");
     await logIn(page);
@@ -195,6 +238,7 @@ test.describe('party RSVP assignments', () => {
   });
 
   test('an unchanged host party save keeps the selected adults reserved', async ({ page }) => {
+    setTestDisplayNames([['admin', 'Party friend']]);
     runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $friend = get_user_by('login', 'admin'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); foreach (array(array($owner, 'RSVP owner'), array($friend, 'Party friend')) as $entry) { $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $entry[0]->user_email, 'display_name' => $entry[1], 'user_id' => $entry[0]->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); } $wpdb->replace(at_gathering_table(), array('user_id' => $owner->ID, 'status' => 'yes', 'guest_count' => 2, 'guest_names' => '', 'children_count' => 0, 'dietary' => '', 'foods' => '[]', 'food_amounts' => '{}', 'custom_food' => '', 'notes' => '', 'created_at' => $now, 'updated_at' => $now)); $owner_guest = at_gathering_roster_guest_by_user($owner->ID); $friend_guest = at_gathering_roster_guest_by_user($friend->ID); foreach (array(array($owner_guest->id, 1), array($friend_guest->id, 0)) as $assignment) { $wpdb->insert(at_gathering_assignments_table(), array('rsvp_user_id' => $owner->ID, 'guest_id' => $assignment[0], 'is_owner' => $assignment[1], 'created_at' => $now)); } update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
     await logInAsAdmin(page);
     await page.goto('/wp-admin/admin.php?page=at-gathering');
@@ -234,7 +278,8 @@ test.describe('party RSVP assignments', () => {
 
     await page.goto(`/signup/?at_setup=${setupToken}&at_rsvp_draft=${draft}`);
     await expect(page.getByText('Confirm your details to link your existing account to the invitation.')).toBeVisible();
-    await page.getByLabel('Display name').fill('RSVP owner');
+    await expect(page.getByLabel('Display name')).toHaveValue('guest');
+    await expect(page.getByLabel('Display name')).toHaveAttribute('readonly', '');
     await page.getByRole('button', { name: 'Set up account' }).click();
     await expect(page.getByRole('status')).toContainText('Your account is ready');
     const claimed = runWpEval("$owner = get_user_by('login', 'guest'); $guest = at_gathering_roster_guest_by_user($owner->ID); echo $guest && 'claimed' === $guest->claim_state ? 'claimed' : 'unclaimed';").trim();
@@ -245,6 +290,7 @@ test.describe('party RSVP assignments', () => {
   });
 
   test('assignment conflict rejects the full update', async ({ page }) => {
+    setTestDisplayNames([['admin', 'Reserved adult']]);
     runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $admin = get_user_by('login', 'admin'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); foreach (array(array($owner, 'RSVP owner'), array($admin, 'Reserved adult')) as $entry) { $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $entry[0]->user_email, 'display_name' => $entry[1], 'user_id' => $entry[0]->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); } $reserved_guest_id = (int) at_gathering_roster_guest_by_user($admin->ID)->id; update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint()); $wpdb->insert(at_gathering_assignments_table(), array('rsvp_user_id' => 999999, 'guest_id' => $reserved_guest_id, 'is_owner' => 0, 'created_at' => $now));");
     await logIn(page);
     await page.goto('/rsvp/');
@@ -270,6 +316,7 @@ test.describe('party RSVP assignments', () => {
   });
 
   test('an RSVP owner without an assignment row stays reserved to their own party', async ({ page }) => {
+    setTestDisplayNames([['admin', 'Reserved owner']]);
     runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $reserved_owner = get_user_by('login', 'admin'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); foreach (array(array($owner, 'RSVP owner'), array($reserved_owner, 'Reserved owner')) as $entry) { $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $entry[0]->user_email, 'display_name' => $entry[1], 'user_id' => $entry[0]->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); } $wpdb->replace(at_gathering_table(), array('user_id' => $reserved_owner->ID, 'status' => 'yes', 'guest_count' => 1, 'guest_names' => '', 'children_count' => 0, 'dietary' => '', 'foods' => '[]', 'food_amounts' => '{}', 'custom_food' => '', 'notes' => '', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
     await logIn(page);
     await page.goto('/rsvp/');
