@@ -417,7 +417,7 @@ function at_gathering_rsvp_shortcode() {
 					<label><input type="radio" name="at_status" value="no" <?php checked( $form_status, 'no' ); ?>> I can’t make it</label>
 				</div>
 			</fieldset>
-			<?php if ( $party_choices ) : ?>
+			<?php if ( at_gathering_party_choices_authorized() ) : ?>
 				<fieldset class="at-party-roster"><legend>Adults in your party</legend><p class="at-field-help">You’re included automatically. Search or browse to add the adults coming with you.</p>
 					<?php foreach ( $party_choices as $choice ) : $is_you = $linked_guest && (int) $linked_guest->id === (int) $choice->id; $is_unavailable = ! $is_you && in_array( (int) $choice->id, $unavailable_ids, true ); ?>
 						<label class="<?php echo $is_unavailable ? 'is-unavailable' : ''; ?>" data-party-owner="<?php echo $is_you ? 'true' : 'false'; ?>"><input type="checkbox" name="at_party_guest_ids[]" value="<?php echo esc_attr( $choice->id ); ?>" <?php checked( in_array( (int) $choice->id, $assigned_ids, true ) ); ?> <?php disabled( $is_you || $is_unavailable ); ?>> <span><?php echo esc_html( $choice->display_name ); ?><?php echo $is_you ? ' (you)' : ( $is_unavailable ? ' (already RSVP’d)' : '' ); ?></span></label>
