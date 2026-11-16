@@ -78,6 +78,20 @@ test('food settings remain labeled and fit phone, tablet, and desktop viewports'
   }
 });
 
+test('food settings preview automatic plural forms as units are edited', async ({ page }) => {
+  await logInAsAdmin(page);
+  await page.goto('/wp-admin/admin.php?page=at-gathering');
+
+  const firstRow = page.locator('.at-admin-foods tbody tr').first();
+  const unitInput = firstRow.locator('td').nth(1).locator('input');
+  const pluralPreview = firstRow.locator('.at-food-plural-preview');
+  await expect(pluralPreview).toContainText('Enter a unit or size');
+  await unitInput.fill('large tray');
+  await expect(pluralPreview).toContainText('large trays');
+  await unitInput.fill('berry');
+  await expect(pluralPreview).toContainText('berries');
+});
+
 test('an administrator can hide a claimed guest from the RSVP picker without deleting their RSVP', async ({ page }) => {
   runWpEval("global $wpdb; $email = 'picker-test@example.test'; $user_id = wp_insert_user(array('user_login' => 'picker-test', 'user_pass' => wp_generate_password(), 'user_email' => $email, 'display_name' => 'Picker Test Guest', 'role' => 'subscriber')); if (is_wp_error($user_id)) { WP_CLI::error($user_id->get_error_message()); } $now = current_time('mysql'); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $email, 'display_name' => 'Picker Test Guest', 'user_id' => $user_id, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); $wpdb->replace(at_gathering_table(), array('user_id' => $user_id, 'status' => 'yes', 'guest_count' => 1, 'guest_names' => '', 'children_count' => 0, 'dietary' => '', 'foods' => '[]', 'food_amounts' => '{}', 'custom_food' => '', 'notes' => '', 'created_at' => $now, 'updated_at' => $now));");
   try {

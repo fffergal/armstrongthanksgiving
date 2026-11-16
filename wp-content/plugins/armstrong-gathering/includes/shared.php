@@ -319,6 +319,8 @@ function at_gathering_admin_enqueue_assets( $hook_suffix ) {
 	}
 	$style_version = file_exists( AT_GATHERING_DIR . 'assets/gathering.css' ) ? filemtime( AT_GATHERING_DIR . 'assets/gathering.css' ) : AT_GATHERING_VERSION;
 	wp_enqueue_style( 'armstrong-gathering-admin', AT_GATHERING_URL . 'assets/gathering.css', array(), $style_version );
+	$script_version = file_exists( AT_GATHERING_DIR . 'assets/admin.js' ) ? filemtime( AT_GATHERING_DIR . 'assets/admin.js' ) : AT_GATHERING_VERSION;
+	wp_enqueue_script( 'armstrong-gathering-admin', AT_GATHERING_URL . 'assets/admin.js', array(), $script_version, true );
 }
 add_action( 'admin_enqueue_scripts', 'at_gathering_admin_enqueue_assets' );
 
