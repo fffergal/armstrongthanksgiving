@@ -169,6 +169,12 @@ through SSH, WP-CLI, the WordPress admin, or the deployment script. Use those
 paths only for an explicitly requested recovery or operational intervention.
 Do not use the online Theme File Editor for repository changes.
 
+Ad-hoc production data queries and changes that the admin page does not yet
+support may be carried out with WP-CLI and SQL queries. Confirm the production
+target and the affected records before making a change, keep writes narrowly
+scoped, and verify the result afterward. This allowance is for data operations;
+production code changes still follow the CI deployment process above.
+
 During an explicitly requested WordPress recovery or operational intervention,
 if WordPress says the component is already installed, follow the
 **Replace current with uploaded** link and verify the success notice. WordPress
