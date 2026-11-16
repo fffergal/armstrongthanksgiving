@@ -101,7 +101,7 @@
         chip.textContent = name + (status ? ' · ' + status.textContent.trim() : '') + (isOwner || choice.disabled ? '' : ' ×');
         if (!isOwner && !choice.disabled) {
           chip.type = 'button';
-          chip.setAttribute('aria-label', 'Remove ' + name + ' from your party');
+          chip.setAttribute('aria-label', 'Remove ' + name + ' from your party' + (status ? ' — ' + status.textContent.trim() : ''));
           chip.addEventListener('click', function () {
             choice.checked = false;
             choice.dispatchEvent(new Event('change', { bubbles: true }));

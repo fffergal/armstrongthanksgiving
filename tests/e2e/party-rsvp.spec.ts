@@ -117,25 +117,25 @@ test.describe('party RSVP assignments', () => {
     await nameField.fill('Alex Morgan');
     await emailField.fill('alex-invite@example.test');
     await page.getByRole('button', { name: 'Request invite' }).click();
-    await expect(page.getByRole('button', { name: 'Remove Alex Morgan from your party' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Remove Alex Morgan from your party — Host review pending', exact: true })).toBeVisible();
     await expect(page.locator('.at-party-invite-status')).toContainText('hosts will review');
 
     await nameField.fill('Taylor Reed');
     await emailField.fill('taylor-invite@example.test');
     await page.getByRole('button', { name: 'Request invite' }).click();
-    await expect(page.getByRole('button', { name: 'Remove Taylor Reed from your party' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Remove Taylor Reed from your party — Host review pending', exact: true })).toBeVisible();
     const mail = JSON.parse(runWpEval('echo wp_json_encode(get_transient("at_gathering_last_test_mail"));')) as { message: string };
     expect(mail.message).toContain('Taylor Reed');
     expect(mail.message).toContain('taylor-invite@example.test');
-    await page.getByRole('button', { name: 'Remove Alex Morgan from your party' }).click();
-    await expect(page.getByRole('button', { name: 'Remove Alex Morgan from your party' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Remove Alex Morgan from your party — Host review pending', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Remove Alex Morgan from your party — Host review pending', exact: true })).toHaveCount(0);
     await nameField.fill('Alex Morgan');
     await emailField.fill('alex-invite@example.test');
     await page.getByRole('button', { name: 'Request invite' }).click();
-    await expect(page.getByRole('button', { name: 'Remove Alex Morgan from your party' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Remove Alex Morgan from your party — Host review pending', exact: true })).toBeVisible();
     await expect(page.locator('.at-party-invite-status')).toContainText('was added back to your party');
-    await page.getByRole('button', { name: 'Remove Alex Morgan from your party' }).click();
-    await expect(page.getByRole('button', { name: 'Remove Alex Morgan from your party' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Remove Alex Morgan from your party — Host review pending', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Remove Alex Morgan from your party — Host review pending', exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Save my RSVP' }).click();
     await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
 
@@ -176,7 +176,7 @@ test.describe('party RSVP assignments', () => {
   });
 
   test('a pending party invite appears as a registered guest after the next page load', async ({ page }) => {
-    runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $owner->user_email, 'display_name' => 'RSVP owner', 'user_id' => $owner->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
+    runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); $wpdb->delete(at_gathering_table(), array('user_id' => $owner->ID)); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $owner->user_email, 'display_name' => 'RSVP owner', 'user_id' => $owner->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
     await logIn(page);
     await page.goto('/rsvp/');
     await page.getByRole('combobox', { name: 'Add an adult' }).fill('No matching name');
@@ -188,6 +188,7 @@ test.describe('party RSVP assignments', () => {
     runWpEval("global $wpdb; $guest = at_gathering_roster_guest_by_email('jordan-invite@example.test'); $wpdb->update(at_gathering_roster_table(), array('claim_state' => 'invited'), array('id' => $guest->id));");
     await page.reload();
     await expect(page.locator('.at-party-selected')).toContainText('Invitation sent · waiting for sign-up');
+    await expect(page.getByRole('button', { name: 'Remove Jordan Guest from your party — Invitation sent · waiting for sign-up', exact: true })).toBeVisible();
     runWpEval("global $wpdb; $guest = at_gathering_roster_guest_by_email('jordan-invite@example.test'); $user = wp_insert_user(array('user_login' => 'jordan-guest', 'user_pass' => wp_generate_password(), 'user_email' => 'jordan-invite@example.test', 'display_name' => 'Jordan Guest', 'role' => 'subscriber')); if (is_wp_error($user)) { WP_CLI::error($user->get_error_message()); } $wpdb->update(at_gathering_roster_table(), array('claim_state' => 'claimed', 'user_id' => $user), array('id' => $guest->id));");
     await page.reload();
     await expect(page.locator('.at-party-roster')).toContainText('Jordan Guest');
@@ -210,6 +211,7 @@ test.describe('party RSVP assignments', () => {
     runWpEval(`global $wpdb; $guest = at_gathering_roster_guest_by_email('${email}'); $now = current_time('mysql', true); $wpdb->update(at_gathering_roster_table(), array('claim_state' => 'invited', 'token_hash' => hash('sha256', '${setupToken}'), 'token_expires' => gmdate('Y-m-d H:i:s', time() + DAY_IN_SECONDS), 'updated_at' => $now), array('id' => $guest->id)); $claimed = at_gathering_claim_guest('${setupToken}', 'Independent Guest', 'cranberry-sauce-2026', 'cranberry-sauce-2026'); if (is_wp_error($claimed)) { WP_CLI::error($claimed->get_error_message()); }`);
     const invitationState = JSON.parse(runWpEval(`global $wpdb; $guest = at_gathering_roster_guest_by_email('${email}'); echo wp_json_encode(array('claim_state' => $guest->claim_state, 'assignment' => at_gathering_party_assignment_for_guest((int) $guest->id)));`)) as { claim_state: string; assignment: unknown };
     expect(invitationState).toEqual({ claim_state: 'claimed', assignment: null });
+    runWpEval(`global $wpdb; $owner = get_user_by('login', 'guest'); $guest = at_gathering_roster_guest_by_email('${email}'); $wpdb->insert(at_gathering_assignments_table(), array('rsvp_user_id' => $owner->ID, 'guest_id' => $guest->id, 'is_owner' => 0, 'created_at' => current_time('mysql', true)));`);
 
     await page.goto('/wp-login.php');
     await page.locator('#user_login').fill(email);
