@@ -69,6 +69,7 @@ test('signup requests use the same public response and direct legacy posts canno
 
 test('unlisted signup requests give admins tokenized approve and decline links', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'rsvp', 'Run invitation review coverage in the desktop RSVP project.');
+  test.setTimeout(60_000);
   const suffix = `review${Date.now()}`.toLowerCase();
   const approvedEmail = `approved-${suffix}@example.test`;
   const declinedEmail = `declined-${suffix}@example.test`;

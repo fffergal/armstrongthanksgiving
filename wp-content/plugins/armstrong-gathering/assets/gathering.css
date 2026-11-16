@@ -390,3 +390,4 @@
   cursor: pointer;
 }
 .at-party-leave-button:focus-visible { outline: 3px solid var(--at-form-focus); outline-offset: 2px; }
+.at-food-plural-preview { display: block; margin-top: 4px; }
