@@ -172,7 +172,7 @@
     search.addEventListener('blur', function () {
       if (!touchStart) closeOptions();
     });
-    inviteOpen.addEventListener('pointerdown', function (event) { if (event.pointerType === 'mouse') event.preventDefault(); });
+    inviteOpen.addEventListener('pointerdown', function (event) { event.preventDefault(); });
     inviteOpen.addEventListener('click', function () {
       inviteFields.hidden = false;
       invitePrompt.hidden = true;
