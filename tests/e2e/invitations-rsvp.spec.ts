@@ -117,10 +117,9 @@ test('unlisted signup requests give admins tokenized approve and decline links',
 
   const adminApprovedEmail = `admin-approved-${suffix}@example.test`;
   await request(adminApprovedEmail);
-  runWpEval(`global $wpdb; $wpdb->update(at_gathering_roster_table(), array('token_expires' => gmdate('Y-m-d H:i:s', time() - DAY_IN_SECONDS)), array('email_normalized' => ${php(adminApprovedEmail)}, 'claim_state' => 'requested'));`);
   const adminDeclinedEmail = `admin-declined-${suffix}@example.test`;
   await request(adminDeclinedEmail);
-  runWpEval(`global $wpdb; $wpdb->update(at_gathering_roster_table(), array('token_expires' => gmdate('Y-m-d H:i:s', time() - DAY_IN_SECONDS)), array('email_normalized' => ${php(adminDeclinedEmail)}, 'claim_state' => 'requested'));`);
+  runWpEval(`global $wpdb; foreach (array(${php(adminApprovedEmail)}, ${php(adminDeclinedEmail)}) as $email) { $wpdb->update(at_gathering_roster_table(), array('token_expires' => gmdate('Y-m-d H:i:s', time() - DAY_IN_SECONDS)), array('email_normalized' => $email, 'claim_state' => 'requested')); }`);
   await page.goto('/wp-admin/admin.php?page=at-gathering');
   const requestRow = page.getByRole('row').filter({ hasText: adminApprovedEmail });
   await expect(requestRow).toContainText('Expired');
