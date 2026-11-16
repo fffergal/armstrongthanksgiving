@@ -85,6 +85,7 @@ test('food settings preview automatic plural forms as units are edited', async (
   const firstRow = page.locator('.at-admin-foods tbody tr').first();
   const unitInput = firstRow.locator('td').nth(1).locator('input');
   const pluralPreview = firstRow.locator('.at-food-plural-preview');
+  await unitInput.fill('');
   await expect(pluralPreview).toContainText('Enter a unit or size');
   await unitInput.fill('large tray');
   await expect(pluralPreview).toContainText('large trays');
