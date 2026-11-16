@@ -129,6 +129,13 @@ test.describe('party RSVP assignments', () => {
     expect(mail.message).toContain('taylor-invite@example.test');
     await page.getByRole('button', { name: 'Remove Alex Morgan from your party' }).click();
     await expect(page.getByRole('button', { name: 'Remove Alex Morgan from your party' })).toHaveCount(0);
+    await nameField.fill('Alex Morgan');
+    await emailField.fill('alex-invite@example.test');
+    await page.getByRole('button', { name: 'Request invite' }).click();
+    await expect(page.getByRole('button', { name: 'Remove Alex Morgan from your party' })).toBeVisible();
+    await expect(page.locator('.at-party-invite-status')).toContainText('was added back to your party');
+    await page.getByRole('button', { name: 'Remove Alex Morgan from your party' }).click();
+    await expect(page.getByRole('button', { name: 'Remove Alex Morgan from your party' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Save my RSVP' }).click();
     await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
 
@@ -187,6 +194,34 @@ test.describe('party RSVP assignments', () => {
     await expect(page.locator('.at-party-selected')).toContainText('Jordan Guest');
     await expect(page.locator('.at-party-selected')).not.toContainText('Host review pending');
     await expect(page.getByRole('button', { name: 'Remove Jordan Guest from your party' })).toBeVisible();
+  });
+
+  test('a claimed invite can RSVP independently if the requester has not saved yet', async ({ page }) => {
+    const email = `unsaved-owner-${Date.now()}@example.test`;
+    const setupToken = 'c'.repeat(64);
+    runWpEval("global $wpdb; $owner = get_user_by('login', 'guest'); $now = current_time('mysql'); $wpdb->query('DELETE FROM ' . at_gathering_assignments_table()); $wpdb->query('DELETE FROM ' . at_gathering_roster_table()); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $owner->user_email, 'display_name' => 'RSVP owner', 'user_id' => $owner->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); update_option('at_gathering_party_reconciliation_complete', true); update_option('at_gathering_party_reconciliation_review_hash', at_gathering_party_legacy_names_fingerprint());");
+    await logIn(page);
+    await page.goto('/rsvp/');
+    await page.getByRole('combobox', { name: 'Add an adult' }).fill('Not listed');
+    await page.getByRole('button', { name: 'Request an invite' }).click();
+    await page.getByLabel('Their name').fill('Independent Guest');
+    await page.getByLabel('Their email').fill(email);
+    await page.getByRole('button', { name: 'Request invite' }).click();
+    runWpEval(`global $wpdb; $guest = at_gathering_roster_guest_by_email('${email}'); $now = current_time('mysql', true); $wpdb->update(at_gathering_roster_table(), array('claim_state' => 'invited', 'token_hash' => hash('sha256', '${setupToken}'), 'token_expires' => gmdate('Y-m-d H:i:s', time() + DAY_IN_SECONDS), 'updated_at' => $now), array('id' => $guest->id)); $claimed = at_gathering_claim_guest('${setupToken}', 'Independent Guest', 'cranberry-sauce-2026', 'cranberry-sauce-2026'); if (is_wp_error($claimed)) { WP_CLI::error($claimed->get_error_message()); }`);
+    const invitationState = JSON.parse(runWpEval(`global $wpdb; $guest = at_gathering_roster_guest_by_email('${email}'); echo wp_json_encode(array('claim_state' => $guest->claim_state, 'assignment' => at_gathering_party_assignment_for_guest((int) $guest->id)));`)) as { claim_state: string; assignment: unknown };
+    expect(invitationState).toEqual({ claim_state: 'claimed', assignment: null });
+
+    await page.goto('/wp-login.php');
+    await page.locator('#user_login').fill(email);
+    await page.locator('#user_pass').fill('cranberry-sauce-2026');
+    await page.locator('#wp-submit').click();
+    await page.waitForURL(url => !url.pathname.endsWith('/wp-login.php'));
+    await page.goto('/rsvp/');
+    await expect(page.getByRole('heading', { name: 'Will you join us?' })).toBeVisible();
+    await expect(page.locator('.at-party-included')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Save my RSVP' }).click();
+    await page.waitForURL(/\/rsvp-confirmation\/\?at_rsvp=saved/);
+    expect(runWpEval(`echo at_gathering_get_rsvp(get_user_by('email', '${email}')->ID) ? 'saved' : 'missing';`).trim()).toBe('saved');
   });
 
   test('signed-out RSVP entry asks for email and does not expose roster choices', async ({ page }) => {

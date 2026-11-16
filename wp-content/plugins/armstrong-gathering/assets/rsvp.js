@@ -207,9 +207,12 @@
           var guest = result.body.data.guest;
           var existingChoice = choices.find(function (choice) { return choice.value === String(guest.id); });
           if (existingChoice) {
+            existingChoice.checked = true;
+            existingChoice.dispatchEvent(new Event('change', { bubbles: true }));
+            renderSelected();
             inviteName.value = '';
             inviteEmail.value = '';
-            inviteStatus.textContent = guest.name + ' is already in your party.';
+            inviteStatus.textContent = result.body.data.reused ? guest.name + ' was added back to your party.' : guest.name + ' is already in your party.';
             inviteName.focus();
             return;
           }

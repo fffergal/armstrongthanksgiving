@@ -359,7 +359,7 @@ function at_gathering_rsvp_shortcode() {
 		global $wpdb;
 		$pending_party_choices = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT g.id, g.display_name, g.claim_state FROM " . at_gathering_assignments_table() . ' a INNER JOIN ' . at_gathering_roster_table() . " g ON g.id = a.guest_id WHERE a.rsvp_user_id = %d AND g.claim_state IN ('requested', 'invited') ORDER BY g.display_name ASC, g.id ASC",
+				"SELECT g.id, CASE WHEN g.user_id IS NOT NULL THEN account.display_name ELSE g.display_name END AS display_name, g.claim_state FROM " . at_gathering_assignments_table() . ' a INNER JOIN ' . at_gathering_roster_table() . ' g ON g.id = a.guest_id LEFT JOIN ' . $wpdb->users . " account ON account.ID = g.user_id WHERE a.rsvp_user_id = %d AND g.claim_state IN ('requested', 'invited') ORDER BY display_name ASC, g.id ASC",
 				$user->ID
 			)
 		);
@@ -372,9 +372,13 @@ function at_gathering_rsvp_shortcode() {
 	}
 	$can_view_contributors = $user->exists();
 	$guest_assignment = $linked_guest ? at_gathering_party_assignment_for_guest( (int) $linked_guest->id ) : null;
+	$included_party_rsvp = null;
 	$included_party_owner = null;
 	if ( $guest_assignment && ! (int) $guest_assignment->is_owner && (int) $guest_assignment->rsvp_user_id !== (int) $user->ID && ! $rsvp ) {
-		$included_party_owner = get_user_by( 'id', (int) $guest_assignment->rsvp_user_id );
+		$included_party_rsvp = at_gathering_get_rsvp( (int) $guest_assignment->rsvp_user_id );
+		if ( $included_party_rsvp ) {
+			$included_party_owner = get_user_by( 'id', (int) $guest_assignment->rsvp_user_id );
+		}
 	}
 
 	ob_start();
@@ -382,7 +386,11 @@ function at_gathering_rsvp_shortcode() {
 		<div class="at-rsvp-app" data-party-invite-url="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" data-party-invite-nonce="<?php echo esc_attr( wp_create_nonce( 'at_party_invitation' ) ); ?>" data-party-leave-nonce="<?php echo esc_attr( wp_create_nonce( 'at_leave_party' ) ); ?>">
 			<?php if ( $included_party_owner ) : ?>
 				<div class="at-party-included" data-party-leave-panel>
-					<p><strong>You’re included in <?php echo esc_html( $included_party_owner->display_name ); ?>’s RSVP.</strong> You don’t need to submit a separate RSVP to be counted.</p>
+					<?php if ( in_array( $included_party_rsvp->status, array( 'yes', 'maybe' ), true ) ) : ?>
+						<p><strong>You’re included in <?php echo esc_html( $included_party_owner->display_name ); ?>’s RSVP.</strong> You don’t need to submit a separate RSVP to be counted.</p>
+					<?php else : ?>
+						<p><strong><?php echo esc_html( $included_party_owner->display_name ); ?> has you listed in their RSVP, but they can’t make it.</strong> Remove yourself from their party if you’d like to submit your own RSVP.</p>
+					<?php endif; ?>
 					<button type="button" class="at-party-leave-button" data-party-leave>Remove me from their party</button>
 					<p class="at-party-leave-status" role="status" aria-live="polite"></p>
 				</div>
@@ -642,6 +650,31 @@ function at_gathering_save_rsvp() {
 	}
 	if ( ! at_gathering_party_choices_authorized() ) {
 		at_gathering_redirect_error( $return, 'Claim your invitation before saving a party RSVP.', $form_values );
+	}
+	$owner_assignment = at_gathering_party_assignment_for_guest( (int) $owner_guest->id );
+	if ( $owner_assignment && ! (int) $owner_assignment->is_owner && (int) $owner_assignment->rsvp_user_id !== (int) $user->ID && ! at_gathering_get_rsvp( (int) $owner_assignment->rsvp_user_id ) ) {
+		$released = at_gathering_transaction(
+			static function () use ( $wpdb, $owner_guest, $owner_assignment ) {
+				$table = at_gathering_assignments_table();
+				$locked = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE guest_id = %d LIMIT 1 FOR UPDATE", (int) $owner_guest->id ) );
+				if ( ! $locked ) {
+					return true;
+				}
+				if ( (int) $locked->rsvp_user_id !== (int) $owner_assignment->rsvp_user_id || (int) $locked->is_owner ) {
+					return new WP_Error( 'at_stale_party_reservation', 'This account is already reserved to another party. Please ask the hosts to review your RSVP.' );
+				}
+				$saved_rsvp = $wpdb->get_var( $wpdb->prepare( 'SELECT user_id FROM ' . at_gathering_table() . ' WHERE user_id = %d LIMIT 1 FOR UPDATE', (int) $locked->rsvp_user_id ) );
+				if ( $saved_rsvp ) {
+					return new WP_Error( 'at_stale_party_reservation', 'This account is already reserved to a saved RSVP. Please use the included guest prompt on that RSVP page.' );
+				}
+				return 1 === $wpdb->delete( $table, array( 'guest_id' => (int) $owner_guest->id, 'rsvp_user_id' => (int) $owner_assignment->rsvp_user_id, 'is_owner' => 0 ), array( '%d', '%d', '%d' ) )
+					? true
+					: new WP_Error( 'at_stale_party_reservation', 'The earlier party reservation could not be released. Please ask the hosts to review your RSVP.' );
+			}
+		);
+		if ( is_wp_error( $released ) ) {
+			at_gathering_redirect_error( $return, $released->get_error_message(), $form_values );
+		}
 	}
 	$party_guest_ids[] = (int) $owner_guest->id;
 	$party_guest_ids = array_values( array_unique( array_filter( array_map( 'absint', $party_guest_ids ) ) ) );
