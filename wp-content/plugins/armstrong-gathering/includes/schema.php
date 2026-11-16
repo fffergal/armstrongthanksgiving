@@ -236,8 +236,15 @@ function at_gathering_replace_party_assignments( $rsvp_user_id, $guest_ids, $wri
 		return new WP_Error( 'at_invalid_write_callback', 'The RSVP write callback must be callable.' );
 	}
 	foreach ( $guest_ids as $guest_id ) {
-		if ( ! at_gathering_roster_guest( $guest_id ) ) {
+		$guest = at_gathering_roster_guest( $guest_id );
+		if ( ! $guest ) {
 			return new WP_Error( 'at_roster_guest_not_found', 'One of the selected guests is no longer on the roster.' );
+		}
+		if ( 'claimed' !== $guest->claim_state ) {
+			$assignment = at_gathering_party_assignment_for_guest( $guest_id );
+			if ( ! in_array( $guest->claim_state, array( 'requested', 'invited' ), true ) || ! empty( $guest->user_id ) || ! $assignment || (int) $assignment->rsvp_user_id !== $rsvp_user_id ) {
+				return new WP_Error( 'at_roster_guest_not_found', 'One of the selected guests is no longer available.' );
+			}
 		}
 	}
 	return at_gathering_transaction(

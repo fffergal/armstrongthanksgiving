@@ -47,6 +47,94 @@ function at_gathering_party_roster_choices_endpoint() {
 	wp_send_json_success( $choices );
 }
 
+/** Queue a host-reviewed invitation and reserve the unclaimed guest to this party. */
+function at_gathering_request_party_invitation_endpoint() {
+	global $wpdb;
+	if ( ! is_user_logged_in() || ! at_gathering_party_choices_authorized() || ! check_ajax_referer( 'at_party_invitation', 'nonce', false ) ) {
+		wp_send_json_error( array( 'message' => 'Please sign in with a claimed guest account and try again.' ), 403 );
+	}
+	$name = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
+	$email = at_gathering_normalize_email( sanitize_email( wp_unslash( $_POST['email'] ?? '' ) ) );
+	if ( '' === $name || ! is_email( $email ) ) {
+		wp_send_json_error( array( 'message' => 'Enter their name and a valid email address.' ), 400 );
+	}
+	$user = wp_get_current_user();
+	$existing = at_gathering_roster_guest_by_email( $email );
+	if ( $existing ) {
+		$assignment = at_gathering_party_assignment_for_guest( (int) $existing->id );
+		if ( $assignment && (int) $assignment->rsvp_user_id === (int) $user->ID && in_array( $existing->claim_state, array( 'requested', 'invited' ), true ) ) {
+			wp_send_json_success(
+				array(
+					'guest' => array( 'id' => (int) $existing->id, 'name' => (string) $existing->display_name, 'state' => (string) $existing->claim_state ),
+					'reused' => true,
+				)
+			);
+		}
+		wp_send_json_error( array( 'message' => 'We couldn’t add someone with that email. They may already be invited or attached to another RSVP. If they can sign in, look for them in the list; otherwise ask the hosts to help.' ), 409 );
+	}
+	if ( ! function_exists( 'at_gathering_invitation_rate_limited' ) || at_gathering_invitation_rate_limited( $email ) ) {
+		wp_send_json_error( array( 'message' => 'Too many invite requests have been sent. Please try again later or ask the hosts to help.' ), 429 );
+	}
+	$queued = at_gathering_notify_admins_of_invitation_request( $email, '', false, $name );
+	if ( ! $queued ) {
+		wp_send_json_error( array( 'message' => 'We couldn’t request that invitation right now. Please try again or ask the hosts to help.' ), 503 );
+	}
+	$guest = at_gathering_roster_guest_by_email( $email );
+	if ( ! $guest || 'requested' !== $guest->claim_state ) {
+		wp_send_json_error( array( 'message' => 'We couldn’t request that invitation right now. Please ask the hosts to help.' ), 503 );
+	}
+	$assigned = at_gathering_transaction(
+		static function () use ( $wpdb, $guest, $user ) {
+			$assignment = at_gathering_party_assignment_for_guest( (int) $guest->id );
+			if ( $assignment ) {
+				return new WP_Error( 'at_party_invite_conflict', 'This guest is already assigned to another party.' );
+			}
+			$inserted = $wpdb->insert(
+				at_gathering_assignments_table(),
+				array( 'rsvp_user_id' => (int) $user->ID, 'guest_id' => (int) $guest->id, 'is_owner' => 0, 'created_at' => current_time( 'mysql', true ) ),
+				array( '%d', '%d', '%d', '%s' )
+			);
+			return 1 === $inserted ? true : new WP_Error( 'at_party_invite_conflict', 'This guest could not be reserved for your party.' );
+		}
+	);
+	if ( is_wp_error( $assigned ) ) {
+		wp_send_json_error( array( 'message' => 'We couldn’t add someone with that email. They may already be invited or attached to another RSVP. If they can sign in, look for them in the list; otherwise ask the hosts to help.' ), 409 );
+	}
+	wp_send_json_success(
+		array(
+			'guest' => array( 'id' => (int) $guest->id, 'name' => (string) $guest->display_name, 'state' => 'requested' ),
+			'reused' => false,
+		)
+	);
+}
+
+/** Let a claimed guest remove only their own non-owner assignment. */
+function at_gathering_leave_party_endpoint() {
+	global $wpdb;
+	if ( ! is_user_logged_in() || ! check_ajax_referer( 'at_leave_party', 'nonce', false ) ) {
+		wp_send_json_error( array( 'message' => 'Please refresh the page and try again.' ), 403 );
+	}
+	$user = wp_get_current_user();
+	$guest = at_gathering_roster_guest_by_user( $user->ID );
+	if ( ! $guest || at_gathering_get_rsvp( $user->ID ) ) {
+		wp_send_json_error( array( 'message' => 'This party assignment can’t be changed here.' ), 409 );
+	}
+	$result = at_gathering_transaction(
+		static function () use ( $wpdb, $guest, $user ) {
+			$table = at_gathering_assignments_table();
+			$assignment = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE guest_id = %d LIMIT 1 FOR UPDATE", (int) $guest->id ) );
+			if ( ! $assignment || (int) $assignment->is_owner || (int) $assignment->rsvp_user_id === (int) $user->ID ) {
+				return new WP_Error( 'at_party_assignment_unavailable', 'This party assignment can’t be changed here.' );
+			}
+			return 1 === $wpdb->delete( $table, array( 'guest_id' => (int) $guest->id, 'rsvp_user_id' => (int) $assignment->rsvp_user_id, 'is_owner' => 0 ), array( '%d', '%d', '%d' ) ) ? true : new WP_Error( 'at_party_assignment_unavailable', 'This party assignment could not be removed.' );
+		}
+	);
+	if ( is_wp_error( $result ) ) {
+		wp_send_json_error( array( 'message' => 'We couldn’t remove you from that party. Please refresh and try again.' ), 409 );
+	}
+	wp_send_json_success( array( 'message' => 'You’ve been removed from that party.' ) );
+}
+
 function at_gathering_admin_update_party() {
 	$user_id = absint( $_POST['at_rsvp_user_id'] ?? 0 );
 	if ( ! current_user_can( 'manage_options' ) || ! $user_id || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['at_party_update_nonce'] ?? '' ) ), 'at_party_update_' . $user_id ) ) {
@@ -262,9 +350,19 @@ function at_gathering_rsvp_shortcode() {
 			)
 		);
 	}
-	if ( ! array_key_exists( 'party_guest_ids', $values ) && $rsvp && at_gathering_party_choices_authorized() ) {
+	if ( ! array_key_exists( 'party_guest_ids', $values ) && at_gathering_party_choices_authorized() ) {
 		global $wpdb;
 		$assigned_ids = array_map( 'intval', $wpdb->get_col( $wpdb->prepare( 'SELECT guest_id FROM ' . at_gathering_assignments_table() . ' WHERE rsvp_user_id = %d', $user->ID ) ) );
+	}
+	$pending_party_choices = array();
+	if ( at_gathering_party_choices_authorized() ) {
+		global $wpdb;
+		$pending_party_choices = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT g.id, g.display_name, g.claim_state FROM " . at_gathering_assignments_table() . ' a INNER JOIN ' . at_gathering_roster_table() . " g ON g.id = a.guest_id WHERE a.rsvp_user_id = %d AND g.claim_state IN ('requested', 'invited') ORDER BY g.display_name ASC, g.id ASC",
+				$user->ID
+			)
+		);
 	}
 	if ( array_key_exists( 'party_guest_ids', $values ) ) {
 		$assigned_ids = array_map( 'intval', (array) $values['party_guest_ids'] );
@@ -273,13 +371,26 @@ function at_gathering_rsvp_shortcode() {
 		$assigned_ids[] = (int) $linked_guest->id;
 	}
 	$can_view_contributors = $user->exists();
+	$guest_assignment = $linked_guest ? at_gathering_party_assignment_for_guest( (int) $linked_guest->id ) : null;
+	$included_party_owner = null;
+	if ( $guest_assignment && ! (int) $guest_assignment->is_owner && (int) $guest_assignment->rsvp_user_id !== (int) $user->ID && ! $rsvp ) {
+		$included_party_owner = get_user_by( 'id', (int) $guest_assignment->rsvp_user_id );
+	}
 
 	ob_start();
 	?>
-	<div class="at-rsvp-app">
+		<div class="at-rsvp-app" data-party-invite-url="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" data-party-invite-nonce="<?php echo esc_attr( wp_create_nonce( 'at_party_invitation' ) ); ?>" data-party-leave-nonce="<?php echo esc_attr( wp_create_nonce( 'at_leave_party' ) ); ?>">
+			<?php if ( $included_party_owner ) : ?>
+				<div class="at-party-included" data-party-leave-panel>
+					<p><strong>You’re included in <?php echo esc_html( $included_party_owner->display_name ); ?>’s RSVP.</strong> You don’t need to submit a separate RSVP to be counted.</p>
+					<button type="button" class="at-party-leave-button" data-party-leave>Remove me from their party</button>
+					<p class="at-party-leave-status" role="status" aria-live="polite"></p>
+				</div>
+			<?php endif; ?>
 		<?php if ( isset( $_GET['at_rsvp'] ) && 'error' === sanitize_key( $_GET['at_rsvp'] ) ) : ?>
 			<div class="at-success at-error" role="alert"><strong>We could not save that RSVP.</strong><br><?php echo esc_html( sanitize_text_field( wp_unslash( $_GET['at_message'] ?? 'Please check the form and try again.' ) ) ); ?></div>
 		<?php endif; ?>
+		<?php if ( ! $included_party_owner ) : ?>
 		<form id="at-rsvp-form" class="at-rsvp-form" data-party-roster-nonce="<?php echo esc_attr( wp_create_nonce( 'at_party_roster_choices' ) ); ?>" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post">
 			<div class="at-rsvp-intro">
 				<h2>Will you join us?</h2>
@@ -301,7 +412,10 @@ function at_gathering_rsvp_shortcode() {
 			<?php if ( $party_choices ) : ?>
 				<fieldset class="at-party-roster"><legend>Adults in your party</legend><p class="at-field-help">You’re included automatically. Search or browse to add the adults coming with you.</p>
 					<?php foreach ( $party_choices as $choice ) : $is_you = $linked_guest && (int) $linked_guest->id === (int) $choice->id; $is_unavailable = ! $is_you && in_array( (int) $choice->id, $unavailable_ids, true ); ?>
-						<label class="<?php echo $is_unavailable ? 'is-unavailable' : ''; ?>"><input type="checkbox" name="at_party_guest_ids[]" value="<?php echo esc_attr( $choice->id ); ?>" <?php checked( in_array( (int) $choice->id, $assigned_ids, true ) ); ?> <?php disabled( $is_you || $is_unavailable ); ?>> <?php echo esc_html( $choice->display_name ); ?><?php echo $is_you ? ' (you)' : ( $is_unavailable ? ' (already RSVP’d)' : '' ); ?></label>
+						<label class="<?php echo $is_unavailable ? 'is-unavailable' : ''; ?>" data-party-owner="<?php echo $is_you ? 'true' : 'false'; ?>"><input type="checkbox" name="at_party_guest_ids[]" value="<?php echo esc_attr( $choice->id ); ?>" <?php checked( in_array( (int) $choice->id, $assigned_ids, true ) ); ?> <?php disabled( $is_you || $is_unavailable ); ?>> <span><?php echo esc_html( $choice->display_name ); ?><?php echo $is_you ? ' (you)' : ( $is_unavailable ? ' (already RSVP’d)' : '' ); ?></span></label>
+					<?php endforeach; ?>
+					<?php foreach ( $pending_party_choices as $choice ) : ?>
+						<label class="at-party-pending-choice" data-party-state="<?php echo esc_attr( $choice->claim_state ); ?>"><input type="checkbox" name="at_party_guest_ids[]" value="<?php echo esc_attr( $choice->id ); ?>" <?php checked( in_array( (int) $choice->id, $assigned_ids, true ) ); ?>><span><span data-party-name><?php echo esc_html( $choice->display_name ); ?></span> <small><?php echo 'requested' === $choice->claim_state ? 'Host review pending' : 'Invitation sent · waiting for sign-up'; ?></small></span></label>
 					<?php endforeach; ?>
 				</fieldset>
 			<?php elseif ( is_user_logged_in() && ! at_gathering_party_choices_authorized() ) : ?>
@@ -391,6 +505,7 @@ function at_gathering_rsvp_shortcode() {
 			<?php if ( ! $user->exists() ) : ?><p class="at-form-login-note at-form-login-note-top">Already claimed your invitation? <button class="at-link-button" type="submit" name="action" value="at_rsvp_signin" formnovalidate>Sign in first</button>. Your RSVP draft will be kept.</p><?php endif; ?>
 			<p class="at-form-actions at-rsvp-submit-actions"><button class="at-button" type="submit" name="action" value="at_save_rsvp"><?php echo $rsvp ? 'Update my RSVP' : 'Save my RSVP'; ?></button></p>
 		</form>
+		<?php endif; ?>
 	</div>
 	<?php
 	return ob_get_clean();
@@ -532,7 +647,9 @@ function at_gathering_save_rsvp() {
 	$party_guest_ids = array_values( array_unique( array_filter( array_map( 'absint', $party_guest_ids ) ) ) );
 	foreach ( $party_guest_ids as $guest_id ) {
 		$choice = at_gathering_roster_guest( $guest_id );
-		if ( ! $choice || 'claimed' !== $choice->claim_state ) {
+		$assignment = $choice ? at_gathering_party_assignment_for_guest( $guest_id ) : null;
+		$pending_for_this_party = $assignment && (int) $assignment->rsvp_user_id === (int) $user->ID && empty( $choice->user_id ) && in_array( $choice->claim_state, array( 'requested', 'invited' ), true );
+		if ( ! $choice || ( 'claimed' !== $choice->claim_state && ! $pending_for_this_party ) ) {
 			at_gathering_redirect_error( $return, 'One selected adult is no longer available. Please review the party choices.', $form_values );
 		}
 	}
@@ -816,5 +933,7 @@ function at_gathering_register_party_rsvps() {
 	add_action( 'admin_post_at_legacy_owner_link', 'at_gathering_admin_link_legacy_owner' );
 	add_action( 'wp_ajax_at_gathering_party_roster_choices', 'at_gathering_party_roster_choices_endpoint' );
 	add_action( 'wp_ajax_nopriv_at_gathering_party_roster_choices', 'at_gathering_party_roster_choices_endpoint' );
+	add_action( 'wp_ajax_at_gathering_request_party_invitation', 'at_gathering_request_party_invitation_endpoint' );
+	add_action( 'wp_ajax_at_gathering_leave_party', 'at_gathering_leave_party_endpoint' );
 }
 add_action( 'at_gathering_register_party_rsvps', 'at_gathering_register_party_rsvps' );
