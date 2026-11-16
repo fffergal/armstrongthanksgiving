@@ -2,10 +2,9 @@
   'use strict';
 
   var form = document.querySelector('.at-rsvp-form');
-  if (!form) return;
-
-  var roster = form.querySelector('.at-party-roster');
+  var roster = form ? form.querySelector('.at-party-roster') : null;
   if (roster) {
+    var app = form.closest('.at-rsvp-app');
     var choices = Array.from(roster.querySelectorAll('input[type="checkbox"]'));
     var selected = document.createElement('div');
     selected.className = 'at-party-selected';
@@ -26,15 +25,66 @@
     var message = document.createElement('p');
     message.className = 'at-field-help';
     message.setAttribute('role', 'status');
+    var invitePrompt = document.createElement('div');
+    invitePrompt.className = 'at-party-invite-prompt';
+    invitePrompt.hidden = true;
+    var invitePromptText = document.createElement('span');
+    invitePromptText.textContent = 'Can’t find who you’re looking for?';
+    var inviteOpen = document.createElement('button');
+    inviteOpen.type = 'button';
+    inviteOpen.className = 'at-link-button';
+    inviteOpen.textContent = 'Request an invite';
+    invitePrompt.append(invitePromptText, inviteOpen);
+    var inviteFields = document.createElement('div');
+    inviteFields.className = 'at-party-invite-fields';
+    inviteFields.hidden = true;
+    inviteFields.setAttribute('role', 'group');
+    inviteFields.setAttribute('aria-label', 'Request an invitation');
+    var inviteIntro = document.createElement('p');
+    inviteIntro.textContent = 'We’ll ask the hosts to review this request. If approved, they’ll email a sign-up link. Once the person claims it, they’ll appear here as a guest.';
+    var inviteAlternative = document.createElement('p');
+    inviteAlternative.className = 'at-party-invite-alternative';
+    inviteAlternative.textContent = 'Don’t have their email? Ask them to contact the hosts for an invitation. Once they claim it, you can add them from this list.';
+    var inviteNameLabel = document.createElement('label');
+    inviteNameLabel.textContent = 'Their name';
+    var inviteName = document.createElement('input');
+    inviteName.type = 'text';
+    inviteName.name = 'at_party_invite_name';
+    inviteName.autocomplete = 'name';
+    inviteNameLabel.append(inviteName);
+    var inviteEmailLabel = document.createElement('label');
+    inviteEmailLabel.textContent = 'Their email';
+    var inviteEmail = document.createElement('input');
+    inviteEmail.type = 'email';
+    inviteEmail.name = 'at_party_invite_email';
+    inviteEmail.autocomplete = 'email';
+    inviteEmailLabel.append(inviteEmail);
+    var inviteActions = document.createElement('div');
+    inviteActions.className = 'at-party-invite-actions';
+    var inviteSubmit = document.createElement('button');
+    inviteSubmit.type = 'button';
+    inviteSubmit.className = 'at-button';
+    inviteSubmit.textContent = 'Request invite';
+    var inviteCancel = document.createElement('button');
+    inviteCancel.type = 'button';
+    inviteCancel.className = 'at-link-button';
+    inviteCancel.textContent = 'Cancel';
+    inviteActions.append(inviteSubmit, inviteCancel);
+    var inviteStatus = document.createElement('p');
+    inviteStatus.className = 'at-party-invite-status';
+    inviteStatus.setAttribute('role', 'status');
+    inviteStatus.setAttribute('aria-live', 'polite');
+    inviteFields.append(inviteIntro, inviteAlternative, inviteNameLabel, inviteEmailLabel, inviteActions, inviteStatus);
     var active = -1;
     var matches = [];
     var touchStart = null;
     choices.forEach(function (choice) { choice.parentElement.hidden = true; });
     roster.classList.add('at-party-enhanced');
-    roster.append(selected, search, list, message);
+    roster.append(selected, search, list, invitePrompt, inviteFields, message);
 
     function closeOptions() {
       list.hidden = true;
+      invitePrompt.hidden = true;
       search.setAttribute('aria-expanded', 'false');
       search.removeAttribute('aria-activedescendant');
       active = -1;
@@ -42,13 +92,16 @@
     function renderSelected() {
       selected.replaceChildren();
       choices.filter(function (choice) { return choice.checked; }).forEach(function (choice) {
-        var chip = document.createElement(choice.disabled ? 'span' : 'button');
-        chip.className = 'at-party-chip';
-        chip.textContent = choice.parentElement.textContent.trim();
-        if (!choice.disabled) {
+        var nameNode = choice.parentElement.querySelector('[data-party-name]') || choice.parentElement.querySelector('span');
+        var name = (nameNode ? nameNode.textContent : choice.parentElement.textContent).trim();
+        var status = choice.parentElement.querySelector('small');
+        var isOwner = choice.parentElement.dataset.partyOwner === 'true';
+        var chip = document.createElement(isOwner || choice.disabled ? 'span' : 'button');
+        chip.className = 'at-party-chip' + (choice.parentElement.dataset.partyState ? ' is-pending' : '');
+        chip.textContent = name + (status ? ' · ' + status.textContent.trim() : '') + (isOwner || choice.disabled ? '' : ' ×');
+        if (!isOwner && !choice.disabled) {
           chip.type = 'button';
-          chip.textContent += ' ×';
-          chip.setAttribute('aria-label', 'Remove ' + choice.parentElement.textContent.trim());
+          chip.setAttribute('aria-label', 'Remove ' + name + ' from your party' + (status ? ' — ' + status.textContent.trim() : ''));
           chip.addEventListener('click', function () {
             choice.checked = false;
             choice.dispatchEvent(new Event('change', { bubbles: true }));
@@ -63,7 +116,7 @@
       active = -1;
       search.removeAttribute('aria-activedescendant');
       matches = choices.filter(function (choice) {
-        return !choice.checked && choice.parentElement.textContent.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase());
+        return !choice.checked && !choice.parentElement.dataset.partyState && choice.parentElement.textContent.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase());
       });
       list.replaceChildren();
       matches.forEach(function (choice) {
@@ -98,6 +151,7 @@
         list.append(option);
       });
       list.hidden = false;
+      invitePrompt.hidden = false;
       search.setAttribute('aria-expanded', 'true');
       var availableCount = matches.filter(function (choice) { return !choice.disabled; }).length;
       message.textContent = matches.length ? (availableCount ? '' : 'These guests already have an RSVP and can’t be added.') : 'No matching adults to add.';
@@ -117,6 +171,79 @@
     search.addEventListener('input', renderOptions);
     search.addEventListener('blur', function () {
       if (!touchStart) closeOptions();
+    });
+    inviteOpen.addEventListener('pointerdown', function (event) { if (event.pointerType === 'mouse') event.preventDefault(); });
+    inviteOpen.addEventListener('click', function () {
+      inviteFields.hidden = false;
+      invitePrompt.hidden = true;
+      inviteStatus.textContent = '';
+      inviteName.focus();
+    });
+    inviteCancel.addEventListener('click', function () {
+      inviteFields.hidden = true;
+      inviteName.value = '';
+      inviteEmail.value = '';
+      inviteStatus.textContent = '';
+      search.focus();
+    });
+    inviteSubmit.addEventListener('click', function () {
+      if (!inviteName.value.trim() || !inviteEmail.value.trim() || !inviteEmail.checkValidity()) {
+        inviteStatus.textContent = 'Enter their name and a valid email address.';
+        if (!inviteName.value.trim()) inviteName.focus();
+        else inviteEmail.focus();
+        return;
+      }
+      inviteSubmit.disabled = true;
+      inviteStatus.textContent = 'Sending request to the hosts…';
+      var payload = new FormData();
+      payload.set('action', 'at_gathering_request_party_invitation');
+      payload.set('nonce', app.dataset.partyInviteNonce);
+      payload.set('name', inviteName.value.trim());
+      payload.set('email', inviteEmail.value.trim());
+      fetch(app.dataset.partyInviteUrl, { method: 'POST', credentials: 'same-origin', body: payload })
+        .then(function (response) { return response.json().then(function (body) { return { ok: response.ok, body: body }; }); })
+        .then(function (result) {
+          if (!result.ok || !result.body.success) throw new Error(result.body.data && result.body.data.message ? result.body.data.message : 'We couldn’t request that invitation. Please try again or ask the hosts to help.');
+          var guest = result.body.data.guest;
+          var existingChoice = choices.find(function (choice) { return choice.value === String(guest.id); });
+          if (existingChoice) {
+            existingChoice.checked = true;
+            existingChoice.dispatchEvent(new Event('change', { bubbles: true }));
+            renderSelected();
+            inviteName.value = '';
+            inviteEmail.value = '';
+            inviteStatus.textContent = result.body.data.reused ? guest.name + ' was added back to your party.' : guest.name + ' is already in your party.';
+            inviteName.focus();
+            return;
+          }
+          var label = document.createElement('label');
+          label.className = 'at-party-pending-choice';
+          label.dataset.partyState = guest.state;
+          label.hidden = true;
+          var checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.name = 'at_party_guest_ids[]';
+          checkbox.value = String(guest.id);
+          checkbox.checked = true;
+          var labelText = document.createElement('span');
+          var guestName = document.createElement('span');
+          guestName.dataset.partyName = '';
+          guestName.textContent = guest.name;
+          var guestStatus = document.createElement('small');
+          guestStatus.textContent = guest.state === 'invited' ? 'Invitation sent · waiting for sign-up' : 'Host review pending';
+          labelText.append(guestName, document.createTextNode(' '), guestStatus);
+          label.append(checkbox, labelText);
+          roster.insertBefore(label, selected);
+          choices.push(checkbox);
+          checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+          renderSelected();
+          inviteName.value = '';
+          inviteEmail.value = '';
+          inviteStatus.textContent = result.body.data.reused ? guest.name + ' is already pending in your party.' : 'The hosts will review this request. Once approved, ' + guest.name + ' will receive a sign-up link.';
+          inviteName.focus();
+        })
+        .catch(function (error) { inviteStatus.textContent = error.message; })
+        .finally(function () { inviteSubmit.disabled = false; });
     });
     search.addEventListener('keydown', function (event) {
       if (event.key === 'Escape') { event.preventDefault(); closeOptions(); }
@@ -144,6 +271,7 @@
     closeOptions();
   }
 
+  if (form) {
   var touched = form.querySelector('[name="_at_rsvp_touched"]');
   function markRsvpTouched(event) {
     var field = event.target;
@@ -173,4 +301,27 @@
   form.addEventListener('input', syncFoodOffer);
   form.addEventListener('change', syncFoodOffer);
 
+  }
+
+  var leaveButton = document.querySelector('[data-party-leave]');
+  if (leaveButton) {
+    leaveButton.addEventListener('click', function () {
+      var panel = leaveButton.closest('[data-party-leave-panel]');
+      var status = panel.querySelector('.at-party-leave-status');
+      var app = leaveButton.closest('.at-rsvp-app');
+      leaveButton.disabled = true;
+      status.textContent = 'Removing you from their party…';
+      var payload = new FormData();
+      payload.set('action', 'at_gathering_leave_party');
+      payload.set('nonce', app.dataset.partyLeaveNonce);
+      fetch(app.dataset.partyInviteUrl, { method: 'POST', credentials: 'same-origin', body: payload })
+        .then(function (response) { return response.json().then(function (body) { return { ok: response.ok, body: body }; }); })
+        .then(function (result) {
+          if (!result.ok || !result.body.success) throw new Error(result.body.data && result.body.data.message ? result.body.data.message : 'We couldn’t remove you. Please refresh and try again.');
+          status.textContent = result.body.data.message;
+          window.setTimeout(function () { window.location.reload(); }, 600);
+        })
+        .catch(function (error) { status.textContent = error.message; leaveButton.disabled = false; });
+    });
+  }
 }());

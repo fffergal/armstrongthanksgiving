@@ -207,6 +207,14 @@ function at_gathering_claim_guest( $token, $display_name, $password = '', $passw
 			if ( 1 !== $updated ) {
 				return new WP_Error( 'at_claim_invalid', 'This setup link is invalid or expired.' );
 			}
+			$assignment = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . at_gathering_assignments_table() . ' WHERE guest_id = %d LIMIT 1 FOR UPDATE', (int) $locked->id ) );
+			$saved_rsvp = $assignment ? $wpdb->get_var( $wpdb->prepare( 'SELECT user_id FROM ' . at_gathering_table() . ' WHERE user_id = %d LIMIT 1 FOR UPDATE', (int) $assignment->rsvp_user_id ) ) : null;
+			if ( $assignment && ! (int) $assignment->is_owner && ! $saved_rsvp ) {
+				$released = $wpdb->delete( at_gathering_assignments_table(), array( 'guest_id' => (int) $locked->id, 'rsvp_user_id' => (int) $assignment->rsvp_user_id, 'is_owner' => 0 ), array( '%d', '%d', '%d' ) );
+				if ( 1 !== $released ) {
+					return new WP_Error( 'at_claim_assignment_conflict', 'The party reservation could not be released. Ask the hosts to review your RSVP.' );
+				}
+			}
 			return (int) $account_id;
 		}
 	);
@@ -304,9 +312,10 @@ function at_gathering_signup_shortcode() {
 }
 
 /** Queue an invite request for hosts without revealing roster membership publicly. */
-function at_gathering_notify_admins_of_invitation_request( $email, $draft_token = '', $continue_to_rsvp = false ) {
+function at_gathering_notify_admins_of_invitation_request( $email, $draft_token = '', $continue_to_rsvp = false, $display_name = '' ) {
 	global $wpdb;
 	$email = at_gathering_normalize_email( $email );
+	$display_name = sanitize_text_field( $display_name );
 	if ( ! is_email( $email ) ) {
 		return false;
 	}
@@ -327,10 +336,13 @@ function at_gathering_notify_admins_of_invitation_request( $email, $draft_token 
 		'updated_at'             => $now,
 	);
 	if ( $guest ) {
+		if ( $display_name ) {
+			$request_data['display_name'] = $display_name;
+		}
 		$stored = $wpdb->update( $roster_table, $request_data, array( 'id' => (int) $guest->id, 'claim_state' => 'requested' ) );
 	} else {
 		$request_data['email_normalized'] = $email;
-		$request_data['display_name'] = '';
+		$request_data['display_name'] = $display_name;
 		$request_data['claim_state'] = 'requested';
 		$request_data['user_id'] = null;
 		$request_data['created_at'] = $now;
@@ -366,6 +378,7 @@ function at_gathering_notify_admins_of_invitation_request( $email, $draft_token 
 		);
 	};
 	$message = '<p>Someone requested an invitation to the Armstrong Thanksgiving gathering.</p>'
+		. ( $display_name ? '<p>Name: <strong>' . esc_html( $display_name ) . '</strong></p>' : '' )
 		. '<p>Email address: <strong>' . esc_html( $email ) . '</strong></p>'
 		. '<p><a href="' . esc_url( $decision_url( 'approve' ) ) . '">Yes, add them to the invite list and send an invitation</a></p>'
 		. '<p><a href="' . esc_url( $decision_url( 'decline' ) ) . '">No, decline this request</a></p>'
@@ -378,7 +391,7 @@ function at_gathering_notify_admins_of_invitation_request( $email, $draft_token 
 }
 
 /** Process an invitation request without disclosing whether the address is listed. */
-function at_gathering_process_invitation_request( $email, $draft_token = '', $continue_to_rsvp = false ) {
+function at_gathering_process_invitation_request( $email, $draft_token = '', $continue_to_rsvp = false, $display_name = '' ) {
 	$email = at_gathering_normalize_email( $email );
 	if ( ! is_email( $email ) || at_gathering_invitation_rate_limited( $email ) ) {
 		return false;
@@ -388,7 +401,7 @@ function at_gathering_process_invitation_request( $email, $draft_token = '', $co
 		return at_gathering_send_claim_link( $email, $draft_token, $continue_to_rsvp );
 	}
 	if ( ! $guest || 'requested' === $guest->claim_state ) {
-		return at_gathering_notify_admins_of_invitation_request( $email, $draft_token, $continue_to_rsvp );
+		return at_gathering_notify_admins_of_invitation_request( $email, $draft_token, $continue_to_rsvp, $display_name );
 	}
 	return false;
 }
@@ -417,6 +430,40 @@ function at_gathering_render_invitation_request_review( $decision, $token, $emai
 	exit;
 }
 
+/** Decline a pending request and release its party reservation atomically. */
+function at_gathering_decline_invitation_request( $guest_id = 0, $token_hash = '' ) {
+	global $wpdb;
+	$table = at_gathering_roster_table();
+	return at_gathering_transaction(
+		static function () use ( $wpdb, $table, $guest_id, $token_hash ) {
+			$query = "SELECT * FROM {$table} WHERE claim_state = %s";
+			$args = array( 'requested' );
+			if ( $guest_id ) {
+				$query .= ' AND id = %d';
+				$args[] = absint( $guest_id );
+			}
+			if ( $token_hash ) {
+				$query .= ' AND token_hash = %s AND token_expires > %s';
+				$args[] = $token_hash;
+				$args[] = current_time( 'mysql', true );
+			}
+			$request = $wpdb->get_row( $wpdb->prepare( $query . ' LIMIT 1 FOR UPDATE', $args ) );
+			if ( ! $request ) {
+				return new WP_Error( 'at_invitation_request_resolved', 'This invitation request has already been handled or has expired.' );
+			}
+			$assignment_deleted = $wpdb->delete( at_gathering_assignments_table(), array( 'guest_id' => (int) $request->id ), array( '%d' ) );
+			if ( false === $assignment_deleted ) {
+				return new WP_Error( 'at_invitation_request_resolved', 'The party reservation could not be released.' );
+			}
+			$deleted = $wpdb->delete( $table, array( 'id' => (int) $request->id, 'claim_state' => 'requested' ), array( '%d', '%s' ) );
+			if ( 1 !== $deleted ) {
+				return new WP_Error( 'at_invitation_request_resolved', 'This invitation request has already been handled.' );
+			}
+			return $request;
+		}
+	);
+}
+
 /** Handle a host's tokenized decision without requiring a WordPress login. */
 function at_gathering_review_invitation_request() {
 	global $wpdb;
@@ -442,7 +489,9 @@ function at_gathering_review_invitation_request() {
 	if ( 'POST' !== $method || ! wp_verify_nonce( $nonce, $nonce_action ) ) {
 		wp_die( 'Please open the invitation request link again and confirm your choice.', 'Invitation request', array( 'response' => 403 ) );
 	}
-	$result = at_gathering_transaction(
+	$result = 'decline' === $decision
+		? at_gathering_decline_invitation_request( 0, $token_hash )
+		: at_gathering_transaction(
 		static function () use ( $wpdb, $table, $token_hash, $decision ) {
 			$request = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE token_hash = %s AND claim_state = %s AND token_expires > %s LIMIT 1 FOR UPDATE", $token_hash, 'requested', current_time( 'mysql', true ) ) );
 			if ( ! $request ) {
@@ -457,7 +506,7 @@ function at_gathering_review_invitation_request() {
 					array( '%d', '%s', '%s' )
 				);
 			} else {
-				$updated = $wpdb->delete( $table, array( 'id' => (int) $request->id, 'claim_state' => 'requested', 'token_hash' => $token_hash ) );
+				return new WP_Error( 'at_invitation_request_resolved', 'The invitation decision is not available.' );
 			}
 			if ( 1 !== $updated ) {
 				return new WP_Error( 'at_invitation_request_resolved', 'This invitation request has already been handled.' );
@@ -583,8 +632,8 @@ function at_gathering_save_invitation() {
 			$sent = at_gathering_send_claim_link( $guest->email_normalized, '', false, true );
 			$notice = $sent ? 'request_approved' : 'request_approved_email_failed';
 		} else {
-			$deleted = $wpdb->delete( $table, array( 'id' => $guest_id, 'claim_state' => 'requested' ), array( '%d', '%s' ) );
-			$notice = 1 === $deleted ? 'request_declined' : 'request_unavailable';
+			$declined = at_gathering_decline_invitation_request( $guest_id );
+			$notice = is_wp_error( $declined ) ? 'request_unavailable' : 'request_declined';
 		}
 		wp_safe_redirect( add_query_arg( 'at_invitation', $notice, admin_url( 'admin.php?page=at-gathering' ) ) );
 		exit;

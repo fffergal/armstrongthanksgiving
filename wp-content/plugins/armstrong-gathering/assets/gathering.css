@@ -336,3 +336,57 @@
 .at-party-options [role="option"]:hover,
 .at-party-options [aria-selected="true"] { background: #ead7bf; outline: 2px solid #8f4828; outline-offset: -2px; }
 .at-party-options[hidden] { display: none; }
+.at-party-invite-prompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .25rem .5rem;
+  margin-top: .55rem;
+  padding: .7rem .8rem;
+  border: 1px dashed #9b7967;
+  border-radius: .65rem;
+  background: #fff8ef;
+  color: #4c2518;
+}
+.at-party-invite-prompt[hidden],
+.at-party-invite-fields[hidden] { display: none; }
+.at-party-invite-fields {
+  display: grid;
+  gap: .7rem;
+  margin-top: .65rem;
+  padding: 1rem;
+  border: 1px solid #c8ad90;
+  border-radius: .75rem;
+  background: #fff8ef;
+}
+.at-party-invite-fields > p { margin: 0; }
+.at-party-invite-fields > label { display: grid; gap: .35rem; font-weight: 700; }
+.at-party-invite-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.at-party-invite-actions .at-button { min-height: 2.8rem; }
+.at-party-invite-status,
+.at-party-leave-status { margin: 0; color: #4c2518; }
+.at-party-pending-choice small { display: block; color: #6b564c; font-weight: 400; }
+.at-party-selected .at-party-chip.is-pending { border-style: dashed; background: #fff8ef; }
+.at-party-included {
+  display: grid;
+  justify-items: start;
+  gap: .55rem;
+  padding: 1rem 1.1rem;
+  border-left: .35rem solid #706e3d;
+  border-radius: .7rem;
+  background: #fff8ef;
+  color: #4c2518;
+}
+.at-party-included p { margin: 0; }
+.at-party-leave-button {
+  min-height: 2.7rem;
+  padding: .55rem .8rem;
+  border: 1px solid #9b7967;
+  border-radius: .6rem;
+  background: #fff;
+  color: #4c2518;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.at-party-leave-button:focus-visible { outline: 3px solid var(--at-form-focus); outline-offset: 2px; }

@@ -120,6 +120,7 @@ test('unlisted signup requests give admins tokenized approve and decline links',
   runWpEval(`global $wpdb; $wpdb->update(at_gathering_roster_table(), array('token_expires' => gmdate('Y-m-d H:i:s', time() - DAY_IN_SECONDS)), array('email_normalized' => ${php(adminApprovedEmail)}, 'claim_state' => 'requested'));`);
   const adminDeclinedEmail = `admin-declined-${suffix}@example.test`;
   await request(adminDeclinedEmail);
+  const adminDeclinedGuestId = Number(runWpEval(`global $wpdb; $owner = get_user_by('login', 'guest'); $owner_guest = at_gathering_roster_guest_by_user($owner->ID); if (! $owner_guest) { $now = current_time('mysql', true); $wpdb->insert(at_gathering_roster_table(), array('email_normalized' => $owner->user_email, 'display_name' => $owner->display_name, 'user_id' => $owner->ID, 'claim_state' => 'claimed', 'created_at' => $now, 'updated_at' => $now)); $owner_guest = at_gathering_roster_guest_by_user($owner->ID); } $pending = at_gathering_roster_guest_by_email(${php(adminDeclinedEmail)}); $wpdb->insert(at_gathering_assignments_table(), array('rsvp_user_id' => $owner->ID, 'guest_id' => $pending->id, 'is_owner' => 0, 'created_at' => current_time('mysql', true))); echo (int) $pending->id;`).trim());
   runWpEval(`global $wpdb; $wpdb->update(at_gathering_roster_table(), array('token_expires' => gmdate('Y-m-d H:i:s', time() - DAY_IN_SECONDS)), array('email_normalized' => ${php(adminDeclinedEmail)}, 'claim_state' => 'requested'));`);
   await page.goto('/wp-admin/admin.php?page=at-gathering');
   const requestRow = page.getByRole('row').filter({ hasText: adminApprovedEmail });
@@ -138,6 +139,7 @@ test('unlisted signup requests give admins tokenized approve and decline links',
   await declinedRequestRow.getByRole('button', { name: 'Decline' }).click();
   await expect(page).toHaveURL(/at_invitation=request_declined/);
   expect(runWpEval(`echo ! at_gathering_roster_guest_by_email(${php(adminDeclinedEmail)}) ? 'declined' : 'failed';`).trim()).toBe('declined');
+  expect(runWpEval(`global $wpdb; echo (int) $wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM ' . at_gathering_assignments_table() . ' WHERE guest_id = %d', ${adminDeclinedGuestId}));`).trim()).toBe('0');
 
   const declineMail = await request(declinedEmail);
   const declineLink = linkFor(declineMail, 'decline');
