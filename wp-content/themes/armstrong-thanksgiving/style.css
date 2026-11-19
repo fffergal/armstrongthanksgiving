@@ -69,9 +69,10 @@ button.at-button.is-secondary, input[type="submit"].at-button.is-secondary { bac
 .at-header-inner { position: relative; z-index: 1; max-width: 76rem; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 1.25rem; }
 .at-wordmark { display: inline-block; white-space: nowrap; text-decoration: none; font-size: clamp(1.05rem, 2vw, 1.5rem); font-weight: 700; letter-spacing: -.04em; color: var(--at-orange); }
 .at-wordmark span { color: var(--at-brown); }
-.at-nav { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .45rem; font-size: .86rem; font-weight: 700; }
+.at-nav { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: .45rem; font-size: .86rem; font-weight: 700; }
 .at-nav a { display: inline-block; padding: .45rem .7rem; color: var(--at-brown); text-decoration: none; border-radius: 999px; }
 .at-nav a:hover, .at-nav a:focus-visible { background: var(--at-orange); color: #fff; }
+.at-nav > p { margin: 0; }
 
 .at-main { min-height: 70vh; margin-block-start: 0; }
 .at-shell { width: min(100% - 2rem, 76rem); margin: 0 auto; }

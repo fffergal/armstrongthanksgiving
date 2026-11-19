@@ -188,6 +188,19 @@ function armstrong_thanksgiving_sign_out_shortcode() {
 }
 add_shortcode( 'at_sign_out', 'armstrong_thanksgiving_sign_out_shortcode' );
 
+function armstrong_thanksgiving_sign_in_shortcode() {
+	if ( is_user_logged_in() ) {
+		return '';
+	}
+
+	return sprintf(
+		'<a class="at-button" href="%s">%s</a>',
+		esc_url( wp_login_url() ),
+		esc_html__( 'Sign in', 'armstrong-thanksgiving' )
+	);
+}
+add_shortcode( 'at_sign_in', 'armstrong_thanksgiving_sign_in_shortcode' );
+
 /**
  * Give site emails the same warm, flyer-inspired treatment as the front end.
  *

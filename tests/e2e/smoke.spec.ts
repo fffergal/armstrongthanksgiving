@@ -18,6 +18,7 @@ test('hero keeps long words intact at tablet width', async ({ page }) => {
   await page.setViewportSize({ width: 1194, height: 834 });
   await logIn(page);
   await page.goto('/');
+  await expect(page.getByRole('link', { name: 'Sign in', exact: true })).toHaveCount(0);
   const word = page.locator('.at-hero h1 > span');
   await expect(word).toHaveCSS('white-space', 'nowrap');
   expect(await word.evaluate(element => element.getClientRects().length)).toBe(1);
@@ -51,6 +52,17 @@ test('front page keeps the navigation and content focused', async ({ page, reque
   await expect(page.locator('.at-hero')).not.toContainText('Priestfield');
   await expect(page.getByRole('link', { name: 'Open the forum' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'RSVP' }).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Sign in', exact: true })).toHaveAttribute('href', /\/wp-login\.php$/);
+  const nav = page.locator('.at-nav');
+  const headerBox = await page.locator('.at-site-header').boundingBox();
+  expect(headerBox).not.toBeNull();
+  expect(headerBox!.height).toBeLessThan(82);
+  const menuItemCenters = await Promise.all(['RSVP', 'Photos', 'Forum', 'Sign in'].map(async name => {
+    const box = await nav.getByRole('link', { name, exact: true }).boundingBox();
+    expect(box).not.toBeNull();
+    return box!.y + box!.height / 2;
+  }));
+  expect(Math.max(...menuItemCenters) - Math.min(...menuItemCenters)).toBeLessThan(1);
   await expect(page.getByRole('link', { name: 'Sign up without RSVP' })).toHaveAttribute('href', /\/signup\/$/);
   await expect(page.getByText('use the forum and shared photos')).toBeVisible();
   await expect(page.locator('.at-cards article').nth(0)).toContainText('Photos');
