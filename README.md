@@ -139,8 +139,9 @@ npm run deploy:production -- theme --confirm --activate
 npm run verify:production
 ```
 
-The local setup installs and activates WP Super Cache, and installs the WP-CLI
-package `wp-cli/wp-super-cache-cli`, when they are missing. The production
+The local setup installs and activates WP Super Cache. Local browser tests do
+not need the WP-CLI package `wp-cli/wp-super-cache-cli`; production deployment
+and block-editor publishing use its `wp super-cache` commands. The production
 prerequisites are the WP Super Cache plugin and that WP-CLI package; recreate
 the CLI package with:
 
@@ -148,12 +149,12 @@ the CLI package with:
 ssh dh_mbpyvr@armstrongthanksgiving.com 'wp package install wp-cli/wp-super-cache-cli'
 ```
 
-The current production and local installs resolve to `dev-main` commit
-`480d326`; check `wp package list` after recreating the package.
+The current production install resolves to `dev-main` commit `480d326`; check
+`wp package list` after recreating the package.
 
-The local page cache remains off by default so browser tests are deterministic;
-the `wp super-cache` commands are nevertheless available for cache-specific
-checks.
+The local page cache remains off by default so browser tests are deterministic.
+If you need to run cache-specific checks locally, install the package manually
+with `wp package install wp-cli/wp-super-cache-cli`.
 
 The command creates a ZIP from `HEAD`, uploads it to the production server,
 exports the database, archives the previous component, replaces the component,

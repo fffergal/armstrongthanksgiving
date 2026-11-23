@@ -17,12 +17,6 @@ function wp(args, { allowFailure = false } = {}) {
   return result;
 }
 
-function ensureCliPackage(packageName) {
-  const installed = wp(['package', 'list', '--fields=name', '--format=csv'], { allowFailure: true });
-  const packages = installed.stdout?.split(/\r?\n/).map(value => value.trim()).filter(Boolean) ?? [];
-  if (!packages.includes(packageName)) wp(['package', 'install', packageName]);
-}
-
 function ensurePlugin(pluginSlug) {
   if (wp(['plugin', 'is-installed', pluginSlug], { allowFailure: true }).status !== 0) {
     wp(['plugin', 'install', pluginSlug]);
@@ -30,10 +24,8 @@ function ensurePlugin(pluginSlug) {
   wp(['plugin', 'activate', pluginSlug]);
 }
 
-// The GitHub Actions CLI image does not include git, which the package's VCS
-// install needs. Browser tests only need the plugin itself; production
-// deployment checks install and verify the WP-CLI package on the server.
-if (!process.env.CI && !process.env.SKIP_WP_CLI_PACKAGE) ensureCliPackage('wp-cli/wp-super-cache-cli');
+// Local setup and browser tests need the plugin, but not its optional WP-CLI
+// package. Production deployment verifies and uses that package on the server.
 ensurePlugin('wp-super-cache');
 wp(['theme', 'activate', 'armstrong-thanksgiving']);
 wp(['plugin', 'activate', 'bbpress.latest-stable', 'wp-photo-album-plus.latest-stable', 'jonradio-private-site.latest-stable', 'armstrong-gathering']);
